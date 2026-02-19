@@ -88,13 +88,14 @@ CREATE TABLE convoys (
 CREATE TABLE tasks (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    task_type VARCHAR(50) NOT NULL, -- 'production', 'trade', 'exploration', 'upgrade'
+    type VARCHAR(50) NOT NULL,
     description TEXT NOT NULL,
-    requirements JSONB NOT NULL, -- {type: value}
-    rewards JSONB NOT NULL, -- {resource: amount}
+    target INTEGER DEFAULT 1,
     progress FLOAT DEFAULT 0,
+    reward_gold INTEGER DEFAULT 0,
+    reward_experience INTEGER DEFAULT 0,
     completed BOOLEAN DEFAULT FALSE,
-    expires_at TIMESTAMP,
+    claimed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
