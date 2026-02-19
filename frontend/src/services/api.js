@@ -126,4 +126,13 @@ export const autoProductionAPI = {
   tick: (userId) => api.post('/auto-production/tick', { userId }),
 };
 
+// Admin API
+export const adminAPI = {
+  getUsers: () => api.get('/admin/users'),
+  getStats: () => api.get('/admin/stats'),
+  updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  updateResources: (id, data) => api.put(`/admin/users/${id}/resources`, data),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+};
+
 export default api;
