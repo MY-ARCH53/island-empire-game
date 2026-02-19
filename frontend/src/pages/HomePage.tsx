@@ -1,0 +1,749 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Coins, TreePine, Apple, Zap, LogOut, Play, Package, X } from 'lucide-react';
+import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI } from '../services/api';
+import { useToast } from '../contexts/ToastContext';
+import { fireConfetti, fireRewardConfetti } from '../utils/confetti';
+import DailyRewardModal from '../components/DailyRewardModal';
+
+// ── Sabit veri ──────────────────────────────────────────────────────────────
+
+const RESOURCE_CFG: any = {
+  gold:   { icon: Coins,    color: '#f59e0b', label: 'Altın'   },
+  wood:   { icon: TreePine, color: '#10b981', label: 'Odun'    },
+  food:   { icon: Apple,    color: '#ef4444', label: 'Yiyecek' },
+  energy: { icon: Zap,      color: '#06b6d4', label: 'Enerji'  },
+};
+
+const BUILDING_CFG: any = {
+  trafo:          { emoji: '⚡', color: '#06b6d4', label: 'Enerji',  bg: 'rgba(6,182,212,0.12)',  border: 'rgba(6,182,212,0.35)'  },
+  tarla:          { emoji: '🌾', color: '#22c55e', label: 'Yiyecek', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.35)'  },
+  odun_fabrikasi: { emoji: '🪵', color: '#f59e0b', label: 'Odun',   bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)' },
+  maden:          { emoji: '⛏️', color: '#eab308', label: 'Altın',   bg: 'rgba(234,179,8,0.12)',  border: 'rgba(234,179,8,0.35)'  },
+};
+
+const NAV_ITEMS = [
+  { key: 'tasks',       emoji: '📋', label: 'Görevler'  },
+  { key: 'discover',    emoji: '🗺️', label: 'Keşif'    },
+  { key: 'battle',      emoji: '⚔️', label: 'Savaş'    },
+  { key: 'market',      emoji: '🏪', label: 'Pazar'     },
+  { key: 'leaderboard', emoji: '🏆', label: 'Liderlik'  },
+  { key: 'friends',     emoji: '👥', label: 'Arkadaş'   },
+  { key: 'guild',       emoji: '🏰', label: 'Guild'     },
+];
+
+// ── Yardımcı: MM:SS timer ───────────────────────────────────────────────────
+
+function formatTimer(ms: number): string {
+  if (ms <= 0) return '00:00';
+  const totalSec = Math.ceil(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// ── Bileşen ─────────────────────────────────────────────────────────────────
+
+function HomePage() {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  const [user, setUser]               = useState<any>(null);
+  const [islands, setIslands]         = useState<any[]>([]);
+  const [resources, setResources]     = useState<any[]>([]);
+  const [buildings, setBuildings]     = useState<any[]>([]);
+  const [productions, setProductions] = useState<any>({});
+  const [discoverableIslands, setDiscoverableIslands] = useState<any[]>([]);
+  const [tasks, setTasks]             = useState<any[]>([]);
+  const [selectedIslandId, setSelectedIslandId] = useState<number | null>(null);
+  const selectedIslandIdRef = useRef<number | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [activePanel, setActivePanel] = useState<string | null>(null); // 'tasks' | 'discover'
+  const [showDailyReward, setShowDailyReward] = useState(false);
+  const [dailyRewardData, setDailyRewardData] = useState<any>(null);
+  const [autoProduction, setAutoProduction]   = useState<{ active: boolean; endsAt: string | null; remainingMs: number }>({ active: false, endsAt: null, remainingMs: 0 });
+  const [attackNotifications, setAttackNotifications] = useState(0);
+
+  // Saniye ticker → timer görsel güncellemesi
+  useEffect(() => {
+    const ticker = setInterval(() => setBuildings(prev => [...prev]), 1000);
+    return () => clearInterval(ticker);
+  }, []);
+
+  // Veri yükleme döngüsü
+  useEffect(() => {
+    loadGameData();
+    const interval = setInterval(loadGameData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Upgrade otomatik tamamlama
+  useEffect(() => {
+    buildings.forEach(b => {
+      if (b.status === 'upgrading' && b.upgrade_completes_at) {
+        if (new Date() >= new Date(b.upgrade_completes_at)) {
+          handleCompleteUpgrade(b.id);
+        }
+      }
+    });
+  }, [buildings]);
+
+  // ── Veri yükleme ──────────────────────────────────────────────────────────
+
+  const loadGameData = async () => {
+    try {
+      const token    = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      if (!token || !userData) { navigate('/login'); return; }
+
+      const u = JSON.parse(userData);
+      setUser(u);
+
+      const [islandsRes, resourcesRes, discoverableRes, tasksRes] = await Promise.all([
+        gameAPI.getIslands(u.id),
+        gameAPI.getResources(u.id),
+        gameAPI.getDiscoverableIslands(u.id),
+        taskAPI.getTasks(u.id),
+      ]);
+
+      const islandsData = islandsRes.data.data.islands;
+      setIslands(islandsData);
+      setResources(resourcesRes.data.data.resources);
+      setDiscoverableIslands(discoverableRes.data.data.islands);
+      setTasks(tasksRes.data.data.tasks);
+
+      if (islandsData.length > 0) {
+        const currentId = selectedIslandIdRef.current || islandsData[0].id;
+        selectedIslandIdRef.current = currentId;
+        setSelectedIslandId(currentId);
+        await loadIslandBuildings(currentId);
+      }
+
+      try {
+        const dr = await dailyRewardAPI.check(u.id);
+        if (dr.data.data.canClaim) { setDailyRewardData(dr.data.data); setShowDailyReward(true); }
+      } catch {}
+
+      // Otomatik üretim: durum al + tick işlet
+      try {
+        const apRes = await autoProductionAPI.getStatus(u.id);
+        const apData = apRes.data.data;
+        setAutoProduction(apData);
+        if (apData.active) {
+          await autoProductionAPI.tick(u.id);
+        }
+      } catch {}
+
+      // Savaş bildirimi: saldırıya uğrama sayısı
+      try {
+        const unreadRes = await battleAPI.getUnreadAttacks(u.id);
+        setAttackNotifications(unreadRes.data.data.count);
+      } catch {}
+
+      setLoading(false);
+    } catch { setLoading(false); }
+  };
+
+  const loadIslandBuildings = async (islandId: number) => {
+    const buildingsRes = await gameAPI.getBuildings(islandId);
+    const bList = buildingsRes.data.data.buildings;
+    setBuildings(bList);
+
+    const prodsData: any = {};
+    for (const b of bList) {
+      const prodRes = await productionAPI.getBuildingProductions(b.id);
+      const active = prodRes.data.data.productions.find((p: any) => !p.collected);
+      if (active) prodsData[b.id] = active;
+    }
+    setProductions(prodsData);
+  };
+
+  const handleIslandChange = async (id: number) => {
+    selectedIslandIdRef.current = id;
+    setSelectedIslandId(id);
+    await loadIslandBuildings(id);
+  };
+
+  // ── Üretim işlemleri ──────────────────────────────────────────────────────
+
+  const handleStartProduction = async (buildingId: number) => {
+    try {
+      await productionAPI.startProduction(buildingId);
+      if (user) await taskAPI.updateProgress(user.id, 'daily_production');
+      showToast('Üretim başladı!', 'success');
+      loadGameData();
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Üretim başlatılamadı', 'error');
+    }
+  };
+
+  const handleCollectProduction = async (productionId: number) => {
+    if (!user) return;
+    try {
+      const res = await productionAPI.collectProduction(productionId, user.id);
+      showToast(res.data.message, 'success');
+      loadGameData();
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Toplanamadı', 'error');
+    }
+  };
+
+  const handleUpgradeBuilding = async (buildingId: number) => {
+    if (!user) return;
+    try {
+      const res = await gameAPI.upgradeBuilding(buildingId, user.id);
+      await taskAPI.updateProgress(user.id, 'daily_upgrade');
+      showToast(res.data.message, 'success');
+      loadGameData();
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Yükseltme başarısız', 'error');
+    }
+  };
+
+  const handleCompleteUpgrade = async (buildingId: number) => {
+    try { await gameAPI.completeUpgrade(buildingId); loadGameData(); } catch {}
+  };
+
+  // ── Ada keşfi ─────────────────────────────────────────────────────────────
+
+  const handleDiscoverIsland = async (island: any) => {
+    if (!user) return;
+    try {
+      const res = await gameAPI.discoverIsland(user.id, island.name, island.type, island.specialty, island.bonus);
+      fireConfetti();
+      showToast(res.data.message, 'success');
+      setActivePanel(null);
+      loadGameData();
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Keşif başarısız', 'error');
+    }
+  };
+
+  // ── Görevler ──────────────────────────────────────────────────────────────
+
+  const handleClaimReward = async (taskId: number) => {
+    if (!user) return;
+    try {
+      const res = await taskAPI.claimReward(taskId, user.id);
+      fireRewardConfetti();
+      showToast(res.data.message, 'success');
+      loadGameData();
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Ödül toplanamadı', 'error');
+    }
+  };
+
+  const handleClaimDailyReward = async () => {
+    if (!user) return;
+    try {
+      const res = await dailyRewardAPI.claim(user.id);
+      showToast(res.data.message, 'success');
+      setShowDailyReward(false);
+      loadGameData();
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Ödül alınamadı', 'error');
+    }
+  };
+
+  const handleActivateAutoProduction = async () => {
+    if (!user) return;
+    try {
+      const res = await autoProductionAPI.activate(user.id);
+      showToast(res.data.message, 'success');
+      fireConfetti();
+      loadGameData();
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Otomatik üretim başlatılamadı', 'error');
+    }
+  };
+
+  // ── Üretim durumu ─────────────────────────────────────────────────────────
+
+  const getProductionStatus = (building: any) => {
+    const prod = productions[building.id];
+    if (!prod) return { status: 'idle', timerText: '', canCollect: false, percent: 0, productionId: null };
+
+    const now        = Date.now();
+    const completesAt = new Date(prod.completes_at).getTime();
+    const startedAt  = new Date(prod.started_at).getTime();
+    const remaining  = completesAt - now;
+    const total      = completesAt - startedAt;
+    const percent    = Math.min(100, Math.max(0, ((total - remaining) / total) * 100));
+
+    if (remaining <= 0) return { status: 'ready', timerText: 'Hazır!', canCollect: true, percent: 100, productionId: prod.id };
+    return { status: 'producing', timerText: formatTimer(remaining), canCollect: false, percent, productionId: null };
+  };
+
+  const getUpgradeTimerText = (building: any): string | null => {
+    if (building.status !== 'upgrading' || !building.upgrade_completes_at) return null;
+    const remaining = new Date(building.upgrade_completes_at).getTime() - Date.now();
+    return remaining <= 0 ? 'Hazır!' : formatTimer(remaining);
+  };
+
+  const getUpgradePercent = (building: any): number => {
+    if (building.status !== 'upgrading' || !building.upgrade_completes_at || !building.upgrade_started_at) return 0;
+    const remaining = new Date(building.upgrade_completes_at).getTime() - Date.now();
+    const total     = new Date(building.upgrade_completes_at).getTime() - new Date(building.upgrade_started_at).getTime();
+    return Math.min(100, Math.max(0, ((total - remaining) / total) * 100));
+  };
+
+  // ── Nav aksiyonu ──────────────────────────────────────────────────────────
+
+  const handleNavAction = (key: string) => {
+    if (key === 'tasks' || key === 'discover') {
+      setActivePanel(activePanel === key ? null : key);
+    } else if (key === 'market')       navigate('/marketplace');
+    else if (key === 'leaderboard')    navigate('/leaderboard');
+    else if (key === 'battle')         navigate('/battle');
+    else if (key === 'friends')        navigate('/friends');
+    else if (key === 'guild')          navigate('/guilds');
+  };
+
+  // ── Loading ───────────────────────────────────────────────────────────────
+
+  if (loading) return (
+    <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e3a5f,#0f172a)' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div className="spinner" style={{ margin: '0 auto 16px' }} />
+        <p style={{ color: '#93c5fd', fontWeight: 600 }}>Yükleniyor...</p>
+      </div>
+    </div>
+  );
+
+  if (!user) return null;
+
+  const currentIsland = islands.find(i => i.id === selectedIslandId) || islands[0];
+  const activeTasks   = tasks.filter(t => !t.claimed).length;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div style={{ minHeight: '100svh', background: 'linear-gradient(160deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%)', display: 'flex', flexDirection: 'column' }}>
+
+      {/* ════════════ HEADER ════════════ */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 40,
+        background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        padding: '10px 16px 0',
+      }}>
+        {/* Üst satır: Avatar + kullanıcı + çıkış */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'linear-gradient(135deg,#f59e0b,#ef4444)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, boxShadow: '0 0 12px rgba(245,158,11,0.4)',
+            }}>⛵</div>
+            <div>
+              <p style={{ color: '#fff', fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>{user.username}</p>
+              <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                <Pill color="#3b82f6">Sv.{user.level}</Pill>
+                <Pill color="#8b5cf6">{user.league}</Pill>
+                <Pill color="#10b981">{islands.length} Ada</Pill>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }}
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#94a3b8', cursor: 'pointer' }}
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+
+        {/* Kaynaklar */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, paddingBottom: 10 }}>
+          {['gold', 'wood', 'food', 'energy'].map(type => {
+            const res = resources.find((r: any) => r.resource_type === type);
+            const cfg = RESOURCE_CFG[type];
+            if (!cfg || !res) return null;
+            const Icon = cfg.icon;
+            return (
+              <div key={type} style={{
+                background: `${cfg.color}18`, border: `1px solid ${cfg.color}40`,
+                borderRadius: 10, padding: '6px 8px',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <Icon size={14} color={cfg.color} style={{ flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 9, color: '#94a3b8', lineHeight: 1 }}>{cfg.label}</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: cfg.color, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {Math.floor(res.amount).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </header>
+
+      {/* ════════════ ANA İÇERİK ════════════ */}
+      <main style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', paddingBottom: 100 }}>
+
+        {/* Ada sekmeleri */}
+        {islands.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 14, paddingBottom: 2 }}>
+            {islands.map(island => (
+              <button
+                key={island.id}
+                onClick={() => handleIslandChange(island.id)}
+                style={{
+                  flexShrink: 0, padding: '7px 14px', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
+                  ...(island.id === selectedIslandId
+                    ? { background: 'linear-gradient(135deg,#3b82f6,#06b6d4)', color: '#fff', boxShadow: '0 4px 14px rgba(59,130,246,0.4)' }
+                    : { background: 'rgba(255,255,255,0.07)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.10)' }),
+                }}
+              >
+                🏝️ {island.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Seçili ada başlığı */}
+        {currentIsland && (
+          <div style={{
+            background: 'linear-gradient(135deg,rgba(59,130,246,0.18),rgba(6,182,212,0.12))',
+            border: '1px solid rgba(59,130,246,0.30)', borderRadius: 16,
+            padding: '12px 14px', marginBottom: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <p style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>🏝️ {currentIsland.name}</p>
+              <p style={{ color: '#93c5fd', fontSize: 12, marginTop: 2 }}>{currentIsland.specialty}</p>
+            </div>
+            <span style={{ background: 'rgba(59,130,246,0.25)', color: '#93c5fd', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20 }}>
+              Sv.{currentIsland.level}
+            </span>
+          </div>
+        )}
+
+        {/* ── Otomatik Üretim Kartı ── */}
+        <div style={{
+          background: autoProduction.active
+            ? 'linear-gradient(135deg,rgba(6,182,212,0.15),rgba(59,130,246,0.10))'
+            : 'rgba(255,255,255,0.03)',
+          border: autoProduction.active
+            ? '1px solid rgba(6,182,212,0.45)'
+            : '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 16, padding: '14px 16px', marginBottom: 14,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 26 }}>⚡</span>
+            <div>
+              <p style={{ color: autoProduction.active ? '#06b6d4' : '#94a3b8', fontWeight: 700, fontSize: 13 }}>
+                Otomatik Üretim
+                {autoProduction.active && (
+                  <span style={{ marginLeft: 6, background: 'rgba(6,182,212,0.25)', color: '#06b6d4', fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>AKTİF</span>
+                )}
+              </p>
+              {autoProduction.active ? (
+                <p style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+                  Kalan: {(() => {
+                    const totalSec = Math.ceil(autoProduction.remainingMs / 1000);
+                    const h = Math.floor(totalSec / 3600);
+                    const m = Math.floor((totalSec % 3600) / 60);
+                    const s = totalSec % 60;
+                    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+                  })()}
+                </p>
+              ) : (
+                <p style={{ color: '#475569', fontSize: 11, marginTop: 2 }}>💡 1000 enerji · ⏱ 4 saat</p>
+              )}
+            </div>
+          </div>
+          {!autoProduction.active && (
+            <button
+              onClick={handleActivateAutoProduction}
+              style={{
+                background: 'linear-gradient(135deg,#06b6d4,#3b82f6)', border: 'none', borderRadius: 10,
+                color: '#fff', fontWeight: 700, fontSize: 12, padding: '8px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              Etkinleştir
+            </button>
+          )}
+        </div>
+
+        {/* Bina kartları 2×2 */}
+        {buildings.length > 0 && (
+          <>
+            <p style={{ color: '#64748b', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Binalar</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+              {buildings.map(building => {
+                const ps  = getProductionStatus(building);
+                const upgradeText    = getUpgradeTimerText(building);
+                const upgradePercent = getUpgradePercent(building);
+                const cfg = BUILDING_CFG[building.type] || { emoji: '🏠', color: '#64748b', label: building.production_type, bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.30)' };
+                const cost = { gold: 200 * building.level, wood: 100 * building.level };
+
+                return (
+                  <div key={building.id} style={{
+                    background: cfg.bg, border: `1px solid ${cfg.border}`,
+                    borderRadius: 18, padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+                  }}>
+                    {/* Emoji + isim + seviye */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 26, lineHeight: 1 }}>{cfg.emoji}</span>
+                        <div>
+                          <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 13, lineHeight: 1.2 }}>{building.name}</p>
+                          <p style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>+{Math.floor(building.production_rate)} {cfg.label}/s</p>
+                        </div>
+                      </div>
+                      <span style={{ background: 'rgba(255,255,255,0.10)', color: '#94a3b8', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 20, flexShrink: 0 }}>
+                        Sv.{building.level}
+                      </span>
+                    </div>
+
+                    {/* Durum rozeti */}
+                    <div>
+                      <span style={{
+                        display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20,
+                        ...(ps.status === 'ready'
+                          ? { background: 'rgba(34,197,94,0.25)', color: '#4ade80' }
+                          : ps.status === 'producing'
+                          ? { background: 'rgba(249,115,22,0.20)', color: '#fb923c' }
+                          : building.status === 'upgrading'
+                          ? { background: 'rgba(168,85,247,0.20)', color: '#c084fc' }
+                          : { background: 'rgba(100,116,139,0.20)', color: '#94a3b8' }),
+                      }}>
+                        {building.status === 'upgrading' && upgradeText
+                          ? `🔨 ${upgradeText}`
+                          : ps.status === 'ready' ? '✅ Hazır!'
+                          : ps.status === 'producing' ? `⏳ ${ps.timerText}`
+                          : 'Boşta'}
+                      </span>
+                    </div>
+
+                    {/* Progress bar */}
+                    {(ps.status === 'producing' || building.status === 'upgrading') && (
+                      <div style={{ height: 4, background: 'rgba(255,255,255,0.10)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 4,
+                          background: building.status === 'upgrading' ? '#a855f7' : cfg.color,
+                          width: `${building.status === 'upgrading' ? upgradePercent : ps.percent}%`,
+                          transition: 'width 1s linear',
+                        }} />
+                      </div>
+                    )}
+
+                    {/* Aksiyon butonları */}
+                    <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {building.status !== 'upgrading' && ps.status === 'idle' && (
+                        <>
+                          <button
+                            onClick={() => handleStartProduction(building.id)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#22c55e', border: 'none', borderRadius: 12, color: '#fff', fontWeight: 700, fontSize: 13, padding: '9px 0', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            <Play size={14} /> Üret
+                          </button>
+                          <button
+                            onClick={() => handleUpgradeBuilding(building.id)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: 'rgba(168,85,247,0.20)', border: '1px solid rgba(168,85,247,0.40)', borderRadius: 12, color: '#c084fc', fontWeight: 600, fontSize: 11, padding: '7px 0', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            ⬆️ {cost.gold}💰 {cost.wood}🌲
+                          </button>
+                        </>
+                      )}
+
+                      {ps.canCollect && (
+                        <button
+                          onClick={() => handleCollectProduction(ps.productionId)}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'linear-gradient(135deg,#3b82f6,#06b6d4)', border: 'none', borderRadius: 12, color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px 0', cursor: 'pointer', animation: 'pulse 1.5s infinite', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <Package size={14} /> Topla!
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {islands.length === 0 && (
+          <div style={{ textAlign: 'center', paddingTop: 60 }}>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>🏝️</div>
+            <p style={{ color: '#94a3b8', fontSize: 16, fontWeight: 600 }}>Henüz adan yok!</p>
+            <p style={{ color: '#475569', fontSize: 13, marginTop: 8 }}>Oyunu yeniden başlat.</p>
+          </div>
+        )}
+      </main>
+
+      {/* ════════════ PANEL: GÖREVLER ════════════ */}
+      {activePanel === 'tasks' && (
+        <BottomPanel title={`📋 Günlük Görevler (${activeTasks} aktif)`} onClose={() => setActivePanel(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {tasks.length === 0 && <p style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Görev bulunamadı.</p>}
+            {tasks.map(task => {
+              const pct = Math.min(100, (task.progress / task.target) * 100);
+              return (
+                <div key={task.id} style={{
+                  background: task.claimed ? 'rgba(255,255,255,0.04)' : task.completed ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${task.claimed ? 'rgba(255,255,255,0.06)' : task.completed ? 'rgba(34,197,94,0.30)' : 'rgba(255,255,255,0.10)'}`,
+                  borderRadius: 14, padding: 14,
+                  opacity: task.claimed ? 0.5 : 1,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{task.description}</p>
+                      <p style={{ color: '#64748b', fontSize: 11, marginTop: 3 }}>{task.progress} / {task.target}</p>
+                    </div>
+                    <span style={{ color: '#f59e0b', fontSize: 12, fontWeight: 700, marginLeft: 10, flexShrink: 0 }}>💰{task.reward_gold}</span>
+                  </div>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                    <div style={{ height: '100%', borderRadius: 4, width: `${pct}%`, background: task.completed ? '#22c55e' : '#3b82f6', transition: 'width .5s' }} />
+                  </div>
+                  {task.claimed
+                    ? <span style={{ color: '#475569', fontSize: 12 }}>✅ Tamamlandı</span>
+                    : task.completed
+                    ? <button onClick={() => handleClaimReward(task.id)} style={{ background: '#22c55e', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 700, fontSize: 12, padding: '8px 16px', cursor: 'pointer' }}>🎁 Ödül Topla</button>
+                    : <span style={{ color: '#64748b', fontSize: 12 }}>🔄 Devam ediyor...</span>
+                  }
+                </div>
+              );
+            })}
+          </div>
+        </BottomPanel>
+      )}
+
+      {/* ════════════ PANEL: ADA KEŞFİ ════════════ */}
+      {activePanel === 'discover' && (
+        <BottomPanel title={`🗺️ Ada Keşfi (${islands.length}/7)`} onClose={() => setActivePanel(null)}>
+          {islands.length >= 7
+            ? <p style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Maksimum ada sayısına ulaştın!</p>
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {discoverableIslands.map(island => (
+                  <div key={island.id} style={{
+                    background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.30)',
+                    borderRadius: 14, padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 14 }}>{island.name}</p>
+                      <p style={{ color: '#94a3b8', fontSize: 12, marginTop: 3 }}>{island.specialty}</p>
+                      <p style={{ color: '#f59e0b', fontSize: 12, fontWeight: 600, marginTop: 4 }}>💰{island.cost.gold} &nbsp;🌲{island.cost.wood}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDiscoverIsland(island)}
+                      style={{ flexShrink: 0, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', borderRadius: 12, color: '#fff', fontWeight: 700, fontSize: 13, padding: '10px 16px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      Keşfet
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
+          }
+        </BottomPanel>
+      )}
+
+      {/* ════════════ ALT NAVİGASYON ════════════ */}
+      <nav style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+        background: 'rgba(15,23,42,0.96)', backdropFilter: 'blur(16px)',
+        borderTop: '1px solid rgba(255,255,255,0.10)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+          {NAV_ITEMS.map(item => {
+            const isActive = activePanel === item.key;
+            const hasBadge = (item.key === 'tasks' && activeTasks > 0) || (item.key === 'battle' && attackNotifications > 0);
+            const badgeCount = item.key === 'battle' ? attackNotifications : activeTasks;
+            return (
+              <button
+                key={item.key}
+                onClick={() => handleNavAction(item.key)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  padding: '10px 0', border: 'none', background: 'transparent', cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent', position: 'relative',
+                }}
+              >
+                {/* Aktif çizgi */}
+                {isActive && (
+                  <div style={{ position: 'absolute', top: 0, left: '25%', right: '25%', height: 2, background: '#3b82f6', borderRadius: '0 0 2px 2px' }} />
+                )}
+                <span style={{ fontSize: 22, lineHeight: 1 }}>{item.emoji}</span>
+                <span style={{ fontSize: 10, marginTop: 3, fontWeight: 600, color: isActive ? '#60a5fa' : '#475569' }}>{item.label}</span>
+                {/* Görev rozeti */}
+                {hasBadge && (
+                  <span style={{
+                    position: 'absolute', top: 6, right: '18%',
+                    background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 700,
+                    borderRadius: 99, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+                  }}>{badgeCount > 9 ? '9+' : badgeCount}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* ════════════ GÜNLÜK ÖDÜL MODAL ════════════ */}
+      {showDailyReward && dailyRewardData && (
+        <DailyRewardModal
+          day={dailyRewardData.day}
+          reward={dailyRewardData.reward}
+          onClaim={handleClaimDailyReward}
+          onClose={() => setShowDailyReward(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Alt panel bileşeni ────────────────────────────────────────────────────────
+
+function BottomPanel({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+      {/* Arka plan karartma */}
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)' }} />
+      {/* Panel */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        background: '#0f172a', borderTop: '1px solid rgba(255,255,255,0.10)',
+        borderRadius: '20px 20px 0 0',
+        maxHeight: '75svh', display: 'flex', flexDirection: 'column',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        {/* Tutma çubuğu */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0' }}>
+          <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 2 }} />
+        </div>
+        {/* Başlık */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px 10px' }}>
+          <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 15 }}>{title}</p>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 8, padding: '6px', cursor: 'pointer', color: '#64748b', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        </div>
+        {/* İçerik */}
+        <div style={{ overflowY: 'auto', padding: '0 16px 16px', flex: 1 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Küçük rozet bileşeni ──────────────────────────────────────────────────────
+
+function Pill({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <span style={{
+      background: `${color}22`, color, fontSize: 10, fontWeight: 600,
+      padding: '2px 7px', borderRadius: 20,
+    }}>
+      {children}
+    </span>
+  );
+}
+
+export default HomePage;
