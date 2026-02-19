@@ -136,18 +136,15 @@ CREATE TABLE user_shields (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Market Transactions Table
-CREATE TABLE market_transactions (
+-- Marketplace Transactions Table
+CREATE TABLE marketplace_transactions (
     id SERIAL PRIMARY KEY,
-    seller_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    buyer_id INTEGER REFERENCES users(id),
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    transaction_type VARCHAR(20) NOT NULL, -- 'buy', 'sell'
     resource_type VARCHAR(50) NOT NULL,
-    quantity FLOAT NOT NULL,
-    price_per_unit FLOAT NOT NULL,
-    total_price FLOAT NOT NULL,
-    status VARCHAR(20) DEFAULT 'listed', -- 'listed', 'sold', 'cancelled'
-    listed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    sold_at TIMESTAMP
+    amount FLOAT NOT NULL,
+    price FLOAT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Password Resets Table

@@ -17,18 +17,27 @@ function MarketplacePage() {
   }, []);
 
   const loadData = async () => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      setUser(user);
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setUser(user);
 
-      const pricesRes = await marketplaceAPI.getPrices();
-      setPrices(pricesRes.data.data.prices);
+        const pricesRes = await marketplaceAPI.getPrices();
+        setPrices(pricesRes.data.data.prices);
 
-      const transactionsRes = await marketplaceAPI.getTransactions(user.id);
-      setTransactions(transactionsRes.data.data.transactions);
+        try {
+          const transactionsRes = await marketplaceAPI.getTransactions(user.id);
+          setTransactions(transactionsRes.data.data.transactions);
+        } catch {
+          setTransactions([]);
+        }
+      }
+    } catch (error) {
+      console.error('Marketplace load error:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleBuy = async () => {
