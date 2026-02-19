@@ -123,7 +123,8 @@ class AuthController {
           username: user.username,
           level: user.level,
           league: user.league,
-          experience: user.experience
+          experience: user.experience,
+          is_admin: user.is_admin || false
         }
       });
     } catch (error) {
