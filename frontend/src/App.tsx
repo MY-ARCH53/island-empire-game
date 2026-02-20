@@ -12,6 +12,7 @@ import GuildsPage from './pages/GuildsPage';
 import BattlePage from './pages/BattlePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import AdminPage from './pages/AdminPage';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
             <Route path="/battle" element={<BattlePage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </div>
       </Router>

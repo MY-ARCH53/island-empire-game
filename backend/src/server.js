@@ -13,7 +13,7 @@ const friendRoutes = require('./routes/friend.routes');
 const guildRoutes = require('./routes/guild.routes');
 const battleRoutes = require('./routes/battle.routes');
 const autoProductionRoutes = require('./routes/autoProduction.routes');
-
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,7 +42,7 @@ app.use('/api/friends', friendRoutes);
 app.use('/api/guilds', guildRoutes);
 app.use('/api/battles', battleRoutes);
 app.use('/api/auto-production', autoProductionRoutes);
-
+app.use('/api/admin', adminRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route bulunamadi' });

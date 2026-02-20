@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -124,6 +124,15 @@ export const autoProductionAPI = {
   activate: (userId) => api.post('/auto-production/activate', { userId }),
   getStatus: (userId) => api.get(`/auto-production/status?userId=${userId}`),
   tick: (userId) => api.post('/auto-production/tick', { userId }),
+};
+
+// Admin API
+export const adminAPI = {
+  getUsers: () => api.get('/admin/users'),
+  getStats: () => api.get('/admin/stats'),
+  updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  updateResources: (id, data) => api.put(`/admin/users/${id}/resources`, data),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
 };
 
 export default api;
