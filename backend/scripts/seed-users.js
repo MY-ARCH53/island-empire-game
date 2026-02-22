@@ -98,13 +98,15 @@ async function seed() {
         [username, email, passwordHash, level]
       );
 
+      let userId;
       if (userRes.rowCount === 0) {
-        console.log(`  ATLA: ${username} (zaten var)`);
-        skipped++;
-        continue;
+        // Kullanıcı zaten var, id'yi çek (kaynaklar eksik olabilir)
+        const existing = await pool.query(`SELECT id FROM users WHERE username = $1`, [username]);
+        if (existing.rowCount === 0) { skipped++; continue; }
+        userId = existing.rows[0].id;
+      } else {
+        userId = userRes.rows[0].id;
       }
-
-      const userId = userRes.rows[0].id;
 
       // Ordu ekle — level'a göre güç
       const basePower = level * rand(30, 80);
@@ -124,15 +126,15 @@ async function seed() {
         [userId, archer, infantry, cavalry, totalPower]
       );
 
-      // Kaynaklar ekle
-      const gold  = rand(500, 8000);
-      const wood  = rand(300, 5000);
-      const food  = rand(400, 6000);
+      // Kaynaklar ekle (resource_type satır bazlı)
+      const gold = rand(500, 8000);
+      const wood = rand(300, 5000);
+      const food = rand(400, 6000);
 
       await pool.query(
-        `INSERT INTO resources (user_id, gold, wood, food)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (user_id) DO NOTHING`,
+        `INSERT INTO resources (user_id, resource_type, amount)
+         VALUES ($1, 'gold', $2), ($1, 'wood', $3), ($1, 'food', $4)
+         ON CONFLICT (user_id, resource_type) DO NOTHING`,
         [userId, gold, wood, food]
       );
 
