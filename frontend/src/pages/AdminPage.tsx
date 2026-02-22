@@ -4,15 +4,28 @@ import { adminAPI } from '../services/api';
 
 function AdminPage() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<any>(null);
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'users' | 'bots'>('users');
+
+  // Kullanıcı tab state'leri
+  const [stats, setStats]       = useState<any>(null);
+  const [users, setUsers]       = useState<any[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState('');
   const [editUser, setEditUser] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [resourceForm, setResourceForm] = useState<any>({});
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+  const [saving, setSaving]     = useState(false);
+  const [message, setMessage]   = useState('');
+
+  // Bot tab state'leri
+  const [bots, setBots]               = useState<any[]>([]);
+  const [botTotal, setBotTotal]       = useState(0);
+  const [botLoading, setBotLoading]   = useState(false);
+  const [attackCount, setAttackCount] = useState(5);
+  const [attackResults, setAttackResults] = useState<any[]>([]);
+  const [attacking, setAttacking]     = useState(false);
+  const [creating, setCreating]       = useState(false);
+  const [botMsg, setBotMsg]           = useState('');
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -35,6 +48,24 @@ function AdminPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadBots = async () => {
+    setBotLoading(true);
+    try {
+      const res = await adminAPI.getBots();
+      setBots(res.data.data.bots);
+      setBotTotal(res.data.data.total);
+    } catch (err) {
+      console.error('Bot load error:', err);
+    } finally {
+      setBotLoading(false);
+    }
+  };
+
+  const handleTabChange = (tab: 'users' | 'bots') => {
+    setActiveTab(tab);
+    if (tab === 'bots' && bots.length === 0) loadBots();
   };
 
   const openEdit = (user: any) => {
@@ -82,6 +113,37 @@ function AdminPage() {
     }
   };
 
+  const handleCreateBots = async () => {
+    if (!confirm('1000 bot oluşturulacak. Devam edilsin mi?')) return;
+    setCreating(true);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.createBots(1000);
+      setBotMsg(`✅ ${res.data.message}`);
+      await loadBots();
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleBotAttack = async () => {
+    setAttacking(true);
+    setAttackResults([]);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.triggerBotAttack({ count: attackCount });
+      setAttackResults(res.data.data.results);
+      setBotMsg(`✅ ${res.data.message}`);
+      await loadBots();
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setAttacking(false);
+    }
+  };
+
   const filtered = users.filter(u =>
     u.username.toLowerCase().includes(search.toLowerCase()) ||
     u.email.toLowerCase().includes(search.toLowerCase())
@@ -91,7 +153,7 @@ function AdminPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
         <p style={{ color: '#fff', fontSize: 20 }}>Admin paneli yükleniyor...</p>
       </div>
     );
@@ -122,9 +184,9 @@ function AdminPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 }}>
             {[
               { label: 'Toplam Oyuncu', value: stats.total_users, emoji: '👥', color: '#3b82f6' },
-              { label: 'Bugün Aktif', value: stats.active_today, emoji: '🟢', color: '#22c55e' },
+              { label: 'Bugün Aktif',   value: stats.active_today, emoji: '🟢', color: '#22c55e' },
               { label: 'Toplam Savaş', value: stats.total_battles, emoji: '⚔️', color: '#ef4444' },
-              { label: 'Toplam Lonca', value: stats.total_guilds, emoji: '🏰', color: '#f59e0b' },
+              { label: 'Toplam Lonca', value: stats.total_guilds,  emoji: '🏰', color: '#f59e0b' },
             ].map(s => (
               <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '20px 16px', border: `1px solid ${s.color}33` }}>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>{s.emoji}</div>
@@ -135,78 +197,262 @@ function AdminPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div style={{ marginBottom: 16 }}>
-          <input
-            type="text"
-            placeholder="🔍 Oyuncu ara (kullanıcı adı veya e-posta)..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 16px', color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box' }}
-          />
+        {/* Tab Butonları */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {[
+            { key: 'users', label: '👥 Oyuncular' },
+            { key: 'bots',  label: '🤖 Bot Yönetimi' },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => handleTabChange(t.key as any)}
+              style={{
+                padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: 14,
+                background: activeTab === t.key ? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : 'rgba(255,255,255,0.07)',
+                color: activeTab === t.key ? '#fff' : '#64748b',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* Table */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.06)' }}>
-                  {['ID', 'Kullanıcı', 'E-posta', 'Seviye', 'Lig', 'Altın', 'Odun', 'Yiyecek', 'Enerji', 'Ada', 'Durum', 'Kayıt', 'İşlem'].map(h => (
-                    <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+        {/* ── OYUNCULAR SEKMESİ ─────────────────────────────────────────── */}
+        {activeTab === 'users' && (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <input
+                type="text"
+                placeholder="🔍 Oyuncu ara (kullanıcı adı veya e-posta)..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 16px', color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      {['ID', 'Kullanıcı', 'E-posta', 'Seviye', 'Lig', 'Altın', 'Odun', 'Yiyecek', 'Enerji', 'Ada', 'Durum', 'Kayıt', 'İşlem'].map(h => (
+                        <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((u, i) => (
+                      <tr key={u.id} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                        <td style={{ padding: '10px 14px', color: '#64748b' }}>{u.id}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 600 }}>{u.username}</span>
+                            {u.is_admin && <span style={{ background: '#f59e0b22', color: '#f59e0b', fontSize: 10, padding: '2px 6px', borderRadius: 10 }}>ADMIN</span>}
+                            {!u.is_active && <span style={{ background: '#ef444422', color: '#ef4444', fontSize: 10, padding: '2px 6px', borderRadius: 10 }}>BANLANDI</span>}
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#94a3b8', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</td>
+                        <td style={{ padding: '10px 14px' }}><span style={{ color: '#06b6d4', fontWeight: 600 }}>Lvl {u.level}</span></td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ background: `${leagueColor[u.league]}22`, color: leagueColor[u.league], padding: '3px 8px', borderRadius: 10, fontSize: 12 }}>
+                            {u.league}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#f59e0b' }}>{Math.round(u.resources?.gold || 0)}</td>
+                        <td style={{ padding: '10px 14px', color: '#22c55e' }}>{Math.round(u.resources?.wood || 0)}</td>
+                        <td style={{ padding: '10px 14px', color: '#ef4444' }}>{Math.round(u.resources?.food || 0)}</td>
+                        <td style={{ padding: '10px 14px', color: '#06b6d4' }}>{Math.round(u.resources?.energy || 0)}</td>
+                        <td style={{ padding: '10px 14px', color: '#a78bfa' }}>{u.island_count} ada</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: u.is_active ? '#22c55e' : '#ef4444', display: 'inline-block' }} />
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                          {new Date(u.created_at).toLocaleDateString('tr-TR')}
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <button
+                            onClick={() => openEdit(u)}
+                            style={{ background: '#3b82f6', border: 'none', color: '#fff', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                          >
+                            Düzenle
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filtered.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>Oyuncu bulunamadı</div>
+              )}
+            </div>
+            <div style={{ marginTop: 12, color: '#64748b', fontSize: 13 }}>
+              Toplam {filtered.length} / {users.length} oyuncu gösteriliyor
+            </div>
+          </>
+        )}
+
+        {/* ── BOT SEKMESİ ───────────────────────────────────────────────── */}
+        {activeTab === 'bots' && (
+          <>
+            {/* Bot özet kart */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+              <div style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 14, padding: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 6 }}>🤖</div>
+                <div style={{ fontSize: 32, fontWeight: 800, color: '#a78bfa' }}>{botTotal}</div>
+                <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>Toplam Bot</div>
+              </div>
+              <div style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 14, padding: 20 }}>
+                <div style={{ fontSize: 32, marginBottom: 6 }}>⚔️</div>
+                <div style={{ fontSize: 32, fontWeight: 800, color: '#f87171' }}>
+                  {bots.reduce((s, b) => s + (b.attack_count || 0), 0)}
+                </div>
+                <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>Toplam Bot Saldırısı</div>
+              </div>
+            </div>
+
+            {/* Bot oluştur */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700 }}>🤖 Bot Oluştur</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                Tek seferlik 1000 bot oluşturur. Her bot rastgele güç seviyesine sahip olur. Zaten bot varsa ek bot oluşturur.
+              </p>
+              <button
+                onClick={handleCreateBots}
+                disabled={creating}
+                style={{
+                  padding: '11px 24px', borderRadius: 10, border: 'none', cursor: creating ? 'not-allowed' : 'pointer',
+                  fontWeight: 700, fontSize: 14, opacity: creating ? 0.6 : 1,
+                  background: 'linear-gradient(135deg,#8b5cf6,#6366f1)', color: '#fff',
+                }}
+              >
+                {creating ? '⏳ Oluşturuluyor...' : '🤖 1000 Bot Oluştur'}
+              </button>
+            </div>
+
+            {/* Bot saldırısı */}
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, color: '#f87171' }}>⚔️ Bot Saldırısı Başlat</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                Kalkanı olmayan rastgele botlar, kalkanı olmayan rastgele gerçek oyunculara saldırır.
+                Bot kazanırsa kaynak yağmalar ve savunana 3 saatlik kalkan uygulanır.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ color: '#94a3b8', fontSize: 13 }}>Saldırı Sayısı:</label>
+                  <input
+                    type="number" min={1} max={50} value={attackCount}
+                    onChange={e => setAttackCount(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+                    style={{ width: 70, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14, textAlign: 'center' }}
+                  />
+                  <span style={{ color: '#475569', fontSize: 12 }}>(max 50)</span>
+                </div>
+                <button
+                  onClick={handleBotAttack}
+                  disabled={attacking}
+                  style={{
+                    padding: '10px 24px', borderRadius: 10, border: 'none', cursor: attacking ? 'not-allowed' : 'pointer',
+                    fontWeight: 700, fontSize: 14, opacity: attacking ? 0.6 : 1,
+                    background: 'linear-gradient(135deg,#ef4444,#f97316)', color: '#fff',
+                  }}
+                >
+                  {attacking ? '⚔️ Saldırıyor...' : `⚔️ ${attackCount} Saldırı Başlat`}
+                </button>
+              </div>
+            </div>
+
+            {/* Mesaj */}
+            {botMsg && (
+              <div style={{
+                padding: '10px 16px', borderRadius: 10, marginBottom: 16, fontSize: 14,
+                background: botMsg.startsWith('✅') ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                border: `1px solid ${botMsg.startsWith('✅') ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                color: botMsg.startsWith('✅') ? '#4ade80' : '#f87171',
+              }}>
+                {botMsg}
+              </div>
+            )}
+
+            {/* Saldırı sonuçları */}
+            {attackResults.length > 0 && (
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+                <p style={{ color: '#94a3b8', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Son Saldırı Sonuçları</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                  {attackResults.map((r, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '8px 12px', borderRadius: 8,
+                      background: r.winner === 'attacker' ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                      border: `1px solid ${r.winner === 'attacker' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                      fontSize: 13,
+                    }}>
+                      <span>{r.winner === 'attacker' ? '✅' : '❌'} Bot #{r.bot_id} → <strong>{r.target_username}</strong></span>
+                      {r.winner === 'attacker' && r.reward_gold > 0 && (
+                        <span style={{ color: '#f59e0b', fontWeight: 700 }}>+{r.reward_gold}💰</span>
+                      )}
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((u, i) => (
-                  <tr key={u.id} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
-                    <td style={{ padding: '10px 14px', color: '#64748b' }}>{u.id}</td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 600 }}>{u.username}</span>
-                        {u.is_admin && <span style={{ background: '#f59e0b22', color: '#f59e0b', fontSize: 10, padding: '2px 6px', borderRadius: 10 }}>ADMIN</span>}
-                        {!u.is_active && <span style={{ background: '#ef444422', color: '#ef4444', fontSize: 10, padding: '2px 6px', borderRadius: 10 }}>BANLANDI</span>}
-                      </div>
-                    </td>
-                    <td style={{ padding: '10px 14px', color: '#94a3b8', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</td>
-                    <td style={{ padding: '10px 14px' }}><span style={{ color: '#06b6d4', fontWeight: 600 }}>Lvl {u.level}</span></td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span style={{ background: `${leagueColor[u.league]}22`, color: leagueColor[u.league], padding: '3px 8px', borderRadius: 10, fontSize: 12 }}>
-                        {u.league}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 14px', color: '#f59e0b' }}>{Math.round(u.resources?.gold || 0)}</td>
-                    <td style={{ padding: '10px 14px', color: '#22c55e' }}>{Math.round(u.resources?.wood || 0)}</td>
-                    <td style={{ padding: '10px 14px', color: '#ef4444' }}>{Math.round(u.resources?.food || 0)}</td>
-                    <td style={{ padding: '10px 14px', color: '#06b6d4' }}>{Math.round(u.resources?.energy || 0)}</td>
-                    <td style={{ padding: '10px 14px', color: '#a78bfa' }}>{u.island_count} ada</td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: u.is_active ? '#22c55e' : '#ef4444', display: 'inline-block' }} />
-                    </td>
-                    <td style={{ padding: '10px 14px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                      {new Date(u.created_at).toLocaleDateString('tr-TR')}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <button
-                        onClick={() => openEdit(u)}
-                        style={{ background: '#3b82f6', border: 'none', color: '#fff', padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
-                      >
-                        Düzenle
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>Oyuncu bulunamadı</div>
-          )}
-        </div>
+                </div>
+              </div>
+            )}
 
-        <div style={{ marginTop: 12, color: '#64748b', fontSize: 13 }}>
-          Toplam {filtered.length} / {users.length} oyuncu gösteriliyor
-        </div>
+            {/* Bot listesi */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <p style={{ margin: 0, color: '#94a3b8', fontSize: 13, fontWeight: 700 }}>🤖 Bot Listesi ({botTotal})</p>
+                <button onClick={loadBots} disabled={botLoading} style={{ background: 'none', border: 'none', color: '#06b6d4', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                  {botLoading ? '⏳' : '↻ Yenile'}
+                </button>
+              </div>
+              {botLoading ? (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: '#64748b' }}>Yükleniyor...</div>
+              ) : (
+                <div style={{ overflowX: 'auto', maxHeight: 480, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead style={{ position: 'sticky', top: 0 }}>
+                      <tr style={{ background: '#0f172a' }}>
+                        {['ID', 'Bot Adı', 'Seviye', 'Güç', 'Okçu', 'Piyade', 'Süvari', 'Saldırı', 'Son Saldırı', 'Kalkan'].map(h => (
+                          <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bots.map((b, i) => {
+                        const shielded = b.shield_until && new Date(b.shield_until) > new Date();
+                        return (
+                          <tr key={b.id} style={{ borderTop: '1px solid rgba(255,255,255,0.04)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                            <td style={{ padding: '8px 12px', color: '#475569' }}>{b.id}</td>
+                            <td style={{ padding: '8px 12px', fontWeight: 600, color: '#a78bfa' }}>{b.username}</td>
+                            <td style={{ padding: '8px 12px', color: '#06b6d4' }}>Lv{b.level}</td>
+                            <td style={{ padding: '8px 12px', color: '#f97316', fontWeight: 700 }}>{b.total_power}</td>
+                            <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{b.archer_count}</td>
+                            <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{b.infantry_count}</td>
+                            <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{b.cavalry_count}</td>
+                            <td style={{ padding: '8px 12px', color: '#ef4444', fontWeight: 700 }}>{b.attack_count}</td>
+                            <td style={{ padding: '8px 12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              {b.last_attack_at ? new Date(b.last_attack_at).toLocaleDateString('tr-TR') : '—'}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {shielded
+                                ? <span style={{ color: '#3b82f6', fontSize: 12 }}>🛡️ Aktif</span>
+                                : <span style={{ color: '#475569', fontSize: 12 }}>—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {bots.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
+                      Henüz bot yok. "1000 Bot Oluştur" butonunu kullan.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Edit Modal */}
@@ -222,7 +468,6 @@ function AdminPage() {
               <button onClick={() => setEditUser(null)} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
 
-            {/* Kullanıcı Bilgileri */}
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ fontSize: 14, color: '#94a3b8', marginBottom: 12 }}>OYUNCU BİLGİLERİ</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -261,33 +506,24 @@ function AdminPage() {
 
               <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1, background: 'rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <input
-                    type="checkbox"
-                    checked={editForm.is_active}
-                    onChange={e => setEditForm({ ...editForm, is_active: e.target.checked })}
-                  />
+                  <input type="checkbox" checked={editForm.is_active} onChange={e => setEditForm({ ...editForm, is_active: e.target.checked })} />
                   <span style={{ fontSize: 13 }}>Aktif Hesap</span>
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1, background: 'rgba(255,255,255,0.04)', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <input
-                    type="checkbox"
-                    checked={editForm.is_admin}
-                    onChange={e => setEditForm({ ...editForm, is_admin: e.target.checked })}
-                  />
+                  <input type="checkbox" checked={editForm.is_admin} onChange={e => setEditForm({ ...editForm, is_admin: e.target.checked })} />
                   <span style={{ fontSize: 13 }}>Admin Yetkisi</span>
                 </label>
               </div>
             </div>
 
-            {/* Kaynaklar */}
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ fontSize: 14, color: '#94a3b8', marginBottom: 12 }}>KAYNAKLAR</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {[
-                  { key: 'gold', label: '💰 Altın', color: '#f59e0b' },
-                  { key: 'wood', label: '🪵 Odun', color: '#22c55e' },
-                  { key: 'food', label: '🍎 Yiyecek', color: '#ef4444' },
-                  { key: 'energy', label: '⚡ Enerji', color: '#06b6d4' },
+                  { key: 'gold',   label: '💰 Altın',    color: '#f59e0b' },
+                  { key: 'wood',   label: '🪵 Odun',     color: '#22c55e' },
+                  { key: 'food',   label: '🍎 Yiyecek',  color: '#ef4444' },
+                  { key: 'energy', label: '⚡ Enerji',   color: '#06b6d4' },
                 ].map(r => (
                   <div key={r.key}>
                     <label style={{ fontSize: 12, color: r.color, display: 'block', marginBottom: 4 }}>{r.label}</label>
@@ -308,7 +544,6 @@ function AdminPage() {
               </div>
             )}
 
-            {/* Butonlar */}
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={saveUser}

@@ -1,7 +1,13 @@
 const { query } = require('../config/database');
+const bcrypt = require('bcryptjs');
+
+// Bot adı üretmek için listeler
+const BOT_PREFIXES = ['Kaptan','Korsan','Ada','Deniz','Fırtına','Ejder','Aslan',
+                      'Şimşek','Gemi','Kılıç','Kalkan','Kaya','Liman','Rüzgar','Dalgaç'];
+const BOT_SUFFIXES = ['Reis','Bey','Han','Aga','Kurt','Doğan','Yıldız','Demir','Taş','Ocak'];
 
 class AdminController {
-  // Tüm kullanıcıları getir
+  // Tüm kullanıcıları getir (botlar hariç)
   static async getUsers(req, res) {
     try {
       const sql = `
@@ -24,6 +30,7 @@ class AdminController {
           (SELECT g.name FROM guilds g JOIN guild_members gm ON g.id = gm.guild_id WHERE gm.user_id = u.id LIMIT 1) as guild_name,
           (SELECT json_object_agg(resource_type, amount) FROM resources WHERE user_id = u.id) as resources
         FROM users u
+        WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
         ORDER BY u.created_at DESC
       `;
       const result = await query(sql);
@@ -39,10 +46,10 @@ class AdminController {
   static async getStats(req, res) {
     try {
       const [usersRes, battlesRes, guildsRes, activeRes] = await Promise.all([
-        query('SELECT COUNT(*) as total FROM users'),
+        query('SELECT COUNT(*) as total FROM users WHERE (is_bot = FALSE OR is_bot IS NULL)'),
         query('SELECT COUNT(*) as total FROM battles'),
         query('SELECT COUNT(*) as total FROM guilds'),
-        query("SELECT COUNT(*) as total FROM users WHERE last_login > NOW() - INTERVAL '24 hours'"),
+        query("SELECT COUNT(*) as total FROM users WHERE last_login > NOW() - INTERVAL '24 hours' AND (is_bot = FALSE OR is_bot IS NULL)"),
       ]);
 
       res.json({
@@ -99,7 +106,7 @@ class AdminController {
   static async updateResources(req, res) {
     try {
       const { id } = req.params;
-      const resources = req.body; // { gold: 1000, wood: 500, ... }
+      const resources = req.body;
 
       for (const [resourceType, amount] of Object.entries(resources)) {
         if (['gold', 'wood', 'food', 'energy'].includes(resourceType)) {
@@ -132,6 +139,303 @@ class AdminController {
     } catch (error) {
       console.error('Admin deleteUser error:', error);
       res.status(500).json({ success: false, message: 'Kullanici silinemedi' });
+    }
+  }
+
+  // ── BOT YÖNETİMİ ──────────────────────────────────────────────────────────
+
+  // Bot listesi
+  static async getBots(req, res) {
+    try {
+      const sql = `
+        SELECT
+          u.id,
+          u.username,
+          u.level,
+          u.shield_until,
+          u.created_at,
+          COALESCE(a.total_power, 0)    AS total_power,
+          COALESCE(a.archer_count, 0)   AS archer_count,
+          COALESCE(a.infantry_count, 0) AS infantry_count,
+          COALESCE(a.cavalry_count, 0)  AS cavalry_count,
+          (SELECT COUNT(*) FROM battles WHERE attacker_id = u.id)::int    AS attack_count,
+          (SELECT MAX(created_at) FROM battles WHERE attacker_id = u.id)  AS last_attack_at
+        FROM users u
+        LEFT JOIN armies a ON a.user_id = u.id
+        WHERE u.is_bot = TRUE
+        ORDER BY u.id ASC
+      `;
+      const result = await query(sql);
+      const countRes = await query('SELECT COUNT(*) AS total FROM users WHERE is_bot = TRUE');
+
+      res.json({
+        success: true,
+        data: {
+          bots: result.rows,
+          total: parseInt(countRes.rows[0].total),
+        }
+      });
+    } catch (error) {
+      console.error('Admin getBots error:', error);
+      res.status(500).json({ success: false, message: 'Botlar getirilemedi', error: error.message });
+    }
+  }
+
+  // Bot oluştur
+  static async createBots(req, res) {
+    try {
+      const count = Math.min(parseInt(req.body.count) || 1000, 1000);
+
+      // Zaten bot var mı?
+      const existingRes = await query('SELECT COUNT(*) AS total FROM users WHERE is_bot = TRUE');
+      const existing = parseInt(existingRes.rows[0].total);
+      if (existing >= count) {
+        return res.status(400).json({
+          success: false,
+          message: `Zaten ${existing} bot mevcut.`
+        });
+      }
+
+      const startFrom = existing + 1;
+      const toCreate = count - existing;
+      const passwordHash = await bcrypt.hash('bot_password_secret', 8);
+
+      let created = 0;
+      for (let i = startFrom; i <= startFrom + toCreate - 1; i++) {
+        const prefix = BOT_PREFIXES[(i - 1) % BOT_PREFIXES.length];
+        const suffix = BOT_SUFFIXES[Math.floor((i - 1) / BOT_PREFIXES.length) % BOT_SUFFIXES.length];
+        const username = `${prefix}${suffix}${String(i).padStart(3, '0')}`;
+        const email = `bot_${i}@bot.islandsempire.com`;
+
+        // Rastgele ordu gücü: 3 seviye (zayıf / orta / güçlü)
+        const tier = Math.random();
+        let archerCount, infantryCount, cavalryCount;
+        if (tier < 0.4) {
+          // Zayıf bot: 50-200 güç
+          archerCount   = Math.floor(Math.random() * 20 + 5);
+          infantryCount = Math.floor(Math.random() * 20 + 5);
+          cavalryCount  = Math.floor(Math.random() * 8 + 2);
+        } else if (tier < 0.8) {
+          // Orta bot: 200-500 güç
+          archerCount   = Math.floor(Math.random() * 40 + 20);
+          infantryCount = Math.floor(Math.random() * 40 + 20);
+          cavalryCount  = Math.floor(Math.random() * 20 + 8);
+        } else {
+          // Güçlü bot: 500-900 güç
+          archerCount   = Math.floor(Math.random() * 60 + 50);
+          infantryCount = Math.floor(Math.random() * 60 + 50);
+          cavalryCount  = Math.floor(Math.random() * 40 + 20);
+        }
+        const totalPower = archerCount * 3 + infantryCount * 2 + cavalryCount * 5;
+
+        try {
+          const userRes = await query(
+            `INSERT INTO users (username, email, password_hash, is_bot, is_active, level)
+             VALUES ($1, $2, $3, TRUE, TRUE, $4)
+             ON CONFLICT (username) DO NOTHING
+             RETURNING id`,
+            [username, email, passwordHash, Math.floor(Math.random() * 10 + 1)]
+          );
+
+          if (userRes.rows.length === 0) continue; // Conflict, atla
+          const botId = userRes.rows[0].id;
+
+          // Ordu oluştur
+          await query(
+            `INSERT INTO armies (user_id, archer_count, infantry_count, cavalry_count, total_power)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (user_id) DO NOTHING`,
+            [botId, archerCount, infantryCount, cavalryCount, totalPower]
+          );
+
+          // Kaynaklar oluştur
+          const gold  = Math.floor(Math.random() * 4500 + 500);
+          const wood  = Math.floor(Math.random() * 2500 + 500);
+          const food  = Math.floor(Math.random() * 1500 + 300);
+          for (const [type, amount, cap] of [
+            ['gold', gold, 10000], ['wood', wood, 5000],
+            ['food', food, 3000],  ['energy', 100, 200],
+          ]) {
+            await query(
+              `INSERT INTO resources (user_id, resource_type, amount, capacity)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT DO NOTHING`,
+              [botId, type, amount, cap]
+            );
+          }
+          created++;
+        } catch (innerErr) {
+          // Tekil bot hatasını atla, devam et
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `${created} bot oluşturuldu.`,
+        data: { created }
+      });
+    } catch (error) {
+      console.error('Admin createBots error:', error);
+      res.status(500).json({ success: false, message: 'Botlar oluşturulamadı', error: error.message });
+    }
+  }
+
+  // Bot saldırısı tetikle
+  static async triggerBotAttack(req, res) {
+    try {
+      const count = Math.min(parseInt(req.body.count) || 1, 50);
+
+      // Kalkanı olmayan rastgele botlar seç
+      const botsRes = await query(`
+        SELECT u.id, a.total_power, a.archer_count, a.infantry_count, a.cavalry_count
+        FROM users u
+        JOIN armies a ON a.user_id = u.id
+        WHERE u.is_bot = TRUE
+          AND a.total_power > 0
+          AND (u.shield_until IS NULL OR u.shield_until < NOW())
+        ORDER BY RANDOM()
+        LIMIT $1
+      `, [count]);
+
+      if (botsRes.rows.length === 0) {
+        return res.status(400).json({ success: false, message: 'Uygun bot bulunamadı (hepsinin kalkanı aktif olabilir).' });
+      }
+
+      const results = [];
+
+      for (const bot of botsRes.rows) {
+        // Kalkanı olmayan rastgele bir gerçek oyuncu seç (bot hariç)
+        const targetRes = await query(`
+          SELECT u.id, u.username, a.total_power,
+                 r.amount AS gold_amount
+          FROM users u
+          JOIN armies a ON a.user_id = u.id
+          LEFT JOIN resources r ON r.user_id = u.id AND r.resource_type = 'gold'
+          WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
+            AND u.is_active = TRUE
+            AND u.id != $1
+            AND (u.shield_until IS NULL OR u.shield_until < NOW())
+          ORDER BY RANDOM()
+          LIMIT 1
+        `, [bot.id]);
+
+        if (targetRes.rows.length === 0) continue;
+        const target = targetRes.rows[0];
+
+        // ── Savaş hesabı (attackPlayer ile aynı mantık) ──
+        const defenderArmyRes = await query('SELECT * FROM armies WHERE user_id = $1', [target.id]);
+        const defenderArmy = defenderArmyRes.rows[0] || { total_power: 0, archer_count: 0, infantry_count: 0, cavalry_count: 0 };
+
+        const defenderBonus = Math.floor(defenderArmy.total_power * 0.2);
+        const attackerPowerRoll = bot.total_power + Math.random() * 30 - 15;
+        const defenderPowerRoll = (defenderArmy.total_power + defenderBonus) + Math.random() * 30 - 15;
+        const winner = attackerPowerRoll >= defenderPowerRoll ? 'attacker' : 'defender';
+
+        let rewardGold = 0, rewardWood = 0, rewardFood = 0;
+
+        if (winner === 'attacker') {
+          // Yağma
+          const lootRate = 0.1 + Math.random() * 0.1;
+          const defResourcesRes = await query(
+            `SELECT resource_type, amount FROM resources WHERE user_id = $1 AND resource_type IN ('gold','wood','food')`,
+            [target.id]
+          );
+          const defResources = {};
+          defResourcesRes.rows.forEach(r => { defResources[r.resource_type] = r.amount; });
+
+          rewardGold = Math.floor((defResources.gold || 0) * lootRate);
+          rewardWood = Math.floor((defResources.wood || 0) * lootRate);
+          rewardFood = Math.floor((defResources.food || 0) * lootRate);
+
+          // Kaynakları transfer et (bot kazanır — botun kaynakları artar, hedefin azalır)
+          for (const [type, amount] of [['gold', rewardGold], ['wood', rewardWood], ['food', rewardFood]]) {
+            if (amount > 0) {
+              await query(`UPDATE resources SET amount = GREATEST(0, amount - $1) WHERE user_id = $2 AND resource_type = $3`, [amount, target.id, type]);
+              await query(`UPDATE resources SET amount = amount + $1 WHERE user_id = $2 AND resource_type = $3`, [amount, bot.id, type]);
+            }
+          }
+
+          // Savunana 3 saatlik kalkan ver
+          const shieldUntil = new Date(Date.now() + 3 * 60 * 60 * 1000);
+          await query(`UPDATE users SET shield_until = $1 WHERE id = $2`, [shieldUntil, target.id]);
+
+          // Savunma kayıpları
+          const defLossRate = 0.2 + Math.random() * 0.2;
+          await query(`
+            UPDATE armies SET
+              archer_count   = GREATEST(0, archer_count   - $1),
+              infantry_count = GREATEST(0, infantry_count - $2),
+              cavalry_count  = GREATEST(0, cavalry_count  - $3),
+              total_power    = GREATEST(0, total_power    - $4)
+            WHERE user_id = $5
+          `, [
+            Math.floor(defenderArmy.archer_count * defLossRate),
+            Math.floor(defenderArmy.infantry_count * defLossRate),
+            Math.floor(defenderArmy.cavalry_count * defLossRate),
+            Math.floor(defenderArmy.total_power * defLossRate),
+            target.id
+          ]);
+
+          // Bot kayıpları (küçük)
+          const botLossRate = 0.05 + Math.random() * 0.1;
+          await query(`
+            UPDATE armies SET
+              archer_count   = GREATEST(0, archer_count   - $1),
+              infantry_count = GREATEST(0, infantry_count - $2),
+              cavalry_count  = GREATEST(0, cavalry_count  - $3),
+              total_power    = GREATEST(0, total_power    - $4)
+            WHERE user_id = $5
+          `, [
+            Math.floor(bot.archer_count * botLossRate),
+            Math.floor(bot.infantry_count * botLossRate),
+            Math.floor(bot.cavalry_count * botLossRate),
+            Math.floor(bot.total_power * botLossRate),
+            bot.id
+          ]);
+        } else {
+          // Saldıran bot kaybetti — daha fazla kayıp
+          const botLossRate = 0.25 + Math.random() * 0.2;
+          await query(`
+            UPDATE armies SET
+              archer_count   = GREATEST(0, archer_count   - $1),
+              infantry_count = GREATEST(0, infantry_count - $2),
+              cavalry_count  = GREATEST(0, cavalry_count  - $3),
+              total_power    = GREATEST(0, total_power    - $4)
+            WHERE user_id = $5
+          `, [
+            Math.floor(bot.archer_count * botLossRate),
+            Math.floor(bot.infantry_count * botLossRate),
+            Math.floor(bot.cavalry_count * botLossRate),
+            Math.floor(bot.total_power * botLossRate),
+            bot.id
+          ]);
+        }
+
+        // Savaşı kaydet (defender raporlarında görünsün)
+        const battleRes = await query(`
+          INSERT INTO battles (attacker_id, defender_id, battle_type, attacker_power, defender_power, winner, reward_gold, reward_wood, reward_food)
+          VALUES ($1, $2, 'pvp', $3, $4, $5, $6, $7, $8)
+          RETURNING id
+        `, [bot.id, target.id, Math.round(attackerPowerRoll), Math.round(defenderPowerRoll), winner, rewardGold, rewardWood, rewardFood]);
+
+        results.push({
+          battle_id: battleRes.rows[0].id,
+          bot_id: bot.id,
+          target_id: target.id,
+          target_username: target.username,
+          winner,
+          reward_gold: rewardGold,
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `${results.length} bot saldırısı gerçekleştirildi.`,
+        data: { results }
+      });
+    } catch (error) {
+      console.error('Admin triggerBotAttack error:', error);
+      res.status(500).json({ success: false, message: 'Bot saldırısı başlatılamadı', error: error.message });
     }
   }
 }

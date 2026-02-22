@@ -11,4 +11,9 @@ router.put('/users/:id', AdminController.updateUser);
 router.put('/users/:id/resources', AdminController.updateResources);
 router.delete('/users/:id', AdminController.deleteUser);
 
+// Bot yönetimi
+router.get('/bots', AdminController.getBots);
+router.post('/bots/create', AdminController.createBots);
+router.post('/bots/attack', AdminController.triggerBotAttack);
+
 module.exports = router;

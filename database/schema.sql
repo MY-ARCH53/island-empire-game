@@ -14,6 +14,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
+    is_bot BOOLEAN DEFAULT FALSE,
     auto_production_until TIMESTAMP,
     last_seen_attacks_at TIMESTAMP,
     shield_until TIMESTAMP

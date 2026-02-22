@@ -133,6 +133,10 @@ export const adminAPI = {
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   updateResources: (id, data) => api.put(`/admin/users/${id}/resources`, data),
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
+  // Bot yönetimi
+  getBots: () => api.get('/admin/bots'),
+  createBots: (count) => api.post('/admin/bots/create', { count }),
+  triggerBotAttack: (data) => api.post('/admin/bots/attack', data),
 };
 
 export default api;

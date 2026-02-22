@@ -324,6 +324,7 @@ class BattleController {
         LEFT JOIN resources r ON u.id = r.user_id AND r.resource_type = 'gold'
         WHERE u.id != $1
         AND u.is_active = true
+        AND (u.is_bot = FALSE OR u.is_bot IS NULL)
         AND COALESCE(a.total_power, 0) BETWEEN $2 AND $3
         ORDER BY ABS(COALESCE(a.total_power, 0) - $4) ASC
         LIMIT 15
