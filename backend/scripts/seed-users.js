@@ -108,22 +108,25 @@ async function seed() {
         userId = userRes.rows[0].id;
       }
 
-      // Ordu ekle — level'a göre güç
-      // Gerçek oyun güç değerleri: archer=3, infantry=2, cavalry=5
-      const unitBase = level * rand(5, 20);
-      const archerRatio  = rand(20, 40) / 100;
-      const infantryRatio = rand(30, 50) / 100;
-      const cavalryRatio  = 1 - archerRatio - infantryRatio;
+      // Ordu ekle — hedef güç 300-1500 arası (archer=3, infantry=2, cavalry=5)
+      const targetPower = rand(300, 1500);
+      const cavShare = rand(30, 50) / 100;
+      const infShare = rand(25, 40) / 100;
+      const arcShare = 1 - cavShare - infShare;
 
-      const archer   = Math.max(1, Math.floor(unitBase * archerRatio));
-      const infantry = Math.max(1, Math.floor(unitBase * infantryRatio));
-      const cavalry  = Math.max(1, Math.floor(unitBase * cavalryRatio));
+      const cavalry  = Math.max(1, Math.floor(targetPower * cavShare / 5));
+      const infantry = Math.max(1, Math.floor(targetPower * infShare / 2));
+      const archer   = Math.max(1, Math.floor(targetPower * arcShare / 3));
       const totalPower = archer * 3 + infantry * 2 + cavalry * 5;
 
       await pool.query(
         `INSERT INTO armies (user_id, archer_count, infantry_count, cavalry_count, total_power)
          VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (user_id) DO NOTHING`,
+         ON CONFLICT (user_id) DO UPDATE SET
+           archer_count = EXCLUDED.archer_count,
+           infantry_count = EXCLUDED.infantry_count,
+           cavalry_count = EXCLUDED.cavalry_count,
+           total_power = EXCLUDED.total_power`,
         [userId, archer, infantry, cavalry, totalPower]
       );
 
