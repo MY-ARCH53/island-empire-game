@@ -150,11 +150,13 @@ function HomePage() {
     setBuildings(bList);
 
     const prodsData: any = {};
-    for (const b of bList) {
-      const prodRes = await productionAPI.getBuildingProductions(b.id);
+    const prodResults = await Promise.all(
+      bList.map((b: any) => productionAPI.getBuildingProductions(b.id))
+    );
+    prodResults.forEach((prodRes: any, i: number) => {
       const active = prodRes.data.data.productions.find((p: any) => !p.collected);
-      if (active) prodsData[b.id] = active;
-    }
+      if (active) prodsData[bList[i].id] = active;
+    });
     setProductions(prodsData);
   };
 
@@ -168,10 +170,13 @@ function HomePage() {
 
   const handleStartProduction = async (buildingId: number) => {
     try {
-      await productionAPI.startProduction(buildingId);
-      if (user) await taskAPI.updateProgress(user.id, 'daily_production');
+      const res = await productionAPI.startProduction(buildingId);
+      if (user) taskAPI.updateProgress(user.id, 'daily_production').catch(() => {});
       showToast('Üretim başladı!', 'success');
-      loadGameData();
+      // Sadece bu binanın durumunu güncelle
+      const prod = res.data.data.production;
+      setBuildings((prev: any[]) => prev.map(b => b.id === buildingId ? { ...b, status: 'producing' } : b));
+      setProductions((prev: any) => ({ ...prev, [buildingId]: prod }));
     } catch (e: any) {
       showToast(e.response?.data?.message || 'Üretim başlatılamadı', 'error');
     }
@@ -182,7 +187,16 @@ function HomePage() {
     try {
       const res = await productionAPI.collectProduction(productionId, user.id);
       showToast(res.data.message, 'success');
-      loadGameData();
+      // Sadece bina durumunu ve kaynakları güncelle
+      const buildingId = Object.keys(productions).find(
+        (key: any) => productions[key]?.id === productionId
+      );
+      if (buildingId) {
+        setBuildings((prev: any[]) => prev.map(b => b.id === parseInt(buildingId) ? { ...b, status: 'idle' } : b));
+        setProductions((prev: any) => { const next = { ...prev }; delete next[parseInt(buildingId)]; return next; });
+      }
+      // Sadece kaynakları yenile
+      gameAPI.getResources(user.id).then(r => setResources(r.data.data.resources)).catch(() => {});
     } catch (e: any) {
       showToast(e.response?.data?.message || 'Toplanamadı', 'error');
     }

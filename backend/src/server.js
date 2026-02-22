@@ -14,6 +14,7 @@ const guildRoutes = require('./routes/guild.routes');
 const battleRoutes = require('./routes/battle.routes');
 const autoProductionRoutes = require('./routes/autoProduction.routes');
 const adminRoutes = require('./routes/admin.routes');
+const { startWorker } = require('./services/autoProductionWorker');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,4 +51,5 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log('Server calisiyor: http://localhost:' + PORT);
+  startWorker();
 });
