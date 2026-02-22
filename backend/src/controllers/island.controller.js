@@ -21,6 +21,18 @@ class IslandController {
         });
       }
 
+      // Ada keşif maliyet tablosu (index = mevcut ada sayısı)
+      const ISLAND_COSTS = [
+        { gold: 1000,     wood: 500      }, // 1. ada (başlangıç)
+        { gold: 10000,    wood: 20000    }, // 2. ada
+        { gold: 100000,   wood: 200000   }, // 3. ada
+        { gold: 300000,   wood: 450000   }, // 4. ada
+        { gold: 600000,   wood: 900000   }, // 5. ada
+        { gold: 1200000,  wood: 1800000  }, // 6. ada
+        { gold: 2400000,  wood: 3600000  }, // 7. ada
+      ];
+      const currentCost = ISLAND_COSTS[islandCount] || ISLAND_COSTS[ISLAND_COSTS.length - 1];
+
       // Rastgele keşfedilebilir adalar oluştur
       const islandTypes = [
         { name: 'Verimli Ova', specialty: 'Yiyecek uretimi %30 fazla', type: 'fertile', bonus: 'food' },
@@ -40,8 +52,8 @@ class IslandController {
           type: island.type,
           bonus: island.bonus,
           cost: {
-            gold: 1000 + (islandCount * 500),
-            wood: 500 + (islandCount * 250)
+            gold: currentCost.gold,
+            wood: currentCost.wood
           }
         }));
 
@@ -75,9 +87,19 @@ class IslandController {
         });
       }
 
-      // Maliyet hesapla
-      const goldCost = 1000 + (islandCount * 500);
-      const woodCost = 500 + (islandCount * 250);
+      // Maliyet hesapla (sabit tablo)
+      const ISLAND_COSTS = [
+        { gold: 1000,     wood: 500      }, // 1. ada
+        { gold: 10000,    wood: 20000    }, // 2. ada
+        { gold: 100000,   wood: 200000   }, // 3. ada
+        { gold: 300000,   wood: 450000   }, // 4. ada
+        { gold: 600000,   wood: 900000   }, // 5. ada
+        { gold: 1200000,  wood: 1800000  }, // 6. ada
+        { gold: 2400000,  wood: 3600000  }, // 7. ada
+      ];
+      const costEntry = ISLAND_COSTS[islandCount] || ISLAND_COSTS[ISLAND_COSTS.length - 1];
+      const goldCost = costEntry.gold;
+      const woodCost = costEntry.wood;
 
       // Kaynakları kontrol et
       const resourcesSql = 'SELECT * FROM resources WHERE user_id = $1';
