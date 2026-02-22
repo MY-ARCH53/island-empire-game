@@ -109,15 +109,16 @@ async function seed() {
       }
 
       // Ordu ekle — level'a göre güç
-      const basePower = level * rand(30, 80);
+      // Gerçek oyun güç değerleri: archer=3, infantry=2, cavalry=5
+      const unitBase = level * rand(5, 20);
       const archerRatio  = rand(20, 40) / 100;
       const infantryRatio = rand(30, 50) / 100;
       const cavalryRatio  = 1 - archerRatio - infantryRatio;
 
-      const archer   = Math.max(1, Math.floor(basePower * archerRatio));
-      const infantry = Math.max(1, Math.floor(basePower * infantryRatio));
-      const cavalry  = Math.max(1, Math.floor(basePower * cavalryRatio));
-      const totalPower = archer * 1 + infantry * 2 + cavalry * 3;
+      const archer   = Math.max(1, Math.floor(unitBase * archerRatio));
+      const infantry = Math.max(1, Math.floor(unitBase * infantryRatio));
+      const cavalry  = Math.max(1, Math.floor(unitBase * cavalryRatio));
+      const totalPower = archer * 3 + infantry * 2 + cavalry * 5;
 
       await pool.query(
         `INSERT INTO armies (user_id, archer_count, infantry_count, cavalry_count, total_power)

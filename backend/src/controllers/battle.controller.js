@@ -453,9 +453,8 @@ class BattleController {
       const defenderArmyResult = await query(defenderArmySql, [defenderId]);
       const defenderArmy = defenderArmyResult.rows.length > 0 ? defenderArmyResult.rows[0] : { total_power: 0, archer_count: 0, infantry_count: 0, cavalry_count: 0 };
 
-      const defenderPowerBonus = Math.floor(defenderArmy.total_power * 0.2);
       const attackerPower = attackerArmy.total_power + Math.floor(Math.random() * 30) - 15;
-      const defenderPower = (defenderArmy.total_power + defenderPowerBonus) + Math.floor(Math.random() * 30) - 15;
+      const defenderPower = defenderArmy.total_power + Math.floor(Math.random() * 30) - 15;
 
       const winner = attackerPower >= defenderPower ? 'attacker' : 'defender';
 
