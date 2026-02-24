@@ -438,6 +438,64 @@ class AdminController {
       res.status(500).json({ success: false, message: 'Bot saldırısı başlatılamadı', error: error.message });
     }
   }
+  // ── ÖDÜL TALEPLERİ ────────────────────────────────────────────────────────
+
+  // GET /api/admin/prize-requests
+  static async getPrizeRequests(req, res) {
+    try {
+      const result = await query(
+        `SELECT pr.id, pr.prize_name, pr.tlcoin_cost, pr.status, pr.admin_note,
+                pr.created_at, pr.updated_at,
+                u.username, u.email
+         FROM prize_requests pr
+         JOIN users u ON u.id = pr.user_id
+         ORDER BY
+           CASE pr.status WHEN 'pending' THEN 0 ELSE 1 END,
+           pr.created_at DESC`
+      );
+      res.json({ success: true, data: { requests: result.rows } });
+    } catch (error) {
+      console.error('Admin getPrizeRequests error:', error);
+      res.status(500).json({ success: false, message: 'Talepler alinamadi', error: error.message });
+    }
+  }
+
+  // PUT /api/admin/prize-requests/:id
+  // Body: { status: 'approved'|'rejected', adminNote?: string }
+  static async updatePrizeRequest(req, res) {
+    try {
+      const { id } = req.params;
+      const { status, adminNote } = req.body;
+
+      if (!['approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ success: false, message: 'Gecersiz durum' });
+      }
+
+      // Reddedilirse TLCoin iade et
+      if (status === 'rejected') {
+        const reqRow = await query(
+          'SELECT user_id, tlcoin_cost FROM prize_requests WHERE id = $1',
+          [id]
+        );
+        if (reqRow.rows[0]) {
+          await query(
+            'UPDATE users SET tlcoin_balance = tlcoin_balance + $1 WHERE id = $2',
+            [reqRow.rows[0].tlcoin_cost, reqRow.rows[0].user_id]
+          );
+        }
+      }
+
+      await query(
+        `UPDATE prize_requests SET status = $1, admin_note = $2, updated_at = NOW() WHERE id = $3`,
+        [status, adminNote || null, id]
+      );
+
+      res.json({ success: true, data: { message: 'Talep guncellendi' } });
+    } catch (error) {
+      console.error('Admin updatePrizeRequest error:', error);
+      res.status(500).json({ success: false, message: 'Guncelleme basarisiz', error: error.message });
+    }
+  }
 }
 
 module.exports = AdminController;

@@ -4,7 +4,7 @@ import { adminAPI } from '../services/api';
 
 function AdminPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'bots'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes'>('users');
 
   // Kullanıcı tab state'leri
   const [stats, setStats]       = useState<any>(null);
@@ -26,6 +26,11 @@ function AdminPage() {
   const [attacking, setAttacking]     = useState(false);
   const [creating, setCreating]       = useState(false);
   const [botMsg, setBotMsg]           = useState('');
+
+  // Ödül talepleri state'leri
+  const [prizeRequests, setPrizeRequests]       = useState<any[]>([]);
+  const [prizeLoading, setPrizeLoading]         = useState(false);
+  const [prizeActionId, setPrizeActionId]       = useState<number | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -63,9 +68,34 @@ function AdminPage() {
     }
   };
 
-  const handleTabChange = (tab: 'users' | 'bots') => {
+  const loadPrizeRequests = async () => {
+    setPrizeLoading(true);
+    try {
+      const res = await adminAPI.getPrizeRequests();
+      setPrizeRequests(res.data.data.requests);
+    } catch (err) {
+      console.error('Prize requests load error:', err);
+    } finally {
+      setPrizeLoading(false);
+    }
+  };
+
+  const handlePrizeAction = async (id: number, status: string, note: string) => {
+    setPrizeActionId(id);
+    try {
+      await adminAPI.updatePrizeRequest(id, status, note);
+      await loadPrizeRequests();
+    } catch (err) {
+      console.error('Prize action error:', err);
+    } finally {
+      setPrizeActionId(null);
+    }
+  };
+
+  const handleTabChange = (tab: 'users' | 'bots' | 'prizes') => {
     setActiveTab(tab);
     if (tab === 'bots' && bots.length === 0) loadBots();
+    if (tab === 'prizes') loadPrizeRequests();
   };
 
   const openEdit = (user: any) => {
@@ -198,10 +228,11 @@ function AdminPage() {
         )}
 
         {/* Tab Butonları */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
-            { key: 'users', label: '👥 Oyuncular' },
-            { key: 'bots',  label: '🤖 Bot Yönetimi' },
+            { key: 'users',  label: '👥 Oyuncular' },
+            { key: 'bots',   label: '🤖 Bot Yönetimi' },
+            { key: 'prizes', label: '🎁 Ödül Talepleri' },
           ].map(t => (
             <button
               key={t.key}
@@ -451,6 +482,77 @@ function AdminPage() {
                 </div>
               )}
             </div>
+          </>
+        )}
+        {/* ── ÖDÜL TALEPLERİ SEKMESİ ──────────────────────────────────── */}
+        {activeTab === 'prizes' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>
+                Pending talepler önce gösterilir. Reddedilirse TLCoin otomatik iade edilir.
+              </p>
+              <button onClick={loadPrizeRequests} disabled={prizeLoading} style={{ background: 'none', border: 'none', color: '#06b6d4', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                {prizeLoading ? '⏳' : '↻ Yenile'}
+              </button>
+            </div>
+
+            {prizeLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>Yükleniyor...</div>
+            ) : prizeRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>Henüz ödül talebi yok.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {prizeRequests.map(req => {
+                  const isPending = req.status === 'pending';
+                  const statusClr = req.status === 'approved' ? '#22c55e' : req.status === 'rejected' ? '#ef4444' : '#f59e0b';
+                  const statusLbl = req.status === 'approved' ? 'Onaylandı' : req.status === 'rejected' ? 'Reddedildi' : 'Beklemede';
+                  const noteId = `note-${req.id}`;
+                  return (
+                    <div key={req.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: isPending ? 12 : 0 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: '0 0 4px', color: '#e2e8f0', fontWeight: 700, fontSize: 15 }}>{req.prize_name}</p>
+                          <p style={{ margin: 0, color: '#64748b', fontSize: 12 }}>
+                            👤 {req.username} · {req.email} · 🪙 {req.tlcoin_cost} TLCoin · {new Date(req.created_at).toLocaleDateString('tr-TR')}
+                          </p>
+                          {req.admin_note && (
+                            <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: 12, padding: '5px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
+                              Not: {req.admin_note}
+                            </p>
+                          )}
+                        </div>
+                        <span style={{ background: `${statusClr}22`, color: statusClr, fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 99, border: `1px solid ${statusClr}44`, whiteSpace: 'nowrap' }}>
+                          {statusLbl}
+                        </span>
+                      </div>
+                      {isPending && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            id={noteId}
+                            placeholder="Admin notu (isteğe bağlı)"
+                            style={{ flex: 1, minWidth: 160, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#f1f5f9', fontSize: 13 }}
+                          />
+                          <button
+                            onClick={() => handlePrizeAction(req.id, 'approved', (document.getElementById(noteId) as HTMLInputElement)?.value || '')}
+                            disabled={prizeActionId === req.id}
+                            style={{ background: '#22c55e', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: 13, padding: '8px 16px', cursor: 'pointer', opacity: prizeActionId === req.id ? 0.6 : 1 }}
+                          >
+                            ✓ Onayla
+                          </button>
+                          <button
+                            onClick={() => handlePrizeAction(req.id, 'rejected', (document.getElementById(noteId) as HTMLInputElement)?.value || '')}
+                            disabled={prizeActionId === req.id}
+                            style={{ background: '#ef4444', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: 13, padding: '8px 16px', cursor: 'pointer', opacity: prizeActionId === req.id ? 0.6 : 1 }}
+                          >
+                            ✗ Reddet
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
       </div>

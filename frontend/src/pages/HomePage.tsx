@@ -359,12 +359,27 @@ function HomePage() {
               </div>
             </div>
           </div>
-          <button
-            onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }}
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#94a3b8', cursor: 'pointer' }}
-          >
-            <LogOut size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => navigate('/tlcoin')}
+              style={{
+                background: 'linear-gradient(135deg,#e11d48,#be123c)',
+                border: 'none', borderRadius: 10,
+                padding: '8px 12px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+                boxShadow: '0 0 14px rgba(225,29,72,0.50)',
+              }}
+            >
+              <span style={{ fontSize: 15 }}>🪙</span>
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 12 }}>TLCoin</span>
+            </button>
+            <button
+              onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }}
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#94a3b8', cursor: 'pointer' }}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Kaynaklar */}

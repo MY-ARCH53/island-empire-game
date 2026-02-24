@@ -137,6 +137,19 @@ export const adminAPI = {
   getBots: () => api.get('/admin/bots'),
   createBots: (count) => api.post('/admin/bots/create', { count }),
   triggerBotAttack: (data) => api.post('/admin/bots/attack', data),
+  // Ödül talepleri
+  getPrizeRequests: () => api.get('/admin/prize-requests'),
+  updatePrizeRequest: (id, status, adminNote) =>
+    api.put(`/admin/prize-requests/${id}`, { status, adminNote }),
+};
+
+// TLCoin API
+export const tlcoinAPI = {
+  getBalance:    (userId) => api.get(`/tlcoin/balance?userId=${userId}`),
+  convertGold:   (userId, goldAmount) => api.post('/tlcoin/convert', { userId, goldAmount }),
+  requestPrize:  (userId, prizeId, prizeName, tlcoinCost) =>
+    api.post('/tlcoin/request-prize', { userId, prizeId, prizeName, tlcoinCost }),
+  getMyRequests: (userId) => api.get(`/tlcoin/my-requests?userId=${userId}`),
 };
 
 export default api;

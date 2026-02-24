@@ -16,4 +16,8 @@ router.get('/bots', AdminController.getBots);
 router.post('/bots/create', AdminController.createBots);
 router.post('/bots/attack', AdminController.triggerBotAttack);
 
+// Ödül talepleri
+router.get('/prize-requests',     AdminController.getPrizeRequests);
+router.put('/prize-requests/:id', AdminController.updatePrizeRequest);
+
 module.exports = router;
