@@ -8,7 +8,7 @@ const PRIZES = [
   {
     id: 'iphone',
     name: 'iPhone 17',
-    cost: 50,
+    cost: 100000,
     emoji: '📱',
     image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'Apple iPhone 17 256GB',
@@ -16,7 +16,7 @@ const PRIZES = [
   {
     id: 'giftcard',
     name: 'Hediye Çeki 500₺',
-    cost: 10,
+    cost: 500,
     emoji: '🎁',
     image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'İstediğin markette kullanabileceğin hediye çeki',
@@ -24,7 +24,7 @@ const PRIZES = [
   {
     id: 'laptop',
     name: 'Laptop',
-    cost: 80,
+    cost: 50000,
     emoji: '💻',
     image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'i5 işlemci, 16GB RAM, 512GB SSD',
@@ -32,7 +32,7 @@ const PRIZES = [
   {
     id: 'desktop',
     name: 'Masaüstü PC',
-    cost: 120,
+    cost: 30000,
     emoji: '🖥️',
     image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'Gaming PC, RTX 3060, 32GB RAM',
