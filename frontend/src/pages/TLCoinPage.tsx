@@ -7,11 +7,11 @@ import { useToast } from '../contexts/ToastContext';
 const PRIZES = [
   {
     id: 'iphone',
-    name: 'iPhone 15',
+    name: 'iPhone 17',
     cost: 50,
     emoji: '📱',
     image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=400&h=300&q=80',
-    description: 'Apple iPhone 15 128GB',
+    description: 'Apple iPhone 17 256GB',
   },
   {
     id: 'giftcard',
@@ -34,7 +34,7 @@ const PRIZES = [
     name: 'Masaüstü PC',
     cost: 120,
     emoji: '🖥️',
-    image: 'https://images.unsplash.com/photo-1593640408182-31c228cf62bb?auto=format&fit=crop&w=400&h=300&q=80',
+    image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'Gaming PC, RTX 3060, 32GB RAM',
   },
 ];
@@ -147,7 +147,8 @@ export default function TLCoinPage() {
         </div>
       </header>
 
-      <main style={{ flex: 1, overflowY: 'auto', padding: '16px', paddingBottom: 40, display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <main style={{ flex: 1, overflowY: 'auto', padding: '16px', paddingBottom: 40, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 22 }}>
 
         {/* Dönüşüm Kartı */}
         <div style={{ background: 'linear-gradient(135deg,rgba(225,29,72,0.12),rgba(190,18,60,0.06))', border: '1px solid rgba(225,29,72,0.30)', borderRadius: 18, padding: 20 }}>
@@ -211,7 +212,7 @@ export default function TLCoinPage() {
                   boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
                 }}>
                   {/* Görsel */}
-                  <div style={{ position: 'relative', height: 140, flexShrink: 0 }}>
+                  <div style={{ position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
                     {hasImgError ? (
                       <div style={{
                         width: '100%', height: '100%',
@@ -317,6 +318,7 @@ export default function TLCoinPage() {
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   );
