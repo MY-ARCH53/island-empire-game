@@ -10,7 +10,7 @@ const PRIZES = [
     name: 'iPhone 15',
     cost: 50,
     emoji: '📱',
-    image: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=400&q=80',
+    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'Apple iPhone 15 128GB',
   },
   {
@@ -18,7 +18,7 @@ const PRIZES = [
     name: 'Hediye Çeki 500₺',
     cost: 10,
     emoji: '🎁',
-    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80',
+    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'İstediğin markette kullanabileceğin hediye çeki',
   },
   {
@@ -26,7 +26,7 @@ const PRIZES = [
     name: 'Laptop',
     cost: 80,
     emoji: '💻',
-    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400&q=80',
+    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'i5 işlemci, 16GB RAM, 512GB SSD',
   },
   {
@@ -34,7 +34,7 @@ const PRIZES = [
     name: 'Masaüstü PC',
     cost: 120,
     emoji: '🖥️',
-    image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?w=400&q=80',
+    image: 'https://images.unsplash.com/photo-1593640408182-31c228cf62bb?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'Gaming PC, RTX 3060, 32GB RAM',
   },
 ];
@@ -55,6 +55,7 @@ export default function TLCoinPage() {
   const [requesting, setRequesting] = useState<string | null>(null);
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadData();
@@ -198,57 +199,81 @@ export default function TLCoinPage() {
         {/* Ödüller */}
         <div>
           <p style={{ color: '#fff', fontWeight: 700, fontSize: 17, marginBottom: 14 }}>🎁 Ödül Kataloğu</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
             {PRIZES.map(prize => {
               const canAfford = tlcoinBalance >= prize.cost;
+              const hasImgError = imgErrors[prize.id];
               return (
                 <div key={prize.id} style={{
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
-                  borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                  background: 'linear-gradient(145deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
                 }}>
-                  <div style={{ position: 'relative' }}>
-                    <img
-                      src={prize.image}
-                      alt={prize.name}
-                      style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
-                      onError={e => {
-                        const el = e.target as HTMLImageElement;
-                        el.style.display = 'none';
-                      }}
-                    />
+                  {/* Görsel */}
+                  <div style={{ position: 'relative', height: 140, flexShrink: 0 }}>
+                    {hasImgError ? (
+                      <div style={{
+                        width: '100%', height: '100%',
+                        background: 'linear-gradient(135deg,rgba(225,29,72,0.22),rgba(15,23,42,0.85))',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 54,
+                      }}>
+                        {prize.emoji}
+                      </div>
+                    ) : (
+                      <>
+                        <img
+                          src={prize.image}
+                          alt={prize.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          onError={() => setImgErrors(prev => ({ ...prev, [prize.id]: true }))}
+                        />
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          background: 'linear-gradient(to bottom,transparent 35%,rgba(10,18,35,0.75) 100%)',
+                        }} />
+                      </>
+                    )}
                     <div style={{
                       position: 'absolute', top: 8, right: 8,
-                      background: 'rgba(225,29,72,0.90)', borderRadius: 99,
-                      padding: '3px 10px', fontSize: 11, fontWeight: 700, color: '#fff',
+                      background: 'rgba(225,29,72,0.95)',
+                      backdropFilter: 'blur(6px)',
+                      borderRadius: 99,
+                      padding: '4px 10px', fontSize: 11, fontWeight: 800, color: '#fff',
+                      boxShadow: '0 2px 10px rgba(225,29,72,0.55)',
                     }}>
                       🪙 {prize.cost}
                     </div>
                   </div>
-                  <div style={{ padding: 12, flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>
+
+                  {/* İçerik */}
+                  <div style={{ padding: '12px 12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>
                       {prize.emoji} {prize.name}
                     </p>
-                    <p style={{ color: '#64748b', fontSize: 11, lineHeight: 1.4, flex: 1 }}>
+                    <p style={{ color: '#64748b', fontSize: 10, lineHeight: 1.45, flex: 1 }}>
                       {prize.description}
                     </p>
                     <button
                       onClick={() => handleRequestPrize(prize)}
                       disabled={requesting === prize.id || !canAfford}
                       style={{
-                        marginTop: 4,
+                        marginTop: 6,
                         background: !canAfford
                           ? 'rgba(255,255,255,0.05)'
                           : 'linear-gradient(135deg,#e11d48,#be123c)',
                         border: !canAfford ? '1px solid rgba(255,255,255,0.10)' : 'none',
                         borderRadius: 10, color: !canAfford ? '#475569' : '#fff',
-                        fontWeight: 700, fontSize: 12, padding: '9px 0',
+                        fontWeight: 700, fontSize: 11, padding: '9px 0',
                         cursor: !canAfford ? 'not-allowed' : 'pointer',
+                        boxShadow: !canAfford ? 'none' : '0 2px 12px rgba(225,29,72,0.40)',
                       }}
                     >
                       {requesting === prize.id
                         ? 'Gönderiliyor...'
                         : !canAfford
-                        ? `Yetersiz (🪙 ${prize.cost})`
+                        ? `🪙 ${prize.cost} gerekli`
                         : 'Talep Et →'}
                     </button>
                   </div>
