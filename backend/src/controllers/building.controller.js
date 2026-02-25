@@ -18,9 +18,43 @@ class BuildingController {
 
       const building = buildingResult.rows[0];
       const currentLevel = building.level;
+
+      if (currentLevel >= 20) {
+        return res.status(400).json({
+          success: false,
+          message: 'Maksimum seviyeye ulasildi (Lv20)'
+        });
+      }
+
       const newLevel = currentLevel + 1;
-      const goldCost = 200 * currentLevel;
-      const woodCost = 100 * currentLevel;
+
+      // Excel ekonomi tablosuna göre yükseltme maliyetleri (index = hedef level)
+      const UPGRADE_COSTS = [
+        { gold: 0,         wood: 0        }, // Lv0 (kullanılmaz)
+        { gold: 0,         wood: 0        }, // Lv1 (başlangıç)
+        { gold: 350,       wood: 175      }, // Lv2
+        { gold: 612,       wood: 306      }, // Lv3
+        { gold: 1072,      wood: 536      }, // Lv4
+        { gold: 1876,      wood: 938      }, // Lv5
+        { gold: 3283,      wood: 1641     }, // Lv6
+        { gold: 5745,      wood: 2872     }, // Lv7
+        { gold: 10053,     wood: 5027     }, // Lv8
+        { gold: 17593,     wood: 8796     }, // Lv9
+        { gold: 30787,     wood: 15394    }, // Lv10
+        { gold: 53878,     wood: 26939    }, // Lv11
+        { gold: 94286,     wood: 47143    }, // Lv12
+        { gold: 165001,    wood: 82501    }, // Lv13
+        { gold: 288752,    wood: 144376   }, // Lv14
+        { gold: 505316,    wood: 252658   }, // Lv15
+        { gold: 884302,    wood: 442151   }, // Lv16
+        { gold: 1547529,   wood: 773764   }, // Lv17
+        { gold: 2708176,   wood: 1354088  }, // Lv18
+        { gold: 4739307,   wood: 2369654  }, // Lv19
+        { gold: 8293788,   wood: 4146894  }, // Lv20
+      ];
+
+      const goldCost = UPGRADE_COSTS[newLevel].gold;
+      const woodCost = UPGRADE_COSTS[newLevel].wood;
 
       const resourcesSql = 'SELECT * FROM resources WHERE user_id = $1';
       const resourcesResult = await query(resourcesSql, [userId]);
@@ -53,7 +87,7 @@ class BuildingController {
         [woodCost, userId, 'wood']
       );
 
-      const newProductionRate = Math.floor(building.production_rate * 1.3);
+      const newProductionRate = Math.floor(building.production_rate * 1.13);
       const upgradeTime = 2 * 60 * 1000;
       const upgradeCompletesAt = new Date(Date.now() + upgradeTime);
 

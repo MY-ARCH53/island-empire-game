@@ -507,7 +507,15 @@ function HomePage() {
                 const upgradeText    = getUpgradeTimerText(building);
                 const upgradePercent = getUpgradePercent(building);
                 const cfg = BUILDING_CFG[building.type] || { emoji: '🏠', color: '#64748b', label: building.production_type, bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.30)' };
-                const cost = { gold: 200 * building.level, wood: 100 * building.level };
+                const UPGRADE_COSTS = [
+                  {gold:0,wood:0},{gold:0,wood:0},{gold:350,wood:175},{gold:612,wood:306},
+                  {gold:1072,wood:536},{gold:1876,wood:938},{gold:3283,wood:1641},{gold:5745,wood:2872},
+                  {gold:10053,wood:5027},{gold:17593,wood:8796},{gold:30787,wood:15394},{gold:53878,wood:26939},
+                  {gold:94286,wood:47143},{gold:165001,wood:82501},{gold:288752,wood:144376},{gold:505316,wood:252658},
+                  {gold:884302,wood:442151},{gold:1547529,wood:773764},{gold:2708176,wood:1354088},
+                  {gold:4739307,wood:2369654},{gold:8293788,wood:4146894},
+                ];
+                const cost = building.level >= 20 ? {gold:0,wood:0} : (UPGRADE_COSTS[building.level + 1] || {gold:0,wood:0});
 
                 return (
                   <div key={building.id} style={{

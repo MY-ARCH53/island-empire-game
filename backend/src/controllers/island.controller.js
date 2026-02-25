@@ -23,13 +23,13 @@ class IslandController {
 
       // Ada keşif maliyet tablosu (index = mevcut ada sayısı)
       const ISLAND_COSTS = [
-        { gold: 1000,     wood: 500      }, // 1. ada (başlangıç)
-        { gold: 10000,    wood: 20000    }, // 2. ada
-        { gold: 100000,   wood: 200000   }, // 3. ada
-        { gold: 300000,   wood: 450000   }, // 4. ada
-        { gold: 600000,   wood: 900000   }, // 5. ada
-        { gold: 1200000,  wood: 1800000  }, // 6. ada
-        { gold: 2400000,  wood: 3600000  }, // 7. ada
+        { gold: 0,          wood: 0         }, // 1. ada (başlangıç - ücretsiz)
+        { gold: 5000,       wood: 3000      }, // 2. ada - Balıkçı Adası
+        { gold: 50000,      wood: 25000     }, // 3. ada - Orman Adası
+        { gold: 500000,     wood: 250000    }, // 4. ada - Maden Adası
+        { gold: 3000000,    wood: 1500000   }, // 5. ada - Ticaret Adası
+        { gold: 15000000,   wood: 8000000   }, // 6. ada - Kraliyet Adası
+        { gold: 45000000,   wood: 22000000  }, // 7. ada - Ejderha Adası
       ];
       const currentCost = ISLAND_COSTS[islandCount] || ISLAND_COSTS[ISLAND_COSTS.length - 1];
 
@@ -89,13 +89,13 @@ class IslandController {
 
       // Maliyet hesapla (sabit tablo)
       const ISLAND_COSTS = [
-        { gold: 1000,     wood: 500      }, // 1. ada
-        { gold: 10000,    wood: 20000    }, // 2. ada
-        { gold: 100000,   wood: 200000   }, // 3. ada
-        { gold: 300000,   wood: 450000   }, // 4. ada
-        { gold: 600000,   wood: 900000   }, // 5. ada
-        { gold: 1200000,  wood: 1800000  }, // 6. ada
-        { gold: 2400000,  wood: 3600000  }, // 7. ada
+        { gold: 0,          wood: 0         }, // 1. ada
+        { gold: 5000,       wood: 3000      }, // 2. ada
+        { gold: 50000,      wood: 25000     }, // 3. ada
+        { gold: 500000,     wood: 250000    }, // 4. ada
+        { gold: 3000000,    wood: 1500000   }, // 5. ada
+        { gold: 15000000,   wood: 8000000   }, // 6. ada
+        { gold: 45000000,   wood: 22000000  }, // 7. ada
       ];
       const costEntry = ISLAND_COSTS[islandCount] || ISLAND_COSTS[ISLAND_COSTS.length - 1];
       const goldCost = costEntry.gold;
