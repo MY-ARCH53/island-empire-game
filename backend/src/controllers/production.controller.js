@@ -41,8 +41,9 @@ if (building.status === 'upgrading') {
         });
       }
 
-      // Üretim süresi: 5 dakika (test için)
-      const productionTime = 5 * 60 * 1000; // 5 dakika (ms)
+      // Üretim süresi: Lv1=55sn, her level %2 azalır → Lv20=~37.5sn
+      const waitSec = Math.round(55 * Math.pow(0.98, building.level - 1));
+      const productionTime = waitSec * 1000;
       const completesAt = new Date(Date.now() + productionTime);
 
       // Üretim oluştur

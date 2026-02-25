@@ -33,29 +33,26 @@ class IslandController {
       ];
       const currentCost = ISLAND_COSTS[islandCount] || ISLAND_COSTS[ISLAND_COSTS.length - 1];
 
-      // Rastgele keşfedilebilir adalar oluştur
-      const islandTypes = [
-        { name: 'Verimli Ova', specialty: 'Yiyecek uretimi %30 fazla', type: 'fertile', bonus: 'food' },
-        { name: 'Madenli Ada', specialty: 'Altin uretimi %30 fazla', type: 'mining', bonus: 'gold' },
-        { name: 'Ormanlik Ada', specialty: 'Odun uretimi %30 fazla', type: 'forest', bonus: 'wood' },
-        { name: 'Ticaret Limani', specialty: 'Ticaret bonusu %20', type: 'trade', bonus: 'trade' },
-        { name: 'Askeri Ussü', specialty: 'Savunma %40 fazla', type: 'military', bonus: 'defense' },
+      // Sıradaki ada — isim ve bonus sıraya göre sabit
+      const ISLAND_PROGRESSION = [
+        null, // 1. ada (Ana Ada - başlangıçta verilir)
+        { name: 'Balıkçı Adası',  specialty: 'Balık ticareti +%5',      type: 'fishing',  bonus: 'trade'   },
+        { name: 'Orman Adası',    specialty: 'Odun üretimi +%10',        type: 'forest',   bonus: 'wood'    },
+        { name: 'Maden Adası',    specialty: 'Maden üretimi +%15',       type: 'mining',   bonus: 'gold'    },
+        { name: 'Ticaret Adası',  specialty: 'Ticaret oranı +%10',       type: 'trade',    bonus: 'trade'   },
+        { name: 'Kraliyet Adası', specialty: 'Tüm üretim +%8',           type: 'royal',    bonus: 'all'     },
+        { name: 'Ejderha Adası',  specialty: 'Efsanevi güç x1.5',        type: 'dragon',   bonus: 'legend'  },
       ];
 
-      const randomIslands = islandTypes
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 3)
-        .map((island, index) => ({
-          id: `discover_${index}`,
-          name: island.name,
-          specialty: island.specialty,
-          type: island.type,
-          bonus: island.bonus,
-          cost: {
-            gold: currentCost.gold,
-            wood: currentCost.wood
-          }
-        }));
+      const nextIsland = ISLAND_PROGRESSION[islandCount] || ISLAND_PROGRESSION[ISLAND_PROGRESSION.length - 1];
+      const randomIslands = [{
+        id: 'discover_0',
+        name: nextIsland.name,
+        specialty: nextIsland.specialty,
+        type: nextIsland.type,
+        bonus: nextIsland.bonus,
+        cost: { gold: currentCost.gold, wood: currentCost.wood }
+      }];
 
       res.json({
         success: true,
@@ -145,12 +142,18 @@ class IslandController {
       // Adaya 4 binayı otomatik ekle
       await GameInitService.initializeIslandBuildings(island.id);
 
+      // Oyuncu unvanını güncelle (yeni ada sayısına göre)
+      const RANKS = ['Köylü', 'Çırak', 'Tüccar', 'Usta', 'Baron', 'Lord', 'Efsane'];
+      const newRank = RANKS[islandCount] || 'Efsane'; // islandCount = eski sayı, yeni = +1
+      await query('UPDATE users SET league = $1 WHERE id = $2', [newRank, userId]);
+
       res.json({
         success: true,
         message: 'Ada kesf edildi',
         data: {
           island,
-          cost: { gold: goldCost, wood: woodCost }
+          cost: { gold: goldCost, wood: woodCost },
+          newRank,
         }
       });
     } catch (error) {
