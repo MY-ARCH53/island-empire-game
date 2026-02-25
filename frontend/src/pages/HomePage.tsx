@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Coins, TreePine, Apple, Zap, LogOut, Play, Package, X } from 'lucide-react';
-import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI } from '../services/api';
+import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI, tradeAPI } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import { fireConfetti, fireRewardConfetti } from '../utils/confetti';
 import DailyRewardModal from '../components/DailyRewardModal';
@@ -26,10 +26,17 @@ const NAV_ITEMS = [
   { key: 'tasks',       emoji: '📋', label: 'Görevler'  },
   { key: 'discover',    emoji: '🗺️', label: 'Keşif'    },
   { key: 'battle',      emoji: '⚔️', label: 'Savaş'    },
+  { key: 'trade',       emoji: '🔄', label: 'Ticaret'   },
   { key: 'market',      emoji: '🏪', label: 'Pazar'     },
   { key: 'leaderboard', emoji: '🏆', label: 'Liderlik'  },
   { key: 'friends',     emoji: '👥', label: 'Arkadaş'   },
   { key: 'guild',       emoji: '🏰', label: 'Guild'     },
+];
+
+const TRADE_RATES = [
+  { type: 'energy', emoji: '⚡', label: 'Enerji',   per: 100, gold: 10,  color: '#06b6d4' },
+  { type: 'food',   emoji: '🍎', label: 'Yiyecek',  per: 100, gold: 15,  color: '#ef4444' },
+  { type: 'wood',   emoji: '🌲', label: 'Odun',     per: 100, gold: 20,  color: '#10b981' },
 ];
 
 // ── Yardımcı: MM:SS timer ───────────────────────────────────────────────────
@@ -63,6 +70,8 @@ function HomePage() {
   const [dailyRewardData, setDailyRewardData] = useState<any>(null);
   const [autoProduction, setAutoProduction]   = useState<{ active: boolean; endsAt: string | null; remainingMs: number }>({ active: false, endsAt: null, remainingMs: 0 });
   const [attackNotifications, setAttackNotifications] = useState(0);
+  const [tradeAmounts, setTradeAmounts] = useState<Record<string, number>>({ energy: 100, food: 100, wood: 100 });
+  const [tradingType, setTradingType]   = useState<string | null>(null);
 
   // Saniye ticker → timer görsel güncellemesi
   useEffect(() => {
@@ -304,13 +313,28 @@ function HomePage() {
   // ── Nav aksiyonu ──────────────────────────────────────────────────────────
 
   const handleNavAction = (key: string) => {
-    if (key === 'tasks' || key === 'discover') {
+    if (key === 'tasks' || key === 'discover' || key === 'trade') {
       setActivePanel(activePanel === key ? null : key);
     } else if (key === 'market')       navigate('/marketplace');
     else if (key === 'leaderboard')    navigate('/leaderboard');
     else if (key === 'battle')         navigate('/battle');
     else if (key === 'friends')        navigate('/friends');
     else if (key === 'guild')          navigate('/guilds');
+  };
+
+  const handleTrade = async (resourceType: string) => {
+    const amount = tradeAmounts[resourceType];
+    setTradingType(resourceType);
+    try {
+      const res = await tradeAPI.convert(user.id, resourceType, amount);
+      const { gold_earned, resource_spent } = res.data.data;
+      setResources(res.data.data.resources);
+      showToast(`+${gold_earned}💰 kazandın! (${resource_spent} ${resourceType === 'energy' ? '⚡' : resourceType === 'food' ? '🍎' : '🌲'} harcandı)`, 'success');
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Ticaret başarısız', 'error');
+    } finally {
+      setTradingType(null);
+    }
   };
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -680,6 +704,67 @@ function HomePage() {
         </BottomPanel>
       )}
 
+      {/* ════════════ PANEL: TİCARET ════════════ */}
+      {activePanel === 'trade' && (
+        <BottomPanel title="🔄 Ticaret — Kaynak → Altın" onClose={() => setActivePanel(null)}>
+          <p style={{ color: '#64748b', fontSize: 12, marginBottom: 14 }}>
+            Fazla kaynaklarını altına çevir. Miktar 100'ün katı olmalı.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {TRADE_RATES.map(rate => {
+              const res = resources.find((r: any) => r.resource_type === rate.type);
+              const balance = res ? Math.floor(res.amount) : 0;
+              const amount  = tradeAmounts[rate.type];
+              const goldOut = Math.floor((amount / rate.per) * rate.gold);
+              const canTrade = balance >= amount && amount >= rate.per && amount % rate.per === 0;
+              return (
+                <div key={rate.type} style={{
+                  background: `rgba(${rate.color === '#06b6d4' ? '6,182,212' : rate.color === '#ef4444' ? '239,68,68' : '16,185,129'},0.08)`,
+                  border: `1px solid ${rate.color}44`, borderRadius: 14, padding: 14,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <p style={{ color: rate.color, fontWeight: 700, fontSize: 14 }}>{rate.emoji} {rate.label}</p>
+                    <p style={{ color: '#64748b', fontSize: 12 }}>Bakiye: <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{balance.toLocaleString()}</span></p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                    <input
+                      type="number" min={rate.per} step={rate.per}
+                      value={amount}
+                      onChange={e => setTradeAmounts(prev => ({ ...prev, [rate.type]: Number(e.target.value) }))}
+                      style={{
+                        flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: 10, padding: '9px 12px', color: '#fff', fontSize: 14, fontWeight: 700, outline: 'none',
+                      }}
+                    />
+                    <span style={{ color: '#475569', fontSize: 16 }}>→</span>
+                    <div style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, padding: '9px 14px', minWidth: 70, textAlign: 'center' }}>
+                      <p style={{ color: '#f59e0b', fontWeight: 800, fontSize: 14 }}>💰 {goldOut}</p>
+                    </div>
+                  </div>
+                  <p style={{ color: '#475569', fontSize: 11, marginBottom: 8 }}>
+                    Oran: {rate.per} {rate.emoji} = {rate.gold} 💰
+                  </p>
+                  <button
+                    onClick={() => handleTrade(rate.type)}
+                    disabled={!canTrade || tradingType === rate.type}
+                    style={{
+                      width: '100%',
+                      background: !canTrade ? 'rgba(255,255,255,0.05)' : `linear-gradient(135deg,${rate.color},${rate.color}bb)`,
+                      border: !canTrade ? '1px solid rgba(255,255,255,0.10)' : 'none',
+                      borderRadius: 10, color: !canTrade ? '#475569' : '#fff',
+                      fontWeight: 700, fontSize: 13, padding: '10px 0',
+                      cursor: !canTrade ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {tradingType === rate.type ? 'İşleniyor...' : !canTrade ? 'Yetersiz kaynak' : `${rate.emoji} Sat → 💰 ${goldOut} Altın`}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </BottomPanel>
+      )}
+
       {/* ════════════ ALT NAVİGASYON ════════════ */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
@@ -687,7 +772,7 @@ function HomePage() {
         borderTop: '1px solid rgba(255,255,255,0.10)',
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)' }}>
           {NAV_ITEMS.map(item => {
             const isActive = activePanel === item.key;
             const hasBadge = (item.key === 'tasks' && activeTasks > 0) || (item.key === 'battle' && attackNotifications > 0);

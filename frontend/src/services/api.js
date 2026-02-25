@@ -152,4 +152,11 @@ export const tlcoinAPI = {
   getMyRequests: (userId) => api.get(`/tlcoin/my-requests?userId=${userId}`),
 };
 
+// Ticaret API
+export const tradeAPI = {
+  getRates:  () => api.get('/trade/rates'),
+  convert:   (userId, resourceType, amount) =>
+    api.post('/trade/convert', { userId, resourceType, amount }),
+};
+
 export default api;

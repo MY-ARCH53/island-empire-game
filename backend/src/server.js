@@ -15,6 +15,7 @@ const battleRoutes = require('./routes/battle.routes');
 const autoProductionRoutes = require('./routes/autoProduction.routes');
 const adminRoutes = require('./routes/admin.routes');
 const tlcoinRoutes = require('./routes/tlcoin.routes');
+const tradeRoutes  = require('./routes/trade.routes');
 const { startWorker } = require('./services/autoProductionWorker');
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/battles', battleRoutes);
 app.use('/api/auto-production', autoProductionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/tlcoin', tlcoinRoutes);
+app.use('/api/trade',  tradeRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route bulunamadi' });
