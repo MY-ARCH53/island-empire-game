@@ -333,8 +333,8 @@ class BattleController {
         AND u.is_active = true
         AND (u.is_bot = FALSE OR u.is_bot IS NULL)
         AND COALESCE(a.total_power, 0) BETWEEN $2 AND $3
-        ORDER BY ABS(COALESCE(a.total_power, 0) - $4) ASC
-        LIMIT 15
+        ORDER BY RANDOM()
+        LIMIT 10
       `;
       const result = await query(sql, [userId, minPower, maxPower, myPower]);
 
