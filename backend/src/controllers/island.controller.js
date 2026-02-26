@@ -2,6 +2,7 @@ const { query } = require('../config/database');
 const IslandModel = require('../models/island.model');
 const GameInitService = require('../services/gameInit.service');
 const { addXP } = require('../services/xp.service');
+const TaskController = require('./task.controller');
 
 class IslandController {
   // Keşfedilebilir adaları getir
@@ -149,6 +150,7 @@ class IslandController {
 
       // Ada keşfine özel XP (+100)
       const xpResult = await addXP(userId, 100);
+      await TaskController.trackWeeklyIsland(userId);
 
       res.json({
         success: true,

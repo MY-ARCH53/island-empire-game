@@ -778,41 +778,59 @@ function HomePage() {
       </main>
 
       {/* ════════════ PANEL: GÖREVLER ════════════ */}
-      {activePanel === 'tasks' && (
-        <BottomPanel title={`📋 Günlük Görevler (${activeTasks} aktif)`} onClose={() => setActivePanel(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {tasks.length === 0 && <p style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Görev bulunamadı.</p>}
-            {tasks.map(task => {
-              const pct = Math.min(100, (task.progress / task.target) * 100);
-              return (
-                <div key={task.id} style={{
-                  background: task.claimed ? 'rgba(255,255,255,0.04)' : task.completed ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${task.claimed ? 'rgba(255,255,255,0.06)' : task.completed ? 'rgba(34,197,94,0.30)' : 'rgba(255,255,255,0.10)'}`,
-                  borderRadius: 14, padding: 14,
-                  opacity: task.claimed ? 0.5 : 1,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{task.description}</p>
-                      <p style={{ color: '#64748b', fontSize: 11, marginTop: 3 }}>{task.progress} / {task.target}</p>
-                    </div>
-                    <span style={{ color: '#f59e0b', fontSize: 12, fontWeight: 700, marginLeft: 10, flexShrink: 0 }}>💰{task.reward_gold}</span>
-                  </div>
-                  <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
-                    <div style={{ height: '100%', borderRadius: 4, width: `${pct}%`, background: task.completed ? '#22c55e' : '#3b82f6', transition: 'width .5s' }} />
-                  </div>
-                  {task.claimed
-                    ? <span style={{ color: '#475569', fontSize: 12 }}>✅ Tamamlandı</span>
-                    : task.completed
-                    ? <button onClick={() => handleClaimReward(task.id)} style={{ background: '#22c55e', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 700, fontSize: 12, padding: '8px 16px', cursor: 'pointer' }}>🎁 Ödül Topla</button>
-                    : <span style={{ color: '#64748b', fontSize: 12 }}>🔄 Devam ediyor...</span>
-                  }
+      {activePanel === 'tasks' && (() => {
+        const dailyTasks  = tasks.filter((t: any) => !t.is_weekly);
+        const weeklyTasks = tasks.filter((t: any) => t.is_weekly);
+        const renderTask  = (task: any) => {
+          const pct = Math.min(100, (task.progress / task.target) * 100);
+          const isWeekly = task.is_weekly;
+          return (
+            <div key={task.id} style={{
+              background: task.claimed ? 'rgba(255,255,255,0.04)' : task.completed ? (isWeekly ? 'rgba(168,85,247,0.12)' : 'rgba(34,197,94,0.10)') : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${task.claimed ? 'rgba(255,255,255,0.06)' : task.completed ? (isWeekly ? 'rgba(168,85,247,0.35)' : 'rgba(34,197,94,0.30)') : (isWeekly ? 'rgba(168,85,247,0.20)' : 'rgba(255,255,255,0.10)')}`,
+              borderRadius: 14, padding: 14, opacity: task.claimed ? 0.5 : 1,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{task.description}</p>
+                  <p style={{ color: '#64748b', fontSize: 11, marginTop: 3 }}>{task.progress} / {task.target}</p>
                 </div>
-              );
-            })}
-          </div>
-        </BottomPanel>
-      )}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, marginLeft: 10, flexShrink: 0 }}>
+                  <span style={{ color: '#f59e0b', fontSize: 12, fontWeight: 700 }}>💰{task.reward_gold.toLocaleString()}</span>
+                  <span style={{ color: '#a78bfa', fontSize: 10 }}>+{task.reward_experience} XP</span>
+                </div>
+              </div>
+              <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                <div style={{ height: '100%', borderRadius: 4, width: `${pct}%`, background: task.completed ? (isWeekly ? '#a855f7' : '#22c55e') : (isWeekly ? '#7c3aed' : '#3b82f6'), transition: 'width .5s' }} />
+              </div>
+              {task.claimed
+                ? <span style={{ color: '#475569', fontSize: 12 }}>✅ Tamamlandı</span>
+                : task.completed
+                ? <button onClick={() => handleClaimReward(task.id)} style={{ background: isWeekly ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : '#22c55e', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 700, fontSize: 12, padding: '8px 16px', cursor: 'pointer' }}>🎁 Ödül Topla</button>
+                : <span style={{ color: '#64748b', fontSize: 12 }}>🔄 Devam ediyor...</span>
+              }
+            </div>
+          );
+        };
+        return (
+          <BottomPanel title={`📋 Görevler (${activeTasks} aktif)`} onClose={() => setActivePanel(null)}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Günlük */}
+              <p style={{ color: '#60a5fa', fontSize: 12, fontWeight: 700, margin: 0 }}>📅 GÜNLÜK GÖREVLER</p>
+              {dailyTasks.length === 0
+                ? <p style={{ color: '#64748b', fontSize: 12, textAlign: 'center' }}>Görev bulunamadı.</p>
+                : dailyTasks.map(renderTask)
+              }
+              {/* Haftalık */}
+              <p style={{ color: '#a78bfa', fontSize: 12, fontWeight: 700, margin: '10px 0 0' }}>🏆 HAFTALIK GÖREVLER</p>
+              {weeklyTasks.length === 0
+                ? <p style={{ color: '#64748b', fontSize: 12, textAlign: 'center' }}>Görev bulunamadı.</p>
+                : weeklyTasks.map(renderTask)
+              }
+            </div>
+          </BottomPanel>
+        );
+      })()}
 
       {/* ════════════ PANEL: ADA KEŞFİ ════════════ */}
       {activePanel === 'discover' && (
