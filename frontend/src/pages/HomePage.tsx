@@ -24,7 +24,6 @@ const BUILDING_CFG: any = {
 
 const NAV_ITEMS = [
   { key: 'tasks',       emoji: '📋', label: 'Görevler'  },
-  { key: 'discover',    emoji: '🗺️', label: 'Keşif'    },
   { key: 'spin',        emoji: '🎰', label: 'Çark'      },
   { key: 'battle',      emoji: '⚔️', label: 'Savaş'    },
   { key: 'trade',       emoji: '🔄', label: 'Ticaret'   },
@@ -608,21 +607,63 @@ function HomePage() {
           </div>
         )}
 
-        {/* Seçili ada başlığı */}
+        {/* Seçili ada başlığı + Keşif butonu */}
         {currentIsland && (
-          <div style={{
-            background: 'linear-gradient(135deg,rgba(59,130,246,0.18),rgba(6,182,212,0.12))',
-            border: '1px solid rgba(59,130,246,0.30)', borderRadius: 16,
-            padding: '12px 14px', marginBottom: 14,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <div>
-              <p style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>🏝️ {currentIsland.name}</p>
-              <p style={{ color: '#93c5fd', fontSize: 12, marginTop: 2 }}>{currentIsland.specialty}</p>
+          <div style={{ marginBottom: 14 }}>
+            {/* Ada bilgi kartı */}
+            <div style={{
+              background: 'linear-gradient(135deg,rgba(59,130,246,0.18),rgba(6,182,212,0.12))',
+              border: '1px solid rgba(59,130,246,0.30)', borderRadius: '16px 16px 0 0',
+              padding: '12px 14px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>🏝️ {currentIsland.name}</p>
+                <p style={{ color: '#93c5fd', fontSize: 12, marginTop: 2 }}>{currentIsland.specialty}</p>
+              </div>
+              <span style={{ background: 'rgba(59,130,246,0.25)', color: '#93c5fd', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20 }}>
+                Sv.{currentIsland.level}
+              </span>
             </div>
-            <span style={{ background: 'rgba(59,130,246,0.25)', color: '#93c5fd', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20 }}>
-              Sv.{currentIsland.level}
-            </span>
+
+            {/* Yeni Ada Keşfet butonu */}
+            {islands.length < 7 ? (
+              <button
+                onClick={() => setActivePanel('discover')}
+                style={{
+                  width: '100%', border: 'none', borderRadius: '0 0 16px 16px', cursor: 'pointer',
+                  background: 'linear-gradient(135deg,rgba(99,102,241,0.25),rgba(139,92,246,0.20))',
+                  borderTop: '1px dashed rgba(139,92,246,0.35)',
+                  padding: '9px 14px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>🗺️</span>
+                  <div style={{ textAlign: 'left' }}>
+                    <p style={{ color: '#c4b5fd', fontWeight: 700, fontSize: 12, margin: 0 }}>Yeni Ada Keşfet</p>
+                    <p style={{ color: '#7c6aad', fontSize: 10, margin: 0 }}>{islands.length}/7 ada keşfedildi</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {/* İlerleme barı */}
+                  <div style={{ width: 60, height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${(islands.length / 7) * 100}%`, background: 'linear-gradient(90deg,#6366f1,#a855f7)', borderRadius: 99 }} />
+                  </div>
+                  <span style={{ color: '#a78bfa', fontSize: 16 }}>›</span>
+                </div>
+              </button>
+            ) : (
+              <div style={{
+                width: '100%', borderRadius: '0 0 16px 16px',
+                background: 'rgba(34,197,94,0.12)', borderTop: '1px solid rgba(34,197,94,0.25)',
+                padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{ fontSize: 16 }}>🏆</span>
+                <p style={{ color: '#4ade80', fontSize: 12, fontWeight: 700, margin: 0 }}>Tüm adalar keşfedildi! 7/7</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1030,7 +1071,7 @@ function HomePage() {
         borderTop: '1px solid rgba(255,255,255,0.10)',
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 0 }}>
           {NAV_ITEMS.map(item => {
             const isActive = activePanel === item.key;
             const hasBadge = (item.key === 'tasks' && activeTasks > 0) || (item.key === 'battle' && attackNotifications > 0);
