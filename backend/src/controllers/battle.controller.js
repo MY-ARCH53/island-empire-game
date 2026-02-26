@@ -336,7 +336,7 @@ class BattleController {
         ORDER BY RANDOM()
         LIMIT 10
       `;
-      const result = await query(sql, [userId, minPower, maxPower, myPower]);
+      const result = await query(sql, [userId, minPower, maxPower]);
 
       res.json({
         success: true,
