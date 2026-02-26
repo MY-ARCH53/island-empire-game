@@ -5,6 +5,7 @@ import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, bat
 import { useToast } from '../contexts/ToastContext';
 import { fireConfetti, fireRewardConfetti, fireLevelUpConfetti } from '../utils/confetti';
 import DailyRewardModal from '../components/DailyRewardModal';
+import TutorialOverlay from '../components/TutorialOverlay';
 
 // ── Sabit veri ──────────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ function HomePage() {
   const [spinning, setSpinning]         = useState(false);
   const [spinResult, setSpinResult]     = useState<{ multiplier: number; goldEarned: number } | null>(null);
   const [spinDisplay, setSpinDisplay]   = useState<number>(2);
+  const [tutorialStep, setTutorialStep] = useState<number>(-1);
 
   // Saniye ticker → bina timer + oto-üretim geri sayım
   useEffect(() => {
@@ -105,6 +107,28 @@ function HomePage() {
     const interval = setInterval(loadGameData, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Tutorial — yeni oyuncuya ilk girişte göster
+  useEffect(() => {
+    if (!localStorage.getItem('tutorial_v1_done')) {
+      setTimeout(() => setTutorialStep(0), 1200);
+    }
+  }, []);
+
+  const handleTutorialNext = () => {
+    if (tutorialStep >= 5) {
+      localStorage.setItem('tutorial_v1_done', '1');
+      setTutorialStep(-1);
+      fireConfetti();
+    } else {
+      setTutorialStep(p => p + 1);
+    }
+  };
+
+  const handleTutorialSkip = () => {
+    localStorage.setItem('tutorial_v1_done', '1');
+    setTutorialStep(-1);
+  };
 
   // Upgrade otomatik tamamlama
   useEffect(() => {
@@ -549,7 +573,7 @@ function HomePage() {
         </div>
 
         {/* Kaynaklar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, paddingBottom: 10 }}>
+        <div data-tutorial="resources" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, paddingBottom: 10 }}>
           {['gold', 'wood', 'food', 'energy'].map(type => {
             const res = resources.find((r: any) => r.resource_type === type);
             const cfg = RESOURCE_CFG[type];
@@ -730,8 +754,8 @@ function HomePage() {
         {buildings.length > 0 && (
           <>
             <p style={{ color: '#64748b', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Binalar</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
-              {buildings.map(building => {
+            <div data-tutorial="buildings" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+              {buildings.map((building, bIdx) => {
                 const ps  = getProductionStatus(building);
                 const upgradeText    = getUpgradeTimerText(building);
                 const upgradePercent = getUpgradePercent(building);
@@ -803,6 +827,7 @@ function HomePage() {
                         <>
                           <button
                             onClick={() => handleStartProduction(building.id)}
+                            data-tutorial={bIdx === 0 ? 'produce-btn' : undefined}
                             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#22c55e', border: 'none', borderRadius: 12, color: '#fff', fontWeight: 700, fontSize: 13, padding: '9px 0', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
                           >
                             <Play size={14} /> Üret
@@ -1091,6 +1116,7 @@ function HomePage() {
               <button
                 key={item.key}
                 onClick={() => handleNavAction(item.key)}
+                data-tutorial={item.key === 'battle' ? 'battle-nav' : item.key === 'tasks' ? 'tasks-nav' : undefined}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   padding: '10px 0', border: 'none', background: 'transparent', cursor: 'pointer',
@@ -1126,6 +1152,16 @@ function HomePage() {
           streakAtRisk={streakAtRisk}
           onClaim={handleClaimDailyReward}
           onClose={() => setShowDailyReward(false)}
+        />
+      )}
+
+      {/* ════════════ TUTORIAL ════════════ */}
+      {tutorialStep >= 0 && (
+        <TutorialOverlay
+          step={tutorialStep}
+          totalSteps={6}
+          onNext={handleTutorialNext}
+          onSkip={handleTutorialSkip}
         />
       )}
     </div>
