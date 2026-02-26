@@ -238,7 +238,6 @@ function HomePage() {
     // userId production controller'a iletilir (görev takibi için)
     try {
       const res = await productionAPI.startProduction(buildingId, user?.id);
-      showToast('Üretim başladı!', 'success');
       handleXP(res.data.data?.xp);
       const prod = res.data.data.production;
       setBuildings((prev: any[]) => prev.map(b => b.id === buildingId ? { ...b, status: 'producing' } : b));
@@ -252,7 +251,6 @@ function HomePage() {
     if (!user) return;
     try {
       const res = await productionAPI.collectProduction(productionId, user.id);
-      showToast(res.data.message, 'success');
       handleXP(res.data.data?.xp);
       // Sadece bina durumunu ve kaynakları güncelle
       const buildingId = Object.keys(productions).find(
