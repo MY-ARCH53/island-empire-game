@@ -1,14 +1,16 @@
-import { X, Gift, Calendar } from 'lucide-react';
+import { X, Gift, Calendar, Flame } from 'lucide-react';
 import { fireLevelUpConfetti } from '../utils/confetti';
 
 interface DailyRewardModalProps {
   day: number;
   reward: { gold: number; wood: number };
+  streakCount?: number;
+  streakAtRisk?: boolean;
   onClaim: () => void;
   onClose: () => void;
 }
 
-function DailyRewardModal({ day, reward, onClaim, onClose }: DailyRewardModalProps) {
+function DailyRewardModal({ day, reward, streakCount = 0, streakAtRisk = false, onClaim, onClose }: DailyRewardModalProps) {
   const handleClaim = () => {
     fireLevelUpConfetti();
     onClaim();
@@ -27,6 +29,17 @@ function DailyRewardModal({ day, reward, onClaim, onClose }: DailyRewardModalPro
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
       <div className="glass-card max-w-lg w-full animate-slideInLeft">
+        {/* FOMO Banner — streak tehlikede */}
+        {streakAtRisk && (
+          <div className="mb-4 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl px-4 py-3 flex items-center gap-3 shadow-lg animate-pulse">
+            <Flame className="w-6 h-6 flex-shrink-0" />
+            <div>
+              <p className="font-bold text-sm">⚠️ {streakCount} Günlük Streakın Tehlikede!</p>
+              <p className="text-xs opacity-90">Bugün almasan yarın streak sıfırlanacak. Şimdi al!</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <Gift className="w-7 h-7 text-yellow-500" />
@@ -47,6 +60,11 @@ function DailyRewardModal({ day, reward, onClaim, onClose }: DailyRewardModalPro
           <p className="text-3xl font-bold text-gray-800 mb-2">
             Gün {day} Ödülü!
           </p>
+          {streakCount >= 2 && (
+            <p className="text-sm text-orange-600 font-semibold mb-2">
+              🔥 {streakCount} günlük seri devam ediyor!
+            </p>
+          )}
           <div className="flex items-center justify-center gap-4 text-2xl font-bold">
             <span className="text-yellow-600">💰 {reward.gold}</span>
             {reward.wood > 0 && (
@@ -93,9 +111,13 @@ function DailyRewardModal({ day, reward, onClaim, onClose }: DailyRewardModalPro
 
         <button
           onClick={handleClaim}
-          className="w-full bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 hover:from-yellow-500 hover:via-orange-600 hover:to-red-600 text-white py-4 rounded-xl font-bold text-lg transition-all btn-modern shadow-2xl"
+          className={`w-full text-white py-4 rounded-xl font-bold text-lg transition-all btn-modern shadow-2xl ${
+            streakAtRisk
+              ? 'bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 hover:from-red-600 hover:via-orange-600 hover:to-yellow-600'
+              : 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 hover:from-yellow-500 hover:via-orange-600 hover:to-red-600'
+          }`}
         >
-          🎁 Ödülü Al!
+          {streakAtRisk ? '🔥 Streakı Kurtar — Ödülü Al!' : '🎁 Ödülü Al!'}
         </button>
 
         <p className="text-xs text-center text-gray-500 mt-3">

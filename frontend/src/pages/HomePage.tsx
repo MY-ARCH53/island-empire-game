@@ -74,6 +74,9 @@ function HomePage() {
   const [activePanel, setActivePanel] = useState<string | null>(null); // 'tasks' | 'discover'
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [dailyRewardData, setDailyRewardData] = useState<any>(null);
+  const [streakAtRisk, setStreakAtRisk]       = useState(false);
+  const [streakCount, setStreakCount]         = useState(0);
+  const [dailyCanClaim, setDailyCanClaim]     = useState(false);
   const [autoProduction, setAutoProduction]   = useState<{ active: boolean; endsAt: string | null; remainingMs: number }>({ active: false, endsAt: null, remainingMs: 0 });
   const [attackNotifications, setAttackNotifications] = useState(0);
   const [tradeAmounts, setTradeAmounts] = useState<Record<string, number>>({ energy: 100, food: 100, wood: 100 });
@@ -147,7 +150,14 @@ function HomePage() {
 
       try {
         const dr = await dailyRewardAPI.check(u.id);
-        if (dr.data.data.canClaim) { setDailyRewardData(dr.data.data); setShowDailyReward(true); }
+        const drData = dr.data.data;
+        setStreakCount(drData.streakCount ?? 0);
+        setDailyCanClaim(drData.canClaim ?? false);
+        if (drData.canClaim) {
+          setDailyRewardData(drData);
+          setShowDailyReward(true);
+          setStreakAtRisk(drData.streakAtRisk ?? false);
+        }
       } catch {}
 
       // Otomatik üretim: durum al + tick işlet
@@ -457,6 +467,26 @@ function HomePage() {
                 <Pill color="#3b82f6">Sv.{user.level}</Pill>
                 <Pill color="#8b5cf6">{getIslandRank(islands.length)}</Pill>
                 <Pill color="#10b981">{islands.length} Ada</Pill>
+                {(streakCount > 0 || dailyCanClaim) && (
+                  <button
+                    onClick={() => setShowDailyReward(true)}
+                    style={{
+                      background: streakAtRisk
+                        ? 'linear-gradient(90deg,#dc2626,#ea580c)'
+                        : dailyCanClaim
+                        ? 'linear-gradient(90deg,#f59e0b,#f97316)'
+                        : 'rgba(251,146,60,0.20)',
+                      border: (streakAtRisk || dailyCanClaim) ? 'none' : '1px solid rgba(251,146,60,0.40)',
+                      borderRadius: 99, padding: '2px 8px', cursor: 'pointer',
+                      fontSize: 10, fontWeight: 700,
+                      color: (streakAtRisk || dailyCanClaim) ? '#fff' : '#fb923c',
+                      animation: (streakAtRisk || dailyCanClaim) ? 'pulse 1.5s infinite' : 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    {streakCount > 0 ? `🔥 ${streakCount}` : '🎁 Ödül!'}
+                  </button>
+                )}
               </div>
               {xpBar && (
                 <div style={{ marginTop: 5, width: 160 }}>
@@ -524,6 +554,27 @@ function HomePage() {
 
       {/* ════════════ ANA İÇERİK ════════════ */}
       <main style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', paddingBottom: 100 }}>
+
+        {/* Streak tehlikede banner */}
+        {streakAtRisk && (
+          <button
+            onClick={() => setShowDailyReward(true)}
+            style={{
+              width: '100%', marginBottom: 12,
+              background: 'linear-gradient(90deg,#dc2626,#ea580c)',
+              border: 'none', borderRadius: 12, padding: '10px 14px',
+              display: 'flex', alignItems: 'center', gap: 10,
+              cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+              animation: 'pulse 2s infinite',
+            }}
+          >
+            <span style={{ fontSize: 22 }}>🔥</span>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ color: '#fff', fontWeight: 700, fontSize: 13, margin: 0 }}>Streak kırılacak! Bugün ödülünü al</p>
+              <p style={{ color: 'rgba(255,255,255,0.80)', fontSize: 11, margin: 0 }}>Almadan çıkarsan serin sıfırlanır → Dokun!</p>
+            </div>
+          </button>
+        )}
 
         {/* Ada sekmeleri */}
         {islands.length > 1 && (
@@ -989,6 +1040,8 @@ function HomePage() {
         <DailyRewardModal
           day={dailyRewardData.day}
           reward={dailyRewardData.reward}
+          streakCount={streakCount}
+          streakAtRisk={streakAtRisk}
           onClaim={handleClaimDailyReward}
           onClose={() => setShowDailyReward(false)}
         />

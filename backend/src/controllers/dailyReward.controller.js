@@ -19,6 +19,8 @@ class DailyRewardController {
 
       let canClaim = false;
       let nextDay = 1;
+      let streakCount = 0;
+      let streakAtRisk = false;
 
       if (lastRewardResult.rows.length === 0) {
         // İlk kez giriş yapıyor
@@ -37,16 +39,21 @@ class DailyRewardController {
 
         if (diffDays >= 1) {
           canClaim = true;
-          // Eğer 1 gün geçmişse streak devam eder
           if (diffDays === 1) {
+            // Streak devam ediyor — bu günü almadı henüz
             nextDay = (lastReward.day_number % 7) + 1;
+            streakCount = lastReward.day_number; // dünkü gün sayısı = mevcut streak
+            streakAtRisk = streakCount >= 1;     // 1+ gün varsa FOMO
           } else {
             // Streak kırıldı, baştan başla
             nextDay = 1;
+            streakCount = 0;
           }
         } else {
+          // Bugün zaten alındı
           canClaim = false;
           nextDay = lastReward.day_number;
+          streakCount = lastReward.day_number;
         }
       }
 
@@ -66,7 +73,9 @@ class DailyRewardController {
         data: {
           canClaim,
           day: nextDay,
-          reward: rewards[nextDay]
+          reward: rewards[nextDay],
+          streakCount,
+          streakAtRisk,
         }
       });
     } catch (error) {
