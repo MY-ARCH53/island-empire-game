@@ -67,6 +67,12 @@ export const dailyRewardAPI = {
   claim: (userId) => api.post('/daily-reward/claim', { userId }),
 };
 
+// Çark çevirme
+export const spinAPI = {
+  getStatus: (userId) => api.get(`/spin/status?userId=${userId}`),
+  spin:      (userId) => api.post('/spin/daily', { userId }),
+};
+
 // Friend API'leri
 export const friendAPI = {
   search: (username, userId) => api.get(`/friends/search?username=${username}&userId=${userId}`),

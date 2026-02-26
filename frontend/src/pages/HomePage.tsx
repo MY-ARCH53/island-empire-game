@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Coins, TreePine, Apple, Zap, LogOut, Play, Package, X } from 'lucide-react';
-import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI, tradeAPI } from '../services/api';
+import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI, tradeAPI, spinAPI } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import { fireConfetti, fireRewardConfetti, fireLevelUpConfetti } from '../utils/confetti';
 import DailyRewardModal from '../components/DailyRewardModal';
@@ -25,6 +25,7 @@ const BUILDING_CFG: any = {
 const NAV_ITEMS = [
   { key: 'tasks',       emoji: '📋', label: 'Görevler'  },
   { key: 'discover',    emoji: '🗺️', label: 'Keşif'    },
+  { key: 'spin',        emoji: '🎰', label: 'Çark'      },
   { key: 'battle',      emoji: '⚔️', label: 'Savaş'    },
   { key: 'trade',       emoji: '🔄', label: 'Ticaret'   },
   { key: 'market',      emoji: '🏪', label: 'Pazar'     },
@@ -78,6 +79,10 @@ function HomePage() {
   const [tradeAmounts, setTradeAmounts] = useState<Record<string, number>>({ energy: 100, food: 100, wood: 100 });
   const [tradingType, setTradingType]   = useState<string | null>(null);
   const [xpBar, setXpBar]               = useState<{ xp: number; xpNeeded: number } | null>(null);
+  const [spinStatus, setSpinStatus]     = useState<{ canSpin: boolean; nextSpinAt: string | null; baseGold: number } | null>(null);
+  const [spinning, setSpinning]         = useState(false);
+  const [spinResult, setSpinResult]     = useState<{ multiplier: number; goldEarned: number } | null>(null);
+  const [spinDisplay, setSpinDisplay]   = useState<number>(2);
 
   // Saniye ticker → bina timer + oto-üretim geri sayım
   useEffect(() => {
@@ -345,13 +350,53 @@ function HomePage() {
   // ── Nav aksiyonu ──────────────────────────────────────────────────────────
 
   const handleNavAction = (key: string) => {
-    if (key === 'tasks' || key === 'discover' || key === 'trade') {
+    if (key === 'tasks' || key === 'discover' || key === 'trade' || key === 'spin') {
+      if (key === 'spin' && !spinStatus && user) {
+        spinAPI.getStatus(user.id).then(r => setSpinStatus(r.data.data)).catch(() => {});
+      }
       setActivePanel(activePanel === key ? null : key);
+      if (key === 'spin') setSpinResult(null);
     } else if (key === 'market')       navigate('/marketplace');
     else if (key === 'leaderboard')    navigate('/leaderboard');
     else if (key === 'battle')         navigate('/battle');
     else if (key === 'friends')        navigate('/friends');
     else if (key === 'guild')          navigate('/guilds');
+  };
+
+  const handleSpin = async () => {
+    if (!user || spinning || !spinStatus?.canSpin) return;
+    setSpinning(true);
+    setSpinResult(null);
+
+    // Animasyon: 2.5 saniye boyunca hızlı sayı döndür
+    const multis = [2, 3, 4, 5, 6, 8, 10];
+    let tick = 0;
+    const anim = setInterval(() => {
+      setSpinDisplay(multis[tick % multis.length]);
+      tick++;
+    }, 120);
+
+    try {
+      const res = await spinAPI.spin(user.id);
+      const { multiplier, goldEarned, xp } = res.data.data;
+
+      setTimeout(() => {
+        clearInterval(anim);
+        setSpinDisplay(multiplier);
+        setSpinResult({ multiplier, goldEarned });
+        setSpinStatus(prev => prev ? { ...prev, canSpin: false } : prev);
+        setSpinning(false);
+        handleXP(xp);
+        if (multiplier >= 5) { fireConfetti(); fireRewardConfetti(); }
+        else { fireRewardConfetti(); }
+        // Kaynakları güncelle
+        gameAPI.getResources(user.id).then(r => setResources(r.data.data.resources)).catch(() => {});
+      }, 2500);
+    } catch (e: any) {
+      clearInterval(anim);
+      setSpinning(false);
+      showToast(e.response?.data?.message || 'Hata oluştu', 'error');
+    }
   };
 
   const handleTrade = async (resourceType: string) => {
@@ -746,6 +791,93 @@ function HomePage() {
               </div>
             )
           }
+        </BottomPanel>
+      )}
+
+      {/* ════════════ PANEL: ÇARK ════════════ */}
+      {activePanel === 'spin' && (
+        <BottomPanel title="🎰 Günlük Çark" onClose={() => setActivePanel(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, padding: '10px 0' }}>
+
+            {/* Çark görseli */}
+            <div style={{
+              width: 160, height: 160, borderRadius: '50%',
+              background: spinning
+                ? 'conic-gradient(#f59e0b,#ef4444,#8b5cf6,#06b6d4,#22c55e,#f59e0b)'
+                : spinResult
+                ? spinResult.multiplier >= 5
+                  ? 'linear-gradient(135deg,#f59e0b,#ef4444)'
+                  : 'linear-gradient(135deg,#3b82f6,#8b5cf6)'
+                : 'linear-gradient(135deg,#1e293b,#334155)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: spinning ? '0 0 40px rgba(245,158,11,0.6)' : '0 0 20px rgba(99,102,241,0.3)',
+              transition: 'box-shadow .3s',
+              animation: spinning ? 'spin360 0.4s linear infinite' : 'none',
+            }}>
+              <span style={{ fontSize: 52, fontWeight: 900, color: '#fff', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+                x{spinDisplay}
+              </span>
+            </div>
+
+            {/* CSS animasyon */}
+            <style>{`@keyframes spin360 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
+            {/* Sonuç */}
+            {spinResult && (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ color: '#fbbf24', fontWeight: 800, fontSize: 22 }}>
+                  🎉 x{spinResult.multiplier} — +{spinResult.goldEarned.toLocaleString()} 💰
+                </p>
+                <p style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>Yarın tekrar çevirebilirsin!</p>
+              </div>
+            )}
+
+            {/* Çevirme butonu / durum */}
+            {!spinStatus ? (
+              <p style={{ color: '#64748b' }}>Yükleniyor...</p>
+            ) : spinStatus.canSpin ? (
+              <button
+                onClick={handleSpin}
+                disabled={spinning}
+                style={{
+                  background: spinning ? '#334155' : 'linear-gradient(135deg,#f59e0b,#ef4444)',
+                  border: 'none', borderRadius: 16, color: '#fff', fontWeight: 800,
+                  fontSize: 16, padding: '14px 40px', cursor: spinning ? 'not-allowed' : 'pointer',
+                  boxShadow: spinning ? 'none' : '0 0 20px rgba(245,158,11,0.5)',
+                  transition: 'all .3s',
+                }}
+              >
+                {spinning ? '⏳ Dönüyor...' : '🎰 Çarkı Çevir!'}
+              </button>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ color: '#64748b', fontSize: 13 }}>Bugün çevrildi ✅</p>
+                {spinStatus.nextSpinAt && (
+                  <p style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>
+                    Sonraki: {new Date(spinStatus.nextSpinAt).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Ödül tablosu */}
+            <div style={{ width: '100%' }}>
+              <p style={{ color: '#475569', fontSize: 11, textAlign: 'center', marginBottom: 8 }}>
+                Baz ödül: {spinStatus?.baseGold?.toLocaleString() ?? '...'} altın
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
+                {[2,3,4,5,6,8,10].map(m => (
+                  <div key={m} style={{
+                    background: spinResult?.multiplier === m ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${spinResult?.multiplier === m ? '#f59e0b' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: 8, padding: '6px 2px', textAlign: 'center',
+                  }}>
+                    <p style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700 }}>x{m}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </BottomPanel>
       )}
 
