@@ -305,6 +305,13 @@ class BattleController {
       );
       const myPower = myPowerRes.rows.length > 0 ? parseInt(myPowerRes.rows[0].power) : 0;
 
+      // Günlük saldırı sayısı
+      const attacksRes = await query(
+        'SELECT COUNT(*) as count FROM pvp_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE',
+        [userId]
+      );
+      const attacksToday = parseInt(attacksRes.rows[0].count);
+
       // Güç aralığı: benim gücümün %40 ile %250'si arası (minimum 100 aralık)
       const minPower = Math.max(0, Math.floor(myPower * 0.4) - 50);
       const maxPower = Math.max(Math.ceil(myPower * 2.5) + 50, 150);
@@ -333,7 +340,7 @@ class BattleController {
 
       res.json({
         success: true,
-        data: { players: result.rows }
+        data: { players: result.rows, attacks_today: attacksToday, attacks_limit: 5 }
       });
     } catch (error) {
       console.error('List PvP targets error:', error);
@@ -556,12 +563,20 @@ class BattleController {
         }
       } catch {}
 
+      const attacksTodayRes = await query(
+        'SELECT COUNT(*) as count FROM pvp_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE',
+        [attackerId]
+      );
+      const attacksToday = parseInt(attacksTodayRes.rows[0].count);
+
       res.json({
         success: true,
         message: winner === 'attacker' ? 'Zafer! Kaynaklar yagmalandi! 🎉' : 'Savunma basarili! Maglup oldunuz! 💀',
         data: {
           battle: battleResult.rows[0],
           winner,
+          attacks_today: attacksToday,
+          attacks_limit: 5,
           attacker_losses: {
             archer: attackerArcherLoss,
             infantry: attackerInfantryLoss,
