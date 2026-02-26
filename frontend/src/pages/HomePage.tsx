@@ -192,9 +192,14 @@ function HomePage() {
     if (!xpResult) return;
     // XP barını güncelle
     setXpBar({ xp: xpResult.xp, xpNeeded: xpResult.xpNeeded });
-    // User level'ını güncelle
+    // User level'ını güncelle (state + localStorage)
     if (xpResult.leveledUp) {
-      setUser((prev: any) => prev ? { ...prev, level: xpResult.newLevel } : prev);
+      setUser((prev: any) => {
+        if (!prev) return prev;
+        const updated = { ...prev, level: xpResult.newLevel };
+        localStorage.setItem('user', JSON.stringify(updated));
+        return updated;
+      });
       fireLevelUpConfetti();
       showToast(`🎉 LEVEL ${xpResult.newLevel}! +${xpResult.goldReward?.toLocaleString()} altın!`, 'success');
     }
