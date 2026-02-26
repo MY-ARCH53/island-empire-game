@@ -1,4 +1,5 @@
 const { query } = require('../config/database');
+const TaskController = require('./task.controller');
 
 class AutoProductionController {
   // Otomatik üretimi etkinleştir (1000 enerji → 4 saat)
@@ -128,13 +129,15 @@ class AutoProductionController {
             await query("UPDATE buildings SET status = 'idle' WHERE id = $1", [building.id]);
             building.status = 'idle';
             collected++;
+            // Günlük görev takibi
+            await TaskController.trackProgress(userId, 'daily_collect');
           }
         }
 
         // Bina boşta ise yeni üretim başlat
         if (building.status === 'idle') {
-          const productionTime = 5 * 60 * 1000; // 5 dakika
-          const completesAt = new Date(Date.now() + productionTime);
+          const waitSec = Math.round(55 * Math.pow(0.98, building.level - 1));
+          const completesAt = new Date(Date.now() + waitSec * 1000);
           await query(
             'INSERT INTO productions (building_id, product_type, quantity, completes_at) VALUES ($1, $2, $3, $4)',
             [building.id, building.production_type, building.production_rate, completesAt]

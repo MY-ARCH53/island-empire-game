@@ -33,7 +33,8 @@ async function processUserTick(userId) {
     }
 
     if (building.status === 'idle') {
-      const completesAt = new Date(Date.now() + 5 * 60 * 1000);
+      const waitSec = Math.round(55 * Math.pow(0.98, building.level - 1));
+      const completesAt = new Date(Date.now() + waitSec * 1000);
       await query(
         'INSERT INTO productions (building_id, product_type, quantity, completes_at) VALUES ($1, $2, $3, $4)',
         [building.id, building.production_type, building.production_rate, completesAt]

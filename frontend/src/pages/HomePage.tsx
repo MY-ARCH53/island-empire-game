@@ -78,9 +78,15 @@ function HomePage() {
   const [tradeAmounts, setTradeAmounts] = useState<Record<string, number>>({ energy: 100, food: 100, wood: 100 });
   const [tradingType, setTradingType]   = useState<string | null>(null);
 
-  // Saniye ticker → timer görsel güncellemesi
+  // Saniye ticker → bina timer + oto-üretim geri sayım
   useEffect(() => {
-    const ticker = setInterval(() => setBuildings(prev => [...prev]), 1000);
+    const ticker = setInterval(() => {
+      setBuildings(prev => [...prev]);
+      setAutoProduction(prev => prev.active && prev.remainingMs > 0
+        ? { ...prev, remainingMs: Math.max(0, prev.remainingMs - 1000) }
+        : prev
+      );
+    }, 1000);
     return () => clearInterval(ticker);
   }, []);
 
