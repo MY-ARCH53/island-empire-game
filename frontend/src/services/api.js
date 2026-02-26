@@ -32,8 +32,6 @@ export const gameAPI = {
   getBuildings: (islandId) => api.get(`/buildings/${islandId}`),
   upgradeBuilding: (buildingId, userId) => api.post('/buildings/upgrade', { buildingId, userId }),
   completeUpgrade: (buildingId) => api.post(`/buildings/complete-upgrade/${buildingId}`),
-  constructBuilding: (islandId, buildingType, userId) => api.post('/buildings/construct', { islandId, buildingType, userId }),
-  completeConstruction: (buildingId) => api.post(`/buildings/complete-construction/${buildingId}`),
   getDiscoverableIslands: (userId) => api.get(`/islands/discoverable?userId=${userId}`),
   discoverIsland: (userId, islandName, islandType, specialty, bonus) => api.post('/islands/discover', { userId, islandName, islandType, specialty, bonus }),
 };

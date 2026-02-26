@@ -17,7 +17,8 @@ CREATE TABLE users (
     is_bot BOOLEAN DEFAULT FALSE,
     auto_production_until TIMESTAMP,
     last_seen_attacks_at TIMESTAMP,
-    shield_until TIMESTAMP
+    shield_until TIMESTAMP,
+    last_spin_at TIMESTAMP
 );
 
 -- Islands Table
@@ -100,7 +101,8 @@ CREATE TABLE tasks (
     claimed BOOLEAN DEFAULT FALSE,
     completed_at TIMESTAMP,
     claimed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_weekly BOOLEAN DEFAULT FALSE
 );
 
 -- League Rankings Table
