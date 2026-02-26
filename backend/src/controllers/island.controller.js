@@ -142,10 +142,9 @@ class IslandController {
       // Adaya 4 binayı otomatik ekle
       await GameInitService.initializeIslandBuildings(island.id);
 
-      // Oyuncu unvanını güncelle (yeni ada sayısına göre)
+      // Oyuncu unvanı — ada sayısından hesaplanır (DB'ye yazılmaz)
       const RANKS = ['Köylü', 'Çırak', 'Tüccar', 'Usta', 'Baron', 'Lord', 'Efsane'];
       const newRank = RANKS[islandCount] || 'Efsane'; // islandCount = eski sayı, yeni = +1
-      await query('UPDATE users SET league = $1 WHERE id = $2', [newRank, userId]);
 
       res.json({
         success: true,

@@ -8,18 +8,20 @@ export const fireConfetti = () => {
 
   (function frame() {
     confetti({
-      particleCount: 3,
+      particleCount: 12,
       angle: 60,
-      spread: 55,
+      spread: 70,
       origin: { x: 0 },
-      colors: colors
+      colors: colors,
+      zIndex: 9999,
     });
     confetti({
-      particleCount: 3,
+      particleCount: 12,
       angle: 120,
-      spread: 55,
+      spread: 70,
       origin: { x: 1 },
-      colors: colors
+      colors: colors,
+      zIndex: 9999,
     });
 
     if (Date.now() < end) {
@@ -30,10 +32,11 @@ export const fireConfetti = () => {
 
 export const fireRewardConfetti = () => {
   confetti({
-    particleCount: 100,
-    spread: 70,
+    particleCount: 150,
+    spread: 80,
     origin: { y: 0.6 },
-    colors: ['#FFD700', '#FFA500', '#FF6347']
+    colors: ['#FFD700', '#FFA500', '#FF6347'],
+    zIndex: 9999,
   });
 };
 

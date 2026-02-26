@@ -39,6 +39,11 @@ const TRADE_RATES = [
   { type: 'wood',   emoji: '🌲', label: 'Odun',     per: 100, gold: 20,  color: '#10b981' },
 ];
 
+const ISLAND_RANKS = ['Köylü', 'Çırak', 'Tüccar', 'Usta', 'Baron', 'Lord', 'Efsane'];
+function getIslandRank(islandCount: number): string {
+  return ISLAND_RANKS[Math.min(Math.max(islandCount - 1, 0), ISLAND_RANKS.length - 1)] ?? 'Köylü';
+}
+
 // ── Yardımcı: MM:SS timer ───────────────────────────────────────────────────
 
 function formatTimer(ms: number): string {
@@ -233,9 +238,9 @@ function HomePage() {
     if (!user) return;
     try {
       const res = await gameAPI.discoverIsland(user.id, island.name, island.type, island.specialty, island.bonus);
-      fireConfetti();
-      showToast(res.data.message, 'success');
       setActivePanel(null);
+      showToast(`🏝️ ${island.name} keşfedildi!`, 'success');
+      setTimeout(() => { fireConfetti(); fireRewardConfetti(); }, 100);
       loadGameData();
     } catch (e: any) {
       showToast(e.response?.data?.message || 'Keşif başarısız', 'error');
@@ -378,7 +383,7 @@ function HomePage() {
               <p style={{ color: '#fff', fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>{user.username}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
                 <Pill color="#3b82f6">Sv.{user.level}</Pill>
-                <Pill color="#8b5cf6">{user.league}</Pill>
+                <Pill color="#8b5cf6">{getIslandRank(islands.length)}</Pill>
                 <Pill color="#10b981">{islands.length} Ada</Pill>
               </div>
             </div>
