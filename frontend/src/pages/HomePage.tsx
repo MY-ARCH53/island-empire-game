@@ -183,9 +183,9 @@ function HomePage() {
   // ── Üretim işlemleri ──────────────────────────────────────────────────────
 
   const handleStartProduction = async (buildingId: number) => {
+    // userId production controller'a iletilir (görev takibi için)
     try {
-      const res = await productionAPI.startProduction(buildingId);
-      if (user) taskAPI.updateProgress(user.id, 'daily_production').catch(() => {});
+      const res = await productionAPI.startProduction(buildingId, user?.id);
       showToast('Üretim başladı!', 'success');
       // Sadece bu binanın durumunu güncelle
       const prod = res.data.data.production;
@@ -439,6 +439,24 @@ function HomePage() {
 
       {/* ════════════ ANA İÇERİK ════════════ */}
       <main style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', paddingBottom: 100 }}>
+
+        {/* iPhone 17 Hedef Çubuğu */}
+        {(() => {
+          const GOAL = 100_000_000;
+          const gold = resources.find((r: any) => r.resource_type === 'gold')?.amount ?? 0;
+          const pct = Math.min(100, (gold / GOAL) * 100);
+          return (
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 14, padding: '10px 14px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 700 }}>📱 iPhone 17 Hedefi</span>
+                <span style={{ color: '#f59e0b', fontSize: 11, fontWeight: 600 }}>{pct.toFixed(2)}% • {Math.floor(gold).toLocaleString()} / 100M</span>
+              </div>
+              <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#f59e0b,#ef4444)', borderRadius: 6, transition: 'width .5s' }} />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Ada sekmeleri */}
         {islands.length > 1 && (

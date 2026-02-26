@@ -1,10 +1,11 @@
 const { query } = require('../config/database');
+const TaskController = require('./task.controller');
 
 class ProductionController {
   // Üretim başlat
   static async startProduction(req, res) {
     try {
-      const { buildingId } = req.body;
+      const { buildingId, userId } = req.body;
 
       // Bina bilgisini al
       const buildingSql = 'SELECT * FROM buildings WHERE id = $1';
@@ -66,6 +67,9 @@ if (building.status === 'upgrading') {
         'UPDATE buildings SET status = $1 WHERE id = $2',
         ['producing', buildingId]
       );
+
+      // Günlük görev takibi
+      if (userId) await TaskController.trackProgress(userId, 'daily_production');
 
       res.json({
         success: true,
@@ -148,6 +152,9 @@ if (building.status === 'upgrading') {
         'UPDATE buildings SET status = $1 WHERE id = $2',
         ['idle', production.building_id]
       );
+
+      // Günlük görev takibi
+      if (userId) await TaskController.trackProgress(userId, 'daily_collect');
 
       res.json({
         success: true,

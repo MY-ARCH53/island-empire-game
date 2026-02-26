@@ -39,7 +39,7 @@ export const gameAPI = {
 
 export const productionAPI = {
   getBuildingProductions: (buildingId) => api.get(`/production/building/${buildingId}`),
-  startProduction: (buildingId) => api.post('/production/start', { buildingId }),
+  startProduction: (buildingId, userId) => api.post('/production/start', { buildingId, userId }),
   collectProduction: (productionId, userId) => api.post(`/production/collect/${productionId}`, { userId }),
 };
 

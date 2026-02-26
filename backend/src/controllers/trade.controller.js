@@ -1,4 +1,5 @@
 const { query } = require('../config/database');
+const TaskController = require('./task.controller');
 
 // Ticaret oranları: kaynak türü → 100 birim karşılığı altın
 const TRADE_RATES = {
@@ -59,6 +60,9 @@ class TradeController {
         'SELECT resource_type, amount FROM resources WHERE user_id = $1',
         [userId]
       );
+
+      // Günlük görev takibi
+      await TaskController.trackProgress(userId, 'daily_trade');
 
       res.json({
         success: true,

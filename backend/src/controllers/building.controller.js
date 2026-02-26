@@ -1,4 +1,5 @@
 const { query } = require('../config/database');
+const TaskController = require('./task.controller');
 
 class BuildingController {
   static async upgradeBuilding(req, res) {
@@ -95,6 +96,9 @@ class BuildingController {
         'UPDATE buildings SET level = $1, production_rate = $2, status = $3, upgrade_started_at = CURRENT_TIMESTAMP, upgrade_completes_at = $4 WHERE id = $5',
         [newLevel, newProductionRate, 'upgrading', upgradeCompletesAt, buildingId]
       );
+
+      // Günlük görev takibi
+      await TaskController.trackProgress(userId, 'daily_upgrade');
 
       res.json({
         success: true,
