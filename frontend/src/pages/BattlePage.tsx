@@ -103,6 +103,7 @@ function BattlePage() {
   const { showToast } = useToast();
 
   const [user, setUser]               = useState<any>(null);
+  const userIdRef                     = useRef<number | null>(null);
   const [army, setArmy]               = useState<any>(null);
   const [pirates, setPirates]         = useState<any[]>([]);
   const [pvpTargets, setPvpTargets]   = useState<any[]>([]);
@@ -113,6 +114,7 @@ function BattlePage() {
 
   // Günlük PvP sayacı
   const [pvpAttacksToday, setPvpAttacksToday] = useState(0);
+  const [pvpLoading, setPvpLoading] = useState(false);
 
   // Recruit
   const [recruitType, setRecruitType]   = useState('infantry');
@@ -153,6 +155,7 @@ function BattlePage() {
     if (!raw) { navigate('/login'); return; }
     const u = JSON.parse(raw);
     setUser(u);
+    userIdRef.current = u.id;
     loadAll(u.id);
   }, []);
 
@@ -170,12 +173,18 @@ function BattlePage() {
   };
 
   const loadPvp = async () => {
-    if (!user) return;
+    const uid = userIdRef.current;
+    if (!uid) return;
+    setPvpLoading(true);
     try {
-      const res = await battleAPI.listPvpTargets(user.id);
+      const res = await battleAPI.listPvpTargets(uid);
       setPvpTargets(res.data.data.players);
       setPvpAttacksToday(res.data.data.attacks_today ?? 0);
-    } catch {}
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Rakipler yüklenemedi', 'error');
+    } finally {
+      setPvpLoading(false);
+    }
   };
 
   const loadReports = async () => {
@@ -496,7 +505,9 @@ function BattlePage() {
           <div style={{ ...CARD }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <p style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>👥 Yakın Güçteki Rakipler</p>
-              <button onClick={loadPvp} style={{ background: 'none', border: 'none', color: '#06b6d4', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>↻ Yenile</button>
+              <button onClick={loadPvp} disabled={pvpLoading} style={{ background: 'none', border: 'none', color: '#06b6d4', cursor: pvpLoading ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, opacity: pvpLoading ? 0.5 : 1 }}>
+                {pvpLoading ? '⏳' : '↻ Yenile'}
+              </button>
             </div>
 
             {/* Günlük saldırı sayacı */}
