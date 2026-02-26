@@ -141,7 +141,7 @@ function BattlePage() {
       setBattlePhase(0);
       phaseTimerRef.current = setInterval(() => {
         setBattlePhase(p => (p + 1) % BATTLE_PHASES.length);
-      }, 600);
+      }, 900);
     } else {
       clearInterval(phaseTimerRef.current);
     }
