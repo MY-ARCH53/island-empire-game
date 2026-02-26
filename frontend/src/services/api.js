@@ -23,6 +23,7 @@ export const authAPI = {
   startGame: (userId) => api.post('/auth/start-game', { userId }),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post('/auth/reset-password', { token, password }),
+  getProfile: (userId) => api.get(`/auth/profile?userId=${userId}`),
 };
 
 export const gameAPI = {

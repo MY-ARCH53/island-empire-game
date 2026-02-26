@@ -455,12 +455,24 @@ function HomePage() {
         {/* Üst satır: Avatar + kullanıcı + çıkış */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 12,
-              background: 'linear-gradient(135deg,#f59e0b,#ef4444)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, boxShadow: '0 0 12px rgba(245,158,11,0.4)',
-            }}>⛵</div>
+            <button
+              onClick={() => navigate('/profile')}
+              style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: 'linear-gradient(135deg,#f59e0b,#ef4444)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, boxShadow: '0 0 12px rgba(245,158,11,0.4)',
+                border: 'none', cursor: 'pointer', flexShrink: 0,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {(() => {
+                const u = JSON.parse(localStorage.getItem('user') || '{}');
+                const AVATARS = ['⛵','🏴‍☠️','🦁','🐉','🦅','🌊','⚡','🔥','💎','🏆'];
+                const idx = parseInt(localStorage.getItem(`avatar_${u.id}`) || '0');
+                return AVATARS[idx] || '⛵';
+              })()}
+            </button>
             <div>
               <p style={{ color: '#fff', fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>{user.username}</p>
               <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>

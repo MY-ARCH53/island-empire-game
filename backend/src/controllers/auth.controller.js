@@ -241,6 +241,90 @@ class AuthController {
       res.status(500).json({ success: false, message: 'Hata olustu', error: error.message });
     }
   }
+
+  // GET /api/auth/profile?userId=X
+  static async getProfile(req, res) {
+    try {
+      const { userId } = req.query;
+
+      // Kullanıcı temel bilgileri
+      const userRes = await query(
+        'SELECT id, username, level, experience, created_at FROM users WHERE id = $1',
+        [userId]
+      );
+      if (!userRes.rows.length) return res.status(404).json({ success: false });
+      const user = userRes.rows[0];
+
+      // Ada sayısı
+      const islandRes = await query('SELECT COUNT(*) FROM islands WHERE user_id = $1', [userId]);
+      const islandCount = parseInt(islandRes.rows[0].count);
+
+      // Kaynaklar
+      const resourceRes = await query('SELECT resource_type, amount FROM resources WHERE user_id = $1', [userId]);
+      const resources = {};
+      resourceRes.rows.forEach(r => { resources[r.resource_type] = Math.floor(r.amount); });
+
+      // Savaş istatistikleri
+      const battleRes = await query(
+        `SELECT
+           COUNT(*) FILTER (WHERE attacker_id = $1) AS total_attacks,
+           COUNT(*) FILTER (WHERE defender_id = $1) AS total_defenses,
+           COUNT(*) FILTER (WHERE attacker_id = $1 AND winner = 'attacker') AS attack_wins,
+           COUNT(*) FILTER (WHERE defender_id = $1 AND winner = 'defender') AS defense_wins
+         FROM battles WHERE attacker_id = $1 OR defender_id = $1`,
+        [userId]
+      );
+      const battles = battleRes.rows[0];
+
+      // Tamamlanan görev sayısı
+      const taskRes = await query(
+        'SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND claimed = true',
+        [userId]
+      );
+      const completedTasks = parseInt(taskRes.rows[0].count);
+
+      // Günlük ödül — max streak
+      const streakRes = await query(
+        'SELECT MAX(day_number) AS best_streak, COUNT(*) AS total_logins FROM daily_rewards WHERE user_id = $1',
+        [userId]
+      );
+      const { best_streak, total_logins } = streakRes.rows[0];
+
+      // Çark çevirme sayısı
+      const spinRes = await query(
+        'SELECT COUNT(*) FROM daily_rewards WHERE user_id = $1',
+        [userId]
+      );
+
+      const RANKS = ['Köylü', 'Çırak', 'Tüccar', 'Usta', 'Baron', 'Lord', 'Efsane'];
+      const rank = RANKS[Math.min(islandCount - 1, RANKS.length - 1)] || 'Köylü';
+
+      // Kayıt tarihinden bu yana gün sayısı
+      const daysSince = Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000);
+
+      res.json({
+        success: true,
+        data: {
+          user: { ...user, rank },
+          islandCount,
+          resources,
+          battles: {
+            totalAttacks:  parseInt(battles.total_attacks),
+            totalDefenses: parseInt(battles.total_defenses),
+            attackWins:    parseInt(battles.attack_wins),
+            defenseWins:   parseInt(battles.defense_wins),
+          },
+          completedTasks,
+          bestStreak: parseInt(best_streak) || 0,
+          totalLogins: parseInt(total_logins) || 0,
+          daysSince,
+        },
+      });
+    } catch (error) {
+      console.error('getProfile error:', error);
+      res.status(500).json({ success: false, message: 'Profil yuklenemedi', error: error.message });
+    }
+  }
 }
 
 module.exports = AuthController;
