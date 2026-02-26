@@ -83,6 +83,7 @@ function RegisterPage() {
                   required
                   minLength={3}
                   disabled={loading}
+                  style={{ fontSize: 16 }}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">En az 3 karakter</p>
@@ -101,6 +102,7 @@ function RegisterPage() {
                   placeholder="ornek@mail.com"
                   required
                   disabled={loading}
+                  style={{ fontSize: 16 }}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">Şifre sıfırlama için kullanılır</p>
@@ -120,6 +122,7 @@ function RegisterPage() {
                   required
                   minLength={6}
                   disabled={loading}
+                  style={{ fontSize: 16 }}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">En az 6 karakter</p>
@@ -138,6 +141,7 @@ function RegisterPage() {
                   placeholder="••••••••"
                   required
                   disabled={loading}
+                  style={{ fontSize: 16 }}
                 />
               </div>
             </div>

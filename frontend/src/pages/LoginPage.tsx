@@ -72,6 +72,7 @@ function LoginPage() {
                   placeholder="kullaniciadi"
                   required
                   disabled={loading}
+                  style={{ fontSize: 16 }}
                 />
               </div>
             </div>
@@ -91,6 +92,7 @@ function LoginPage() {
                   placeholder="••••••••"
                   required
                   disabled={loading}
+                  style={{ fontSize: 16 }}
                 />
               </div>
             </div>
