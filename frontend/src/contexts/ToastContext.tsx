@@ -18,7 +18,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning') => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts([{ id, message, type }]); // Sadece en son toast göster
   };
 
   const removeToast = (id: number) => {
