@@ -45,13 +45,14 @@ function Toast({ message, type, onClose, duration = 3000 }: ToastProps) {
 
   return (
     <div
-      className={`fixed top-4 right-4 z-50 min-w-80 max-w-md ${getStyles()} rounded-xl shadow-2xl p-4 flex items-center gap-3 animate-slideInRight`}
+      className={`${getStyles()} rounded-xl shadow-2xl p-3 flex items-center gap-3 animate-slideInRight`}
+      style={{ pointerEvents: 'auto', width: '100%' }}
     >
       {getIcon()}
-      <p className="flex-1 font-medium">{message}</p>
+      <p className="flex-1 font-medium text-sm">{message}</p>
       <button
         onClick={onClose}
-        className="hover:bg-white hover:bg-opacity-20 rounded-lg p-1 transition"
+        className="hover:bg-white hover:bg-opacity-20 rounded-lg p-1 transition flex-shrink-0"
       >
         <X className="w-4 h-4" />
       </button>
