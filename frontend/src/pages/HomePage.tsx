@@ -87,7 +87,9 @@ function HomePage() {
   const [spinning, setSpinning]         = useState(false);
   const [spinResult, setSpinResult]     = useState<{ multiplier: number; goldEarned: number } | null>(null);
   const [spinDisplay, setSpinDisplay]   = useState<number>(2);
-  const [tutorialStep, setTutorialStep] = useState<number>(-1);
+  const [tutorialStep, setTutorialStep] = useState<number>(
+    () => localStorage.getItem('tutorial_v1_done') ? -1 : 0
+  );
 
   // Saniye ticker → bina timer + oto-üretim geri sayım
   useEffect(() => {
@@ -106,13 +108,6 @@ function HomePage() {
     loadGameData();
     const interval = setInterval(loadGameData, 10000);
     return () => clearInterval(interval);
-  }, []);
-
-  // Tutorial — yeni oyuncuya ilk girişte göster
-  useEffect(() => {
-    if (!localStorage.getItem('tutorial_v1_done')) {
-      setTimeout(() => setTutorialStep(0), 1200);
-    }
   }, []);
 
   const handleTutorialNext = () => {
