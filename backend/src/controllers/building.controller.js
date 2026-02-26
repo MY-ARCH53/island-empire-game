@@ -1,5 +1,6 @@
 const { query } = require('../config/database');
 const TaskController = require('./task.controller');
+const { addXP } = require('../services/xp.service');
 
 class BuildingController {
   static async upgradeBuilding(req, res) {
@@ -97,8 +98,9 @@ class BuildingController {
         [newLevel, newProductionRate, 'upgrading', upgradeCompletesAt, buildingId]
       );
 
-      // Günlük görev takibi
+      // Günlük görev takibi + XP
       await TaskController.trackProgress(userId, 'daily_upgrade');
+      const xpResult = await addXP(userId, 25);
 
       res.json({
         success: true,
@@ -106,7 +108,8 @@ class BuildingController {
         data: {
           newLevel: newLevel,
           cost: { gold: goldCost, wood: woodCost },
-          newProductionRate: newProductionRate
+          newProductionRate: newProductionRate,
+          xp: xpResult,
         }
       });
     } catch (error) {

@@ -1,6 +1,7 @@
 const { query } = require('../config/database');
 const IslandModel = require('../models/island.model');
 const GameInitService = require('../services/gameInit.service');
+const { addXP } = require('../services/xp.service');
 
 class IslandController {
   // Keşfedilebilir adaları getir
@@ -144,7 +145,10 @@ class IslandController {
 
       // Oyuncu unvanı — ada sayısından hesaplanır (DB'ye yazılmaz)
       const RANKS = ['Köylü', 'Çırak', 'Tüccar', 'Usta', 'Baron', 'Lord', 'Efsane'];
-      const newRank = RANKS[islandCount] || 'Efsane'; // islandCount = eski sayı, yeni = +1
+      const newRank = RANKS[islandCount] || 'Efsane';
+
+      // Ada keşfine özel XP (+100)
+      const xpResult = await addXP(userId, 100);
 
       res.json({
         success: true,
@@ -153,6 +157,7 @@ class IslandController {
           island,
           cost: { gold: goldCost, wood: woodCost },
           newRank,
+          xp: xpResult,
         }
       });
     } catch (error) {

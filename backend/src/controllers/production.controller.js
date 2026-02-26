@@ -1,5 +1,6 @@
 const { query } = require('../config/database');
 const TaskController = require('./task.controller');
+const { addXP } = require('../services/xp.service');
 
 class ProductionController {
   // Üretim başlat
@@ -68,14 +69,19 @@ if (building.status === 'upgrading') {
         ['producing', buildingId]
       );
 
-      // Günlük görev takibi
-      if (userId) await TaskController.trackProgress(userId, 'daily_production');
+      // Günlük görev takibi + XP
+      let xpResult = { leveledUp: false };
+      if (userId) {
+        await TaskController.trackProgress(userId, 'daily_production');
+        xpResult = await addXP(userId, 5);
+      }
 
       res.json({
         success: true,
         message: 'Üretim başladı! 🌾',
         data: {
-          production: result.rows[0]
+          production: result.rows[0],
+          xp: xpResult,
         }
       });
     } catch (error) {
@@ -153,17 +159,19 @@ if (building.status === 'upgrading') {
         ['idle', production.building_id]
       );
 
-      // Günlük görev takibi
-      if (userId) await TaskController.trackProgress(userId, 'daily_collect');
+      // Günlük görev takibi + XP
+      let xpResult = { leveledUp: false };
+      if (userId) {
+        await TaskController.trackProgress(userId, 'daily_collect');
+        xpResult = await addXP(userId, 10);
+      }
 
       res.json({
         success: true,
         message: `${production.quantity} ${resourceType} toplandı! 🎉`,
         data: {
-          collected: {
-            type: resourceType,
-            amount: production.quantity
-          }
+          collected: { type: resourceType, amount: production.quantity },
+          xp: xpResult,
         }
       });
     } catch (error) {

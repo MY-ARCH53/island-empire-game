@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Coins, TreePine, Apple, Zap, LogOut, Play, Package, X } from 'lucide-react';
 import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI, tradeAPI } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
-import { fireConfetti, fireRewardConfetti } from '../utils/confetti';
+import { fireConfetti, fireRewardConfetti, fireLevelUpConfetti } from '../utils/confetti';
 import DailyRewardModal from '../components/DailyRewardModal';
 
 // ── Sabit veri ──────────────────────────────────────────────────────────────
@@ -77,6 +77,7 @@ function HomePage() {
   const [attackNotifications, setAttackNotifications] = useState(0);
   const [tradeAmounts, setTradeAmounts] = useState<Record<string, number>>({ energy: 100, food: 100, wood: 100 });
   const [tradingType, setTradingType]   = useState<string | null>(null);
+  const [xpBar, setXpBar]               = useState<{ xp: number; xpNeeded: number } | null>(null);
 
   // Saniye ticker → bina timer + oto-üretim geri sayım
   useEffect(() => {
@@ -186,6 +187,19 @@ function HomePage() {
     await loadIslandBuildings(id);
   };
 
+  // ── Level-up işleyici ─────────────────────────────────────────────────────
+  const handleXP = (xpResult: any) => {
+    if (!xpResult) return;
+    // XP barını güncelle
+    setXpBar({ xp: xpResult.xp, xpNeeded: xpResult.xpNeeded });
+    // User level'ını güncelle
+    if (xpResult.leveledUp) {
+      setUser((prev: any) => prev ? { ...prev, level: xpResult.newLevel } : prev);
+      fireLevelUpConfetti();
+      showToast(`🎉 LEVEL ${xpResult.newLevel}! +${xpResult.goldReward?.toLocaleString()} altın!`, 'success');
+    }
+  };
+
   // ── Üretim işlemleri ──────────────────────────────────────────────────────
 
   const handleStartProduction = async (buildingId: number) => {
@@ -193,7 +207,7 @@ function HomePage() {
     try {
       const res = await productionAPI.startProduction(buildingId, user?.id);
       showToast('Üretim başladı!', 'success');
-      // Sadece bu binanın durumunu güncelle
+      handleXP(res.data.data?.xp);
       const prod = res.data.data.production;
       setBuildings((prev: any[]) => prev.map(b => b.id === buildingId ? { ...b, status: 'producing' } : b));
       setProductions((prev: any) => ({ ...prev, [buildingId]: prod }));
@@ -207,6 +221,7 @@ function HomePage() {
     try {
       const res = await productionAPI.collectProduction(productionId, user.id);
       showToast(res.data.message, 'success');
+      handleXP(res.data.data?.xp);
       // Sadece bina durumunu ve kaynakları güncelle
       const buildingId = Object.keys(productions).find(
         (key: any) => productions[key]?.id === productionId
@@ -226,8 +241,8 @@ function HomePage() {
     if (!user) return;
     try {
       const res = await gameAPI.upgradeBuilding(buildingId, user.id);
-      await taskAPI.updateProgress(user.id, 'daily_upgrade');
       showToast(res.data.message, 'success');
+      handleXP(res.data.data?.xp);
       loadGameData();
     } catch (e: any) {
       showToast(e.response?.data?.message || 'Yükseltme başarısız', 'error');
@@ -247,6 +262,7 @@ function HomePage() {
       setActivePanel(null);
       showToast(`🏝️ ${island.name} keşfedildi!`, 'success');
       setTimeout(() => { fireConfetti(); fireRewardConfetti(); }, 100);
+      handleXP(res.data.data?.xp);
       loadGameData();
     } catch (e: any) {
       showToast(e.response?.data?.message || 'Keşif başarısız', 'error');
@@ -392,6 +408,19 @@ function HomePage() {
                 <Pill color="#8b5cf6">{getIslandRank(islands.length)}</Pill>
                 <Pill color="#10b981">{islands.length} Ada</Pill>
               </div>
+              {xpBar && (
+                <div style={{ marginTop: 5, width: 160 }}>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.10)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 4,
+                      width: `${Math.min(100, (xpBar.xp / xpBar.xpNeeded) * 100)}%`,
+                      background: 'linear-gradient(90deg,#a78bfa,#6366f1)',
+                      transition: 'width .4s ease',
+                    }} />
+                  </div>
+                  <p style={{ color: '#7c3aed', fontSize: 9, marginTop: 2 }}>{xpBar.xp} / {xpBar.xpNeeded} XP</p>
+                </div>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
