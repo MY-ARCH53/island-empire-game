@@ -78,6 +78,7 @@ function HomePage() {
   const [dailyCanClaim, setDailyCanClaim]     = useState(false);
   const [autoProduction, setAutoProduction]   = useState<{ active: boolean; endsAt: string | null; remainingMs: number }>({ active: false, endsAt: null, remainingMs: 0 });
   const [attackNotifications, setAttackNotifications] = useState(0);
+  const prevAttackCountRef = useRef<number>(-1); // -1 = henüz ilk yükleme yapılmadı
   const [tradeAmounts, setTradeAmounts] = useState<Record<string, number>>({ energy: 100, food: 100, wood: 100 });
   const [tradingType, setTradingType]   = useState<string | null>(null);
   const [xpBar, setXpBar]               = useState<{ xp: number; xpNeeded: number } | null>(null);
@@ -172,7 +173,19 @@ function HomePage() {
       // Savaş bildirimi: saldırıya uğrama sayısı
       try {
         const unreadRes = await battleAPI.getUnreadAttacks(u.id);
-        setAttackNotifications(unreadRes.data.data.count);
+        const newCount = unreadRes.data.data.count;
+        if (prevAttackCountRef.current === -1) {
+          // İlk yükleme — sadece badge'i göster, toast yok
+          prevAttackCountRef.current = newCount;
+        } else if (newCount > prevAttackCountRef.current) {
+          // Yeni saldırı var!
+          const diff = newCount - prevAttackCountRef.current;
+          showToast(`⚔️ ${diff} yeni saldırıya uğradın! Savaş > Raporlar`, 'error');
+          prevAttackCountRef.current = newCount;
+        } else {
+          prevAttackCountRef.current = newCount;
+        }
+        setAttackNotifications(newCount);
       } catch {}
 
       setLoading(false);
