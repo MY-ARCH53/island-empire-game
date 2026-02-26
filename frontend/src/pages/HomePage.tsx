@@ -1144,7 +1144,7 @@ function HomePage() {
       </nav>
 
       {/* ════════════ GÜNLÜK ÖDÜL MODAL ════════════ */}
-      {showDailyReward && dailyRewardData && (
+      {showDailyReward && dailyRewardData && tutorialStep < 0 && (
         <DailyRewardModal
           day={dailyRewardData.day}
           reward={dailyRewardData.reward}
