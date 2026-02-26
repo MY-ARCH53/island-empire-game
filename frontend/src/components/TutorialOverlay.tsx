@@ -46,11 +46,18 @@ export default function TutorialOverlay({ step, totalSteps, onNext, onSkip }: Pr
     updateRect();
   }, [updateRect]);
 
-  // Tooltip pozisyonu: element ekranın alt yarısındaysa yukarı koy
-  const tooltipBelow = spotlightRect ? spotlightRect.top < window.innerHeight * 0.5 : true;
+  // (tooltip pozisyonu aşağıda hesaplanıyor)
 
   const PAD = 10;
+  const NAV_HEIGHT = 75;      // alt nav bar yüksekliği
+  const TOOLTIP_H  = 190;     // tooltip tahmini yüksekliği
   const sr = spotlightRect;
+
+  // Alta yeterli yer yoksa tooltip'i yukarı koy
+  const spaceBelow = sr
+    ? window.innerHeight - (sr.top + sr.height + PAD + 16) - NAV_HEIGHT
+    : 999;
+  const tooltipBelow = sr ? spaceBelow >= TOOLTIP_H : true;
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000 }}>
@@ -137,8 +144,8 @@ export default function TutorialOverlay({ step, totalSteps, onNext, onSkip }: Pr
             left: sr ? Math.min(Math.max(sr.left - 8, 8), window.innerWidth - 316) : 16,
             ...(sr
               ? tooltipBelow
-                ? { top: sr.top + sr.height + PAD + 16 }
-                : { bottom: window.innerHeight - (sr.top - PAD) + 12 }
+                ? { top: Math.min(sr.top + sr.height + PAD + 16, window.innerHeight - NAV_HEIGHT - TOOLTIP_H - 8) }
+                : { bottom: Math.max(window.innerHeight - (sr.top - PAD) + 12, NAV_HEIGHT + 8) }
               : { top: '50%', transform: 'translateY(-50%)' }
             ),
             width: 300,
