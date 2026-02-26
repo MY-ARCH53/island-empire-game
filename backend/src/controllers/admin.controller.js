@@ -304,7 +304,8 @@ class AdminController {
       const results = [];
 
       for (const bot of botsRes.rows) {
-        // Kalkanı olmayan rastgele bir gerçek oyuncu seç (bot hariç)
+        // Kalkanı olmayan, admin olmayan, botun yenebileceği gerçek oyuncuyu seç
+        const maxTargetPower = Math.floor(bot.total_power * 1.5) + 10;
         const targetRes = await query(`
           SELECT u.id, u.username, a.total_power,
                  r.amount AS gold_amount
@@ -313,11 +314,13 @@ class AdminController {
           LEFT JOIN resources r ON r.user_id = u.id AND r.resource_type = 'gold'
           WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
             AND u.is_active = TRUE
+            AND u.is_admin = FALSE
             AND u.id != $1
             AND (u.shield_until IS NULL OR u.shield_until < NOW())
+            AND COALESCE(a.total_power, 0) <= $2
           ORDER BY RANDOM()
           LIMIT 1
-        `, [bot.id]);
+        `, [bot.id, maxTargetPower]);
 
         if (targetRes.rows.length === 0) continue;
         const target = targetRes.rows[0];
@@ -438,6 +441,139 @@ class AdminController {
       res.status(500).json({ success: false, message: 'Bot saldırısı başlatılamadı', error: error.message });
     }
   }
+  // Tüm bot ordularına toplu güç ekle
+  static async boostBotArmies(req, res) {
+    try {
+      const a = Math.max(0, parseInt(req.body.archerAdd)   || 0);
+      const i = Math.max(0, parseInt(req.body.infantryAdd) || 0);
+      const c = Math.max(0, parseInt(req.body.cavalryAdd)  || 0);
+      const powerAdd = a * 3 + i * 2 + c * 5;
+
+      if (powerAdd === 0) {
+        return res.status(400).json({ success: false, message: 'En az 1 asker eklenmelidir.' });
+      }
+
+      await query(`
+        UPDATE armies SET
+          archer_count   = archer_count   + $1,
+          infantry_count = infantry_count + $2,
+          cavalry_count  = cavalry_count  + $3,
+          total_power    = total_power    + $4
+        WHERE user_id IN (SELECT id FROM users WHERE is_bot = TRUE)
+      `, [a, i, c, powerAdd]);
+
+      const countRes = await query('SELECT COUNT(*) as cnt FROM users WHERE is_bot = TRUE');
+      res.json({
+        success: true,
+        message: `${countRes.rows[0].cnt} bota güç eklendi (+${powerAdd} güç/bot).`,
+      });
+    } catch (error) {
+      console.error('Admin boostBotArmies error:', error);
+      res.status(500).json({ success: false, message: 'Güç eklenemedi', error: error.message });
+    }
+  }
+
+  // Belirli bir kullanıcıya bot saldırısı
+  static async attackSpecificUser(req, res) {
+    try {
+      const { targetUserId, botCount = 1 } = req.body;
+      const count = Math.min(parseInt(botCount) || 1, 10);
+
+      const userRes = await query(
+        'SELECT id, username, is_active FROM users WHERE id = $1',
+        [targetUserId]
+      );
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+      }
+      const target = userRes.rows[0];
+      if (!target.is_active) {
+        return res.status(400).json({ success: false, message: 'Kullanıcı aktif değil.' });
+      }
+
+      const botsRes = await query(`
+        SELECT u.id, a.total_power, a.archer_count, a.infantry_count, a.cavalry_count
+        FROM users u
+        JOIN armies a ON a.user_id = u.id
+        WHERE u.is_bot = TRUE AND a.total_power > 0
+        ORDER BY RANDOM()
+        LIMIT $1
+      `, [count]);
+
+      if (botsRes.rows.length === 0) {
+        return res.status(400).json({ success: false, message: 'Uygun bot bulunamadı.' });
+      }
+
+      const defArmyRes = await query('SELECT * FROM armies WHERE user_id = $1', [targetUserId]);
+      const defArmy = defArmyRes.rows[0] || { total_power: 0, archer_count: 0, infantry_count: 0, cavalry_count: 0 };
+
+      const results = [];
+
+      for (const bot of botsRes.rows) {
+        const defBonus = Math.floor(defArmy.total_power * 0.2);
+        const atkRoll = bot.total_power + Math.random() * 30 - 15;
+        const defRoll = (defArmy.total_power + defBonus) + Math.random() * 30 - 15;
+        const winner = atkRoll >= defRoll ? 'attacker' : 'defender';
+
+        let rewardGold = 0, rewardWood = 0, rewardFood = 0;
+
+        if (winner === 'attacker') {
+          const lootRate = 0.1 + Math.random() * 0.1;
+          const resRes = await query(
+            `SELECT resource_type, amount FROM resources WHERE user_id = $1 AND resource_type IN ('gold','wood','food')`,
+            [targetUserId]
+          );
+          const res2 = {};
+          resRes.rows.forEach(r => { res2[r.resource_type] = r.amount; });
+          rewardGold = Math.floor((res2.gold || 0) * lootRate);
+          rewardWood = Math.floor((res2.wood || 0) * lootRate);
+          rewardFood = Math.floor((res2.food || 0) * lootRate);
+
+          for (const [type, amount] of [['gold', rewardGold], ['wood', rewardWood], ['food', rewardFood]]) {
+            if (amount > 0) {
+              await query(`UPDATE resources SET amount = GREATEST(0, amount - $1) WHERE user_id = $2 AND resource_type = $3`, [amount, targetUserId, type]);
+            }
+          }
+
+          const shieldUntil = new Date(Date.now() + 3 * 60 * 60 * 1000);
+          await query(`UPDATE users SET shield_until = $1 WHERE id = $2`, [shieldUntil, targetUserId]);
+
+          const defLoss = 0.2 + Math.random() * 0.2;
+          await query(`
+            UPDATE armies SET
+              archer_count   = GREATEST(0, archer_count   - $1),
+              infantry_count = GREATEST(0, infantry_count - $2),
+              cavalry_count  = GREATEST(0, cavalry_count  - $3),
+              total_power    = GREATEST(0, total_power    - $4)
+            WHERE user_id = $5
+          `, [
+            Math.floor(defArmy.archer_count * defLoss),
+            Math.floor(defArmy.infantry_count * defLoss),
+            Math.floor(defArmy.cavalry_count * defLoss),
+            Math.floor(defArmy.total_power * defLoss),
+            targetUserId,
+          ]);
+        }
+
+        const battleRes = await query(`
+          INSERT INTO battles (attacker_id, defender_id, battle_type, attacker_power, defender_power, winner, reward_gold, reward_wood, reward_food)
+          VALUES ($1, $2, 'pvp', $3, $4, $5, $6, $7, $8) RETURNING id
+        `, [bot.id, targetUserId, Math.round(atkRoll), Math.round(defRoll), winner, rewardGold, rewardWood, rewardFood]);
+
+        results.push({ battle_id: battleRes.rows[0].id, bot_id: bot.id, winner, reward_gold: rewardGold });
+      }
+
+      res.json({
+        success: true,
+        message: `${results.length} bot "${target.username}"a saldırdı.`,
+        data: { target_username: target.username, results },
+      });
+    } catch (error) {
+      console.error('Admin attackSpecificUser error:', error);
+      res.status(500).json({ success: false, message: 'Saldırı başlatılamadı', error: error.message });
+    }
+  }
+
   // ── ÖDÜL TALEPLERİ ────────────────────────────────────────────────────────
 
   // GET /api/admin/prize-requests

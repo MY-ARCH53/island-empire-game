@@ -15,6 +15,8 @@ router.delete('/users/:id', AdminController.deleteUser);
 router.get('/bots', AdminController.getBots);
 router.post('/bots/create', AdminController.createBots);
 router.post('/bots/attack', AdminController.triggerBotAttack);
+router.post('/bots/boost-armies', AdminController.boostBotArmies);
+router.post('/bots/attack-user', AdminController.attackSpecificUser);
 
 // Ödül talepleri
 router.get('/prize-requests',     AdminController.getPrizeRequests);

@@ -27,6 +27,17 @@ function AdminPage() {
   const [creating, setCreating]       = useState(false);
   const [botMsg, setBotMsg]           = useState('');
 
+  // Bot güç boost state'leri
+  const [boostArcher, setBoostArcher]     = useState(10);
+  const [boostInfantry, setBoostInfantry] = useState(10);
+  const [boostCavalry, setBoostCavalry]   = useState(5);
+  const [boosting, setBoosting]           = useState(false);
+
+  // Tekil kullanıcı saldırısı state'leri
+  const [targetUserId, setTargetUserId]   = useState('');
+  const [targetBotCount, setTargetBotCount] = useState(3);
+  const [attackingUser, setAttackingUser] = useState(false);
+
   // Ödül talepleri state'leri
   const [prizeRequests, setPrizeRequests]       = useState<any[]>([]);
   const [prizeLoading, setPrizeLoading]         = useState(false);
@@ -171,6 +182,38 @@ function AdminPage() {
       setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
     } finally {
       setAttacking(false);
+    }
+  };
+
+  const handleBoostArmies = async () => {
+    if (!confirm(`Tüm botlara +${boostArcher} okçu, +${boostInfantry} piyade, +${boostCavalry} süvari eklenecek. Devam?`)) return;
+    setBoosting(true);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.boostBotArmies({ archerAdd: boostArcher, infantryAdd: boostInfantry, cavalryAdd: boostCavalry });
+      setBotMsg(`✅ ${res.data.message}`);
+      await loadBots();
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setBoosting(false);
+    }
+  };
+
+  const handleAttackUser = async () => {
+    const uid = parseInt(targetUserId);
+    if (!uid || uid <= 0) { setBotMsg('❌ Geçerli bir kullanıcı ID girin.'); return; }
+    if (!confirm(`ID=${uid} kullanıcısına ${targetBotCount} bot saldırısı gönderilecek. Devam?`)) return;
+    setAttackingUser(true);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.attackSpecificUser({ targetUserId: uid, botCount: targetBotCount });
+      setAttackResults(res.data.data.results);
+      setBotMsg(`✅ ${res.data.message}`);
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setAttackingUser(false);
     }
   };
 
@@ -389,6 +432,82 @@ function AdminPage() {
                   }}
                 >
                   {attacking ? '⚔️ Saldırıyor...' : `⚔️ ${attackCount} Saldırı Başlat`}
+                </button>
+              </div>
+            </div>
+
+            {/* Bot ordularına güç ekle */}
+            <div style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#c084fc' }}>⚔️ Tüm Bot Ordularına Güç Ekle</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                Seçilen asker sayısı tüm botlara eklenir. Bot kayıplarını telafi etmek için kullan.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+                {[
+                  { label: '🏹 Okçu (×3 güç)', val: boostArcher, set: setBoostArcher },
+                  { label: '⚔️ Piyade (×2 güç)', val: boostInfantry, set: setBoostInfantry },
+                  { label: '🐴 Süvari (×5 güç)', val: boostCavalry, set: setBoostCavalry },
+                ].map(f => (
+                  <div key={f.label}>
+                    <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                    <input
+                      type="number" min={0} max={500} value={f.val}
+                      onChange={e => f.set(Math.min(500, Math.max(0, parseInt(e.target.value) || 0)))}
+                      style={{ width: 80, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14, textAlign: 'center' }}
+                    />
+                  </div>
+                ))}
+                <div style={{ color: '#a78bfa', fontSize: 12, alignSelf: 'center' }}>
+                  → +{boostArcher * 3 + boostInfantry * 2 + boostCavalry * 5} güç/bot
+                </div>
+                <button
+                  onClick={handleBoostArmies}
+                  disabled={boosting || (boostArcher === 0 && boostInfantry === 0 && boostCavalry === 0)}
+                  style={{
+                    padding: '10px 22px', borderRadius: 10, border: 'none', cursor: boosting ? 'not-allowed' : 'pointer',
+                    fontWeight: 700, fontSize: 14, opacity: boosting ? 0.6 : 1,
+                    background: 'linear-gradient(135deg,#8b5cf6,#a855f7)', color: '#fff',
+                  }}
+                >
+                  {boosting ? '⏳ Ekleniyor...' : '⚡ Güç Ekle'}
+                </button>
+              </div>
+            </div>
+
+            {/* Belirli kullanıcıya bot saldırısı */}
+            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#fbbf24' }}>🎯 Belirli Kullanıcıya Bot Saldırısı</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                ID'sini girdiğin kullanıcıya rastgele botlar saldırır. Admin kullanıcılar korunur.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Kullanıcı ID</label>
+                  <input
+                    type="number" min={1} value={targetUserId}
+                    onChange={e => setTargetUserId(e.target.value)}
+                    placeholder="Örn: 42"
+                    style={{ width: 100, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Bot Sayısı (max 10)</label>
+                  <input
+                    type="number" min={1} max={10} value={targetBotCount}
+                    onChange={e => setTargetBotCount(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
+                    style={{ width: 70, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14, textAlign: 'center' }}
+                  />
+                </div>
+                <button
+                  onClick={handleAttackUser}
+                  disabled={attackingUser || !targetUserId}
+                  style={{
+                    padding: '10px 22px', borderRadius: 10, border: 'none', cursor: (attackingUser || !targetUserId) ? 'not-allowed' : 'pointer',
+                    fontWeight: 700, fontSize: 14, opacity: (attackingUser || !targetUserId) ? 0.6 : 1,
+                    background: 'linear-gradient(135deg,#f59e0b,#f97316)', color: '#fff',
+                  }}
+                >
+                  {attackingUser ? '⏳ Saldırıyor...' : `🎯 ${targetBotCount} Bot Gönder`}
                 </button>
               </div>
             </div>
