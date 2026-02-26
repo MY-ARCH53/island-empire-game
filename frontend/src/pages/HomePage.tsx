@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { fireConfetti, fireRewardConfetti, fireLevelUpConfetti } from '../utils/confetti';
 import DailyRewardModal from '../components/DailyRewardModal';
 import TutorialOverlay from '../components/TutorialOverlay';
+import ContextualHint from '../components/ContextualHint';
 
 // ── Sabit veri ──────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ function HomePage() {
   const [spinning, setSpinning]         = useState(false);
   const [spinResult, setSpinResult]     = useState<{ multiplier: number; goldEarned: number } | null>(null);
   const [spinDisplay, setSpinDisplay]   = useState<number>(2);
+  const [activeHint, setActiveHint]     = useState<string | null>(null);
   const [tutorialStep, setTutorialStep] = useState<number>(
     () => localStorage.getItem('tutorial_v1_done') ? -1 : 0
   );
@@ -123,6 +125,63 @@ function HomePage() {
   const handleTutorialSkip = () => {
     localStorage.setItem('tutorial_v1_done', '1');
     setTutorialStep(-1);
+  };
+
+  // ── Bağlamsal ipuçları (contextual hints) ─────────────────────────────────
+  useEffect(() => {
+    if (tutorialStep >= 0 || activeHint) return; // Tutorial veya başka hint varsa bekle
+
+    const energy = resources.find((r: any) => r.resource_type === 'energy');
+    const gold   = resources.find((r: any) => r.resource_type === 'gold');
+    const wood   = resources.find((r: any) => r.resource_type === 'wood');
+
+    // 1. Otomatik üretim: 1000 enerji birikti ve aktif değil
+    if (
+      energy?.amount >= 1000 &&
+      !autoProduction.active &&
+      !localStorage.getItem('hint_autoprod_seen')
+    ) {
+      setActiveHint('auto-production');
+      return;
+    }
+
+    // 2. Ada keşfi: herhangi bir ada satın alınabilir
+    const canAffordIsland = discoverableIslands.some(
+      (isl: any) => (gold?.amount ?? 0) >= isl.cost.gold && (wood?.amount ?? 0) >= isl.cost.wood
+    );
+    if (canAffordIsland && !localStorage.getItem('hint_island_seen')) {
+      setActiveHint('island-discovery');
+      return;
+    }
+
+    // 3. TLCoin: 3. gün girişi
+    if (streakCount >= 3 && !localStorage.getItem('hint_tlcoin_seen')) {
+      setActiveHint('tlcoin');
+      return;
+    }
+  }, [resources, autoProduction.active, discoverableIslands, streakCount, tutorialStep, activeHint]);
+
+  const handleHintAction = () => {
+    if (activeHint === 'auto-production') {
+      localStorage.setItem('hint_autoprod_seen', '1');
+      setActiveHint(null);
+      handleActivateAutoProduction();
+    } else if (activeHint === 'island-discovery') {
+      localStorage.setItem('hint_island_seen', '1');
+      setActiveHint(null);
+      setActivePanel('discover');
+    } else if (activeHint === 'tlcoin') {
+      localStorage.setItem('hint_tlcoin_seen', '1');
+      setActiveHint(null);
+      navigate('/tlcoin');
+    }
+  };
+
+  const handleHintDismiss = () => {
+    if (activeHint === 'auto-production') localStorage.setItem('hint_autoprod_seen', '1');
+    else if (activeHint === 'island-discovery') localStorage.setItem('hint_island_seen', '1');
+    else if (activeHint === 'tlcoin') localStorage.setItem('hint_tlcoin_seen', '1');
+    setActiveHint(null);
   };
 
   // Upgrade otomatik tamamlama
@@ -1147,6 +1206,15 @@ function HomePage() {
           streakAtRisk={streakAtRisk}
           onClaim={handleClaimDailyReward}
           onClose={() => setShowDailyReward(false)}
+        />
+      )}
+
+      {/* ════════════ CONTEXTUAL HINT ════════════ */}
+      {activeHint && tutorialStep < 0 && (
+        <ContextualHint
+          hintKey={activeHint}
+          onAction={handleHintAction}
+          onDismiss={handleHintDismiss}
         />
       )}
 
