@@ -89,9 +89,14 @@ function HomePage() {
   const [spinResult, setSpinResult]     = useState<{ multiplier: number; goldEarned: number } | null>(null);
   const [spinDisplay, setSpinDisplay]   = useState<number>(2);
   const [activeHint, setActiveHint]     = useState<string | null>(null);
-  const [tutorialStep, setTutorialStep] = useState<number>(
-    () => localStorage.getItem('tutorial_v1_done') ? -1 : 0
-  );
+  const [tutorialStep, setTutorialStep] = useState<number>(() => {
+    try {
+      const u = localStorage.getItem('user');
+      const uid = u ? JSON.parse(u).id : null;
+      const key = uid ? `tutorial_v1_done_${uid}` : 'tutorial_v1_done';
+      return localStorage.getItem(key) ? -1 : 0;
+    } catch { return 0; }
+  });
 
   // Saniye ticker → bina timer + oto-üretim geri sayım
   useEffect(() => {
@@ -112,9 +117,17 @@ function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
+  const getTutorialKey = () => {
+    try {
+      const u = localStorage.getItem('user');
+      const uid = u ? JSON.parse(u).id : null;
+      return uid ? `tutorial_v1_done_${uid}` : 'tutorial_v1_done';
+    } catch { return 'tutorial_v1_done'; }
+  };
+
   const handleTutorialNext = () => {
     if (tutorialStep >= 5) {
-      localStorage.setItem('tutorial_v1_done', '1');
+      localStorage.setItem(getTutorialKey(), '1');
       setTutorialStep(-1);
       fireConfetti();
     } else {
@@ -123,7 +136,7 @@ function HomePage() {
   };
 
   const handleTutorialSkip = () => {
-    localStorage.setItem('tutorial_v1_done', '1');
+    localStorage.setItem(getTutorialKey(), '1');
     setTutorialStep(-1);
   };
 
