@@ -397,6 +397,8 @@ function HomePage() {
       const res = await dailyRewardAPI.claim(user.id);
       showToast(res.data.message, 'success');
       setShowDailyReward(false);
+      setStreakAtRisk(false);
+      setDailyCanClaim(false);
       loadGameData();
     } catch (e: any) {
       showToast(e.response?.data?.message || 'Ödül alınamadı', 'error');
