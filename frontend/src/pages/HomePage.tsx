@@ -517,11 +517,19 @@ function HomePage() {
   // ── Loading ───────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e3a5f,#0f172a)' }}>
+    <div style={{ minHeight: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#0f172a,#1e3a5f,#0f172a)', position: 'relative' }}>
       <div style={{ textAlign: 'center' }}>
         <div className="spinner" style={{ margin: '0 auto 16px' }} />
         <p style={{ color: '#93c5fd', fontWeight: 600 }}>Yükleniyor...</p>
       </div>
+      {tutorialStep >= 0 && (
+        <TutorialOverlay
+          step={tutorialStep}
+          totalSteps={6}
+          onNext={handleTutorialNext}
+          onSkip={handleTutorialSkip}
+        />
+      )}
     </div>
   );
 
