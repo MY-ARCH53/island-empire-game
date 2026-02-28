@@ -18,6 +18,8 @@ const tlcoinRoutes = require('./routes/tlcoin.routes');
 const tradeRoutes  = require('./routes/trade.routes');
 const spinRoutes   = require('./routes/spin.routes');
 const { startWorker } = require('./services/autoProductionWorker');
+const instagramRoutes = require('./routes/instagram.routes');
+const { startInstagramWorker } = require('./services/instagramWorker');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,7 +51,8 @@ app.use('/api/auto-production', autoProductionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/tlcoin', tlcoinRoutes);
 app.use('/api/trade',  tradeRoutes);
-app.use('/api/spin',   spinRoutes);
+app.use('/api/spin',      spinRoutes);
+app.use('/api/instagram', instagramRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route bulunamadi' });
@@ -58,4 +61,5 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log('Server calisiyor: http://localhost:' + PORT);
   startWorker();
+  startInstagramWorker();
 });

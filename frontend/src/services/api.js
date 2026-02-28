@@ -166,4 +166,10 @@ export const tradeAPI = {
     api.post('/trade/convert', { userId, resourceType, amount }),
 };
 
+// Instagram Boost API
+export const instagramAPI = {
+  verify:    (userId, instagramUsername) => api.post('/instagram/verify', { userId, instagramUsername }),
+  getStatus: (userId) => api.get(`/instagram/status/${userId}`),
+};
+
 export default api;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Coins, TreePine, Apple, Zap, LogOut, Play, Package, X } from 'lucide-react';
-import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI, tradeAPI, spinAPI } from '../services/api';
+import { gameAPI, productionAPI, taskAPI, dailyRewardAPI, autoProductionAPI, battleAPI, tradeAPI, spinAPI, instagramAPI } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import { fireConfetti, fireRewardConfetti, fireLevelUpConfetti } from '../utils/confetti';
 import DailyRewardModal from '../components/DailyRewardModal';
@@ -89,6 +89,9 @@ function HomePage() {
   const [spinResult, setSpinResult]     = useState<{ multiplier: number; goldEarned: number } | null>(null);
   const [spinDisplay, setSpinDisplay]   = useState<number>(2);
   const [activeHint, setActiveHint]     = useState<string | null>(null);
+  const [igStatus, setIgStatus]         = useState<{ active: boolean; username: string | null; handle: string } | null>(null);
+  const [igInput, setIgInput]           = useState('');
+  const [igVerifying, setIgVerifying]   = useState(false);
   const [tutorialStep, setTutorialStep] = useState<number>(() => {
     try {
       const u = localStorage.getItem('user');
@@ -261,6 +264,12 @@ function HomePage() {
         }
       } catch {}
 
+      // Instagram Boost durumu
+      try {
+        const igRes = await instagramAPI.getStatus(u.id);
+        setIgStatus(igRes.data.data);
+      } catch {}
+
       // Savaş bildirimi: saldırıya uğrama sayısı
       try {
         const unreadRes = await battleAPI.getUnreadAttacks(u.id);
@@ -427,6 +436,23 @@ function HomePage() {
       loadGameData();
     } catch (e: any) {
       showToast(e.response?.data?.message || 'Otomatik üretim başlatılamadı', 'error');
+    }
+  };
+
+  const handleVerifyInstagram = async () => {
+    if (!user || !igInput.trim()) return;
+    setIgVerifying(true);
+    try {
+      const res = await instagramAPI.verify(user.id, igInput.trim());
+      showToast(res.data.message, 'success');
+      fireConfetti();
+      const igRes = await instagramAPI.getStatus(user.id);
+      setIgStatus(igRes.data.data);
+      setIgInput('');
+    } catch (e: any) {
+      showToast(e.response?.data?.message || 'Doğrulama başarısız', 'error');
+    } finally {
+      setIgVerifying(false);
     }
   };
 
@@ -826,6 +852,82 @@ function HomePage() {
             </button>
           )}
         </div>
+
+        {/* ── Instagram Boost Kartı ── */}
+        {igStatus !== null && (
+          <div style={{
+            background: igStatus.active
+              ? 'linear-gradient(135deg,rgba(225,48,108,0.15),rgba(131,58,180,0.10))'
+              : 'rgba(255,255,255,0.03)',
+            border: igStatus.active
+              ? '1px solid rgba(225,48,108,0.45)'
+              : '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 16, padding: '14px 16px', marginBottom: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 26 }}>📸</span>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ color: igStatus.active ? '#e1306c' : '#94a3b8', fontWeight: 700, fontSize: 13 }}>
+                  Instagram Boost
+                  {igStatus.active && (
+                    <span style={{ marginLeft: 6, background: 'rgba(225,48,108,0.25)', color: '#e1306c', fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>AKTİF</span>
+                  )}
+                </p>
+                {igStatus.active ? (
+                  <p style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+                    @{igStatus.username} · Tüm kaynaklarda %20 bonus!
+                  </p>
+                ) : (
+                  <p style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+                    @{igStatus.handle || '…'} takip et, %20 kaynak bonusu kazan!
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {!igStatus.active && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
+                <a
+                  href={igStatus.handle ? `https://instagram.com/${igStatus.handle}` : 'https://instagram.com'}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{
+                    background: 'linear-gradient(135deg,#e1306c,#833ab4)', border: 'none', borderRadius: 10,
+                    color: '#fff', fontWeight: 700, fontSize: 11, padding: '7px 12px', cursor: 'pointer',
+                    textDecoration: 'none', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Takip Et →
+                </a>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <input
+                    type="text"
+                    value={igInput}
+                    onChange={(e) => setIgInput(e.target.value)}
+                    placeholder="kullanıcı adın"
+                    style={{
+                      background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 8, color: '#f1f5f9', fontSize: 11, padding: '5px 8px',
+                      width: 110, outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={handleVerifyInstagram}
+                    disabled={igVerifying || !igInput.trim()}
+                    style={{
+                      background: 'rgba(225,48,108,0.25)', border: '1px solid rgba(225,48,108,0.4)',
+                      borderRadius: 8, color: '#e1306c', fontWeight: 700, fontSize: 11,
+                      padding: '5px 10px', cursor: 'pointer', whiteSpace: 'nowrap',
+                      opacity: igVerifying || !igInput.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {igVerifying ? '...' : 'Doğrula'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bina kartları 2×2 */}
         {buildings.length > 0 && (

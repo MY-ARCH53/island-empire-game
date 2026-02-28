@@ -10,6 +10,10 @@ async function processUserTick(userId) {
   const buildingsRes = await query(buildingsSql, [userId]);
   const buildings = buildingsRes.rows;
 
+  // Instagram boost kontrolü (tick başında bir kez sorgulanır)
+  const boostRes = await query('SELECT instagram_boost_active FROM users WHERE id = $1', [userId]);
+  const multiplier = boostRes.rows[0]?.instagram_boost_active ? 1.2 : 1.0;
+
   const now = new Date();
 
   for (const building of buildings) {
@@ -22,9 +26,10 @@ async function processUserTick(userId) {
       const production = prodRes.rows[0];
       if (new Date(production.completes_at) <= now) {
         const resourceType = production.product_type === 'wheat' ? 'food' : production.product_type;
+        const amount = Math.round(production.quantity * multiplier);
         await query(
           'UPDATE resources SET amount = amount + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND resource_type = $3',
-          [production.quantity, userId, resourceType]
+          [amount, userId, resourceType]
         );
         await query('UPDATE productions SET collected = true WHERE id = $1', [production.id]);
         await query("UPDATE buildings SET status = 'idle' WHERE id = $1", [building.id]);

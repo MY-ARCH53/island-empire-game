@@ -135,17 +135,21 @@ if (building.status === 'upgrading') {
         });
       }
 
-      // Kaynağı artır
+      // Kaynağı artır (Instagram boost varsa %20 bonus)
       const resourceType = production.product_type === 'wheat' ? 'food' : production.product_type;
-      
+
+      const boostRes = await query('SELECT instagram_boost_active FROM users WHERE id = $1', [userId]);
+      const multiplier = boostRes.rows[0]?.instagram_boost_active ? 1.2 : 1.0;
+      const amount = Math.round(production.quantity * multiplier);
+
       const updateResourceSql = `
-        UPDATE resources 
+        UPDATE resources
         SET amount = amount + $1, updated_at = CURRENT_TIMESTAMP
         WHERE user_id = $2 AND resource_type = $3
         RETURNING *
       `;
-      
-      await query(updateResourceSql, [production.quantity, userId, resourceType]);
+
+      await query(updateResourceSql, [amount, userId, resourceType]);
 
       // Üretimi toplandı olarak işaretle
       await query(
@@ -168,9 +172,9 @@ if (building.status === 'upgrading') {
 
       res.json({
         success: true,
-        message: `${production.quantity} ${resourceType} toplandı! 🎉`,
+        message: `${amount} ${resourceType} toplandı!${multiplier > 1 ? ' ⚡ +%20 Instagram Boost!' : ' 🎉'}`,
         data: {
-          collected: { type: resourceType, amount: production.quantity },
+          collected: { type: resourceType, amount },
           xp: xpResult,
         }
       });
