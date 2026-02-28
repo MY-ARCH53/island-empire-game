@@ -22,4 +22,9 @@ router.post('/bots/attack-user', AdminController.attackSpecificUser);
 router.get('/prize-requests',     AdminController.getPrizeRequests);
 router.put('/prize-requests/:id', AdminController.updatePrizeRequest);
 
+// Instagram Boost istekleri
+router.get('/instagram-requests',               AdminController.getInstagramRequests);
+router.put('/instagram-requests/:userId',       AdminController.reviewInstagramRequest);
+router.put('/instagram-requests/:userId/revoke', AdminController.revokeInstagramBoost);
+
 module.exports = router;

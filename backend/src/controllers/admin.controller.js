@@ -632,6 +632,83 @@ class AdminController {
       res.status(500).json({ success: false, message: 'Guncelleme basarisiz', error: error.message });
     }
   }
+
+  // ── Instagram Boost İstekleri ─────────────────────────────────────────────
+
+  // GET /api/admin/instagram-requests
+  static async getInstagramRequests(req, res) {
+    try {
+      const result = await query(`
+        SELECT id, username, instagram_username, instagram_boost_active,
+               instagram_request_status, instagram_verified_at, created_at
+        FROM users
+        WHERE instagram_username IS NOT NULL
+        ORDER BY
+          CASE instagram_request_status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+          created_at DESC
+      `);
+      res.json({ success: true, data: { requests: result.rows } });
+    } catch (error) {
+      console.error('Admin getInstagramRequests error:', error);
+      res.status(500).json({ success: false, message: 'İstekler getirilemedi', error: error.message });
+    }
+  }
+
+  // PUT /api/admin/instagram-requests/:userId
+  static async reviewInstagramRequest(req, res) {
+    try {
+      const { userId } = req.params;
+      const { action } = req.body; // 'approve' | 'reject'
+
+      if (action === 'approve') {
+        await query(
+          `UPDATE users
+           SET instagram_boost_active = TRUE,
+               instagram_request_status = 'approved',
+               instagram_verified_at = NOW()
+           WHERE id = $1`,
+          [userId]
+        );
+        res.json({ success: true, message: 'Boost onaylandı ve aktif edildi.' });
+      } else if (action === 'reject') {
+        await query(
+          `UPDATE users
+           SET instagram_boost_active = FALSE,
+               instagram_request_status = 'rejected',
+               instagram_username = NULL,
+               instagram_verified_at = NULL
+           WHERE id = $1`,
+          [userId]
+        );
+        res.json({ success: true, message: 'İstek reddedildi.' });
+      } else {
+        res.status(400).json({ success: false, message: 'Geçersiz action (approve | reject)' });
+      }
+    } catch (error) {
+      console.error('Admin reviewInstagramRequest error:', error);
+      res.status(500).json({ success: false, message: 'İşlem başarısız', error: error.message });
+    }
+  }
+
+  // PUT /api/admin/instagram-requests/:userId/revoke  — aktif bostu iptal et
+  static async revokeInstagramBoost(req, res) {
+    try {
+      const { userId } = req.params;
+      await query(
+        `UPDATE users
+         SET instagram_boost_active = FALSE,
+             instagram_request_status = NULL,
+             instagram_username = NULL,
+             instagram_verified_at = NULL
+         WHERE id = $1`,
+        [userId]
+      );
+      res.json({ success: true, message: 'Boost iptal edildi.' });
+    } catch (error) {
+      console.error('Admin revokeInstagramBoost error:', error);
+      res.status(500).json({ success: false, message: 'İptal başarısız', error: error.message });
+    }
+  }
 }
 
 module.exports = AdminController;

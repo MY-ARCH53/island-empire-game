@@ -1,83 +1,45 @@
 const { query } = require('../config/database');
-const https = require('https');
 
-const IG_BUSINESS_ID  = process.env.INSTAGRAM_BUSINESS_ID;
-const IG_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-
-// ── Yardımcı: HTTPS GET → JSON ─────────────────────────────────────────────
-function fetchJSON(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      let raw = '';
-      res.on('data', (chunk) => (raw += chunk));
-      res.on('end', () => {
-        try { resolve(JSON.parse(raw)); }
-        catch (e) { reject(e); }
-      });
-    }).on('error', reject);
-  });
-}
-
-// ── Cursor-pagination ile tüm takipçileri çek → Set<username> ────────────
-async function fetchAllFollowers() {
-  const followers = new Set();
-
-  let nextUrl =
-    `https://graph.facebook.com/v19.0/${IG_BUSINESS_ID}/followers` +
-    `?fields=username&limit=200&access_token=${IG_ACCESS_TOKEN}`;
-
-  while (nextUrl) {
-    const data = await fetchJSON(nextUrl);
-    if (data.error) throw new Error(data.error.message);
-
-    for (const f of data.data || []) {
-      followers.add(f.username.toLowerCase());
-    }
-
-    nextUrl = data.paging?.next || null;
-  }
-
-  return followers;
-}
-
-// ── Controller ──────────────────────────────────────────────────────────────
 class InstagramController {
 
-  // POST /api/instagram/verify
-  static async verifyFollow(req, res) {
+  // POST /api/instagram/request  — kullanıcı istek gönderir
+  static async requestBoost(req, res) {
     try {
       const { userId, instagramUsername } = req.body;
 
       if (!userId || !instagramUsername) {
         return res.status(400).json({ success: false, message: 'userId ve instagramUsername gerekli' });
       }
-      if (!IG_BUSINESS_ID || !IG_ACCESS_TOKEN) {
-        return res.status(503).json({ success: false, message: 'Instagram entegrasyonu henüz aktif değil' });
-      }
 
       const cleanUsername = instagramUsername.toLowerCase().replace('@', '').trim();
 
-      const followers = await fetchAllFollowers();
-      const isFollowing = followers.has(cleanUsername);
-
-      if (!isFollowing) {
-        return res.status(400).json({
-          success: false,
-          message: `@${cleanUsername} takipçi listesinde bulunamadı. Önce @${process.env.INSTAGRAM_HANDLE || 'hesabımızı'} takip edin!`,
-        });
+      // Zaten aktif boost varsa
+      const current = await query(
+        'SELECT instagram_boost_active, instagram_request_status FROM users WHERE id = $1',
+        [userId]
+      );
+      if (current.rows[0]?.instagram_boost_active) {
+        return res.status(400).json({ success: false, message: 'Boost zaten aktif!' });
       }
 
+      // İstek kaydet
       await query(
         `UPDATE users
-         SET instagram_username = $1, instagram_boost_active = TRUE, instagram_verified_at = NOW()
+         SET instagram_username = $1,
+             instagram_request_status = 'pending',
+             instagram_boost_active = FALSE,
+             instagram_verified_at = NULL
          WHERE id = $2`,
         [cleanUsername, userId]
       );
 
-      res.json({ success: true, message: '🎉 Takip doğrulandı! %20 kaynak bonusu aktif edildi.' });
+      res.json({
+        success: true,
+        message: '📩 İsteğin alındı! Admin inceledikten sonra boost aktif edilecek.',
+      });
     } catch (err) {
-      console.error('[Instagram] verifyFollow hatası:', err.message);
-      res.status(500).json({ success: false, message: 'Doğrulama sırasında hata oluştu: ' + err.message });
+      console.error('[Instagram] requestBoost hatası:', err.message);
+      res.status(500).json({ success: false, message: 'İstek gönderilemedi' });
     }
   }
 
@@ -86,7 +48,9 @@ class InstagramController {
     try {
       const { userId } = req.params;
       const result = await query(
-        'SELECT instagram_username, instagram_boost_active, instagram_verified_at FROM users WHERE id = $1',
+        `SELECT instagram_username, instagram_boost_active,
+                instagram_request_status, instagram_verified_at
+         FROM users WHERE id = $1`,
         [userId]
       );
 
@@ -94,12 +58,13 @@ class InstagramController {
         return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
       }
 
-      const { instagram_username, instagram_boost_active, instagram_verified_at } = result.rows[0];
+      const { instagram_username, instagram_boost_active, instagram_request_status, instagram_verified_at } = result.rows[0];
       res.json({
         success: true,
         data: {
           username: instagram_username,
           active: instagram_boost_active,
+          requestStatus: instagram_request_status, // null | 'pending' | 'approved' | 'rejected'
           verifiedAt: instagram_verified_at,
           handle: process.env.INSTAGRAM_HANDLE || '',
         },
@@ -112,4 +77,3 @@ class InstagramController {
 }
 
 module.exports = InstagramController;
-module.exports.fetchAllFollowers = fetchAllFollowers;

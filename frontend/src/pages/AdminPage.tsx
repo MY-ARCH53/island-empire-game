@@ -4,7 +4,7 @@ import { adminAPI } from '../services/api';
 
 function AdminPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram'>('users');
 
   // Kullanıcı tab state'leri
   const [stats, setStats]       = useState<any>(null);
@@ -42,6 +42,11 @@ function AdminPage() {
   const [prizeRequests, setPrizeRequests]       = useState<any[]>([]);
   const [prizeLoading, setPrizeLoading]         = useState(false);
   const [prizeActionId, setPrizeActionId]       = useState<number | null>(null);
+
+  // Instagram Boost state'leri
+  const [igRequests, setIgRequests]             = useState<any[]>([]);
+  const [igLoading, setIgLoading]               = useState(false);
+  const [igActionId, setIgActionId]             = useState<number | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -103,10 +108,39 @@ function AdminPage() {
     }
   };
 
-  const handleTabChange = (tab: 'users' | 'bots' | 'prizes') => {
+  const loadIgRequests = async () => {
+    setIgLoading(true);
+    try {
+      const res = await adminAPI.getInstagramRequests();
+      setIgRequests(res.data.data.requests);
+    } catch (err) {
+      console.error('IG requests load error:', err);
+    } finally {
+      setIgLoading(false);
+    }
+  };
+
+  const handleIgAction = async (userId: number, action: 'approve' | 'reject' | 'revoke') => {
+    setIgActionId(userId);
+    try {
+      if (action === 'revoke') {
+        await adminAPI.revokeInstagramBoost(userId);
+      } else {
+        await adminAPI.reviewInstagramRequest(userId, action);
+      }
+      await loadIgRequests();
+    } catch (err) {
+      console.error('IG action error:', err);
+    } finally {
+      setIgActionId(null);
+    }
+  };
+
+  const handleTabChange = (tab: 'users' | 'bots' | 'prizes' | 'instagram') => {
     setActiveTab(tab);
     if (tab === 'bots' && bots.length === 0) loadBots();
     if (tab === 'prizes') loadPrizeRequests();
+    if (tab === 'instagram') loadIgRequests();
   };
 
   const openEdit = (user: any) => {
@@ -273,9 +307,10 @@ function AdminPage() {
         {/* Tab Butonları */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
-            { key: 'users',  label: '👥 Oyuncular' },
-            { key: 'bots',   label: '🤖 Bot Yönetimi' },
-            { key: 'prizes', label: '🎁 Ödül Talepleri' },
+            { key: 'users',     label: '👥 Oyuncular' },
+            { key: 'bots',      label: '🤖 Bot Yönetimi' },
+            { key: 'prizes',    label: '🎁 Ödül Talepleri' },
+            { key: 'instagram', label: '📸 Instagram Boost' },
           ].map(t => (
             <button
               key={t.key}
@@ -667,6 +702,79 @@ function AdminPage() {
                           </button>
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── INSTAGRAM BOOST SEKMESİ ──────────────────────────────────── */}
+        {activeTab === 'instagram' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <p style={{ color: '#64748b', fontSize: 13 }}>
+                Oyuncuların Instagram takip istekleri. Onayla → boost aktif, Reddet → oyuncu tekrar gönderebilir.
+              </p>
+              <button onClick={loadIgRequests} disabled={igLoading} style={{ background: 'none', border: 'none', color: '#e1306c', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                {igLoading ? '⏳' : '↻ Yenile'}
+              </button>
+            </div>
+
+            {igLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>Yükleniyor...</div>
+            ) : igRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>Henüz Instagram boost isteği yok.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {igRequests.map((req: any) => {
+                  const statusClr = req.instagram_boost_active ? '#22c55e' : req.instagram_request_status === 'pending' ? '#f59e0b' : '#ef4444';
+                  const statusLbl = req.instagram_boost_active ? 'AKTİF' : req.instagram_request_status === 'pending' ? 'BEKLİYOR' : 'REDDEDİLDİ';
+                  const isPending = req.instagram_request_status === 'pending';
+                  const isActive  = req.instagram_boost_active;
+                  return (
+                    <div key={req.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 160 }}>
+                        <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 13 }}>
+                          {req.username}
+                          <span style={{ marginLeft: 8, background: `${statusClr}22`, color: statusClr, fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>{statusLbl}</span>
+                        </p>
+                        <p style={{ color: '#64748b', fontSize: 12, marginTop: 3 }}>
+                          Instagram: <strong style={{ color: '#e1306c' }}>@{req.instagram_username}</strong>
+                          {req.instagram_verified_at && <span style={{ marginLeft: 8, color: '#475569', fontSize: 11 }}>Onaylandı: {new Date(req.instagram_verified_at).toLocaleDateString('tr-TR')}</span>}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {isPending && (
+                          <>
+                            <button
+                              onClick={() => handleIgAction(req.id, 'approve')}
+                              disabled={igActionId === req.id}
+                              style={{ background: '#22c55e', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: 12, padding: '7px 14px', cursor: 'pointer', opacity: igActionId === req.id ? 0.6 : 1 }}
+                            >
+                              ✓ Onayla
+                            </button>
+                            <button
+                              onClick={() => handleIgAction(req.id, 'reject')}
+                              disabled={igActionId === req.id}
+                              style={{ background: '#ef4444', border: 'none', borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: 12, padding: '7px 14px', cursor: 'pointer', opacity: igActionId === req.id ? 0.6 : 1 }}
+                            >
+                              ✗ Reddet
+                            </button>
+                          </>
+                        )}
+                        {isActive && (
+                          <button
+                            onClick={() => handleIgAction(req.id, 'revoke')}
+                            disabled={igActionId === req.id}
+                            style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, color: '#ef4444', fontWeight: 700, fontSize: 12, padding: '7px 14px', cursor: 'pointer', opacity: igActionId === req.id ? 0.6 : 1 }}
+                          >
+                            Boost İptal
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

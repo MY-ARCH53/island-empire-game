@@ -148,6 +148,10 @@ export const adminAPI = {
   getPrizeRequests: () => api.get('/admin/prize-requests'),
   updatePrizeRequest: (id, status, adminNote) =>
     api.put(`/admin/prize-requests/${id}`, { status, adminNote }),
+  // Instagram Boost istekleri
+  getInstagramRequests: () => api.get('/admin/instagram-requests'),
+  reviewInstagramRequest: (userId, action) => api.put(`/admin/instagram-requests/${userId}`, { action }),
+  revokeInstagramBoost: (userId) => api.put(`/admin/instagram-requests/${userId}/revoke`, {}),
 };
 
 // TLCoin API
@@ -168,7 +172,7 @@ export const tradeAPI = {
 
 // Instagram Boost API
 export const instagramAPI = {
-  verify:    (userId, instagramUsername) => api.post('/instagram/verify', { userId, instagramUsername }),
+  request:   (userId, instagramUsername) => api.post('/instagram/request', { userId, instagramUsername }),
   getStatus: (userId) => api.get(`/instagram/status/${userId}`),
 };
 
