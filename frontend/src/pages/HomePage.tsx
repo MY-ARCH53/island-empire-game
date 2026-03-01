@@ -852,65 +852,6 @@ function HomePage() {
           )}
         </div>
 
-        {/* ── Instagram Boost Kartı ── */}
-        {igStatus !== null && (() => {
-          const isPending  = igStatus.requestStatus === 'pending';
-          const isRejected = igStatus.requestStatus === 'rejected';
-          const borderClr  = igStatus.active ? 'rgba(225,48,108,0.45)' : isPending ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.08)';
-          const bgClr      = igStatus.active ? 'linear-gradient(135deg,rgba(225,48,108,0.15),rgba(131,58,180,0.10))' : isPending ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)';
-          const titleClr   = igStatus.active ? '#e1306c' : isPending ? '#f59e0b' : '#94a3b8';
-          return (
-            <div style={{ background: bgClr, border: `1px solid ${borderClr}`, borderRadius: 16, padding: '14px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: 26 }}>📸</span>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ color: titleClr, fontWeight: 700, fontSize: 13 }}>
-                    Instagram Boost
-                    {igStatus.active  && <span style={{ marginLeft: 6, background: 'rgba(225,48,108,0.25)', color: '#e1306c',  fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>AKTİF</span>}
-                    {isPending        && <span style={{ marginLeft: 6, background: 'rgba(245,158,11,0.20)', color: '#f59e0b',  fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>İNCELENİYOR</span>}
-                    {isRejected       && <span style={{ marginLeft: 6, background: 'rgba(239,68,68,0.20)',  color: '#ef4444',  fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>REDDEDİLDİ</span>}
-                  </p>
-                  <p style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
-                    {igStatus.active  && `@${igStatus.username} · Tüm kaynaklarda %20 bonus!`}
-                    {isPending        && `@${igStatus.username} · Admin onayı bekleniyor...`}
-                    {isRejected       && 'İstek reddedildi. Tekrar gönderebilirsin.'}
-                    {!igStatus.active && !isPending && !isRejected && `@${igStatus.handle || '…'} takip et, %20 kaynak bonusu kazan!`}
-                  </p>
-                </div>
-              </div>
-
-              {/* Yeni istek formu — sadece aktif değilse ve beklemiyorsa göster */}
-              {!igStatus.active && !isPending && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
-                  <a
-                    href={igStatus.handle ? `https://instagram.com/${igStatus.handle}` : 'https://instagram.com'}
-                    target="_blank" rel="noopener noreferrer"
-                    style={{ background: 'linear-gradient(135deg,#e1306c,#833ab4)', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 700, fontSize: 11, padding: '7px 12px', textDecoration: 'none', whiteSpace: 'nowrap' }}
-                  >
-                    Takip Et →
-                  </a>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <input
-                      type="text"
-                      value={igInput}
-                      onChange={(e) => setIgInput(e.target.value)}
-                      placeholder="kullanıcı adın"
-                      style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#f1f5f9', fontSize: 11, padding: '5px 8px', width: 110, outline: 'none' }}
-                    />
-                    <button
-                      onClick={handleRequestInstagram}
-                      disabled={igVerifying || !igInput.trim()}
-                      style={{ background: 'rgba(225,48,108,0.25)', border: '1px solid rgba(225,48,108,0.4)', borderRadius: 8, color: '#e1306c', fontWeight: 700, fontSize: 11, padding: '5px 10px', cursor: 'pointer', whiteSpace: 'nowrap', opacity: igVerifying || !igInput.trim() ? 0.5 : 1 }}
-                    >
-                      {igVerifying ? '...' : 'Gönder'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
         {/* Bina kartları 2×2 */}
         {buildings.length > 0 && (
           <>
@@ -1065,6 +1006,63 @@ function HomePage() {
         return (
           <BottomPanel title={`📋 Görevler (${activeTasks} aktif)`} onClose={() => setActivePanel(null)}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* ── Instagram Boost Kartı ── */}
+              {igStatus !== null && (() => {
+                const isPending  = igStatus.requestStatus === 'pending';
+                const isRejected = igStatus.requestStatus === 'rejected';
+                const borderClr  = igStatus.active ? 'rgba(225,48,108,0.45)' : isPending ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.08)';
+                const bgClr      = igStatus.active ? 'linear-gradient(135deg,rgba(225,48,108,0.15),rgba(131,58,180,0.10))' : isPending ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)';
+                const titleClr   = igStatus.active ? '#e1306c' : isPending ? '#f59e0b' : '#94a3b8';
+                return (
+                  <div style={{ background: bgClr, border: `1px solid ${borderClr}`, borderRadius: 14, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 26 }}>📸</span>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ color: titleClr, fontWeight: 700, fontSize: 13 }}>
+                          Instagram Boost
+                          {igStatus.active  && <span style={{ marginLeft: 6, background: 'rgba(225,48,108,0.25)', color: '#e1306c',  fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>AKTİF</span>}
+                          {isPending        && <span style={{ marginLeft: 6, background: 'rgba(245,158,11,0.20)', color: '#f59e0b',  fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>İNCELENİYOR</span>}
+                          {isRejected       && <span style={{ marginLeft: 6, background: 'rgba(239,68,68,0.20)',  color: '#ef4444',  fontSize: 10, padding: '2px 7px', borderRadius: 99, fontWeight: 700 }}>REDDEDİLDİ</span>}
+                        </p>
+                        <p style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+                          {igStatus.active  && `@${igStatus.username} · Tüm kaynaklarda %20 bonus!`}
+                          {isPending        && `@${igStatus.username} · Admin onayı bekleniyor...`}
+                          {isRejected       && 'İstek reddedildi. Tekrar gönderebilirsin.'}
+                          {!igStatus.active && !isPending && !isRejected && `@${igStatus.handle || '…'} takip et, %20 kaynak bonusu kazan!`}
+                        </p>
+                      </div>
+                    </div>
+                    {!igStatus.active && !isPending && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
+                        <a
+                          href={igStatus.handle ? `https://instagram.com/${igStatus.handle}` : 'https://instagram.com'}
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ background: 'linear-gradient(135deg,#e1306c,#833ab4)', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 700, fontSize: 11, padding: '7px 12px', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                        >
+                          Takip Et →
+                        </a>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <input
+                            type="text"
+                            value={igInput}
+                            onChange={(e) => setIgInput(e.target.value)}
+                            placeholder="kullanıcı adın"
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, color: '#f1f5f9', fontSize: 11, padding: '5px 8px', width: 110, outline: 'none' }}
+                          />
+                          <button
+                            onClick={handleRequestInstagram}
+                            disabled={igVerifying || !igInput.trim()}
+                            style={{ background: 'rgba(225,48,108,0.25)', border: '1px solid rgba(225,48,108,0.4)', borderRadius: 8, color: '#e1306c', fontWeight: 700, fontSize: 11, padding: '5px 10px', cursor: 'pointer', whiteSpace: 'nowrap', opacity: igVerifying || !igInput.trim() ? 0.5 : 1 }}
+                          >
+                            {igVerifying ? '...' : 'Gönder'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Günlük */}
               <p style={{ color: '#60a5fa', fontSize: 12, fontWeight: 700, margin: 0 }}>📅 GÜNLÜK GÖREVLER</p>
               {dailyTasks.length === 0
