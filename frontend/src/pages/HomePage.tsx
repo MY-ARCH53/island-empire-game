@@ -1266,7 +1266,7 @@ function HomePage() {
         borderTop: '1px solid rgba(255,255,255,0.10)',
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 0 }}>
           {NAV_ITEMS.map(item => {
             const isActive = activePanel === item.key;
             const hasBadge = (item.key === 'tasks' && activeTasks > 0) || (item.key === 'battle' && attackNotifications > 0);
