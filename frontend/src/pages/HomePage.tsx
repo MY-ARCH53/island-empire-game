@@ -29,7 +29,7 @@ const NAV_ITEMS = [
   { key: 'spin',        emoji: '🎰', label: 'Çark'      },
   { key: 'battle',      emoji: '⚔️', label: 'Savaş'    },
   { key: 'trade',       emoji: '🔄', label: 'Ticaret'   },
-  { key: 'market',      emoji: '🏪', label: 'Pazar'     },
+  // { key: 'market',      emoji: '🏪', label: 'Pazar'     },  // geçici olarak gizlendi
   { key: 'leaderboard', emoji: '🏆', label: 'Liderlik'  },
   { key: 'friends',     emoji: '👥', label: 'Arkadaş'   },
   { key: 'guild',       emoji: '🏰', label: 'Guild'     },
