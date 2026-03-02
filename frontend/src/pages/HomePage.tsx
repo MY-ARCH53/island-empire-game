@@ -363,7 +363,20 @@ function HomePage() {
       // Sadece kaynakları yenile
       gameAPI.getResources(user.id).then(r => setResources(r.data.data.resources)).catch(() => {});
     } catch (e: any) {
-      showToast(e.response?.data?.message || 'Toplanamadı', 'error');
+      const msg = e.response?.data?.message || '';
+      if (msg.includes('zaten toplandı')) {
+        // Worker zaten toplamış — bina durumunu sessizce yenile
+        const buildingId = Object.keys(productions).find(
+          (key: any) => productions[key]?.id === productionId
+        );
+        if (buildingId) {
+          setBuildings((prev: any[]) => prev.map(b => b.id === parseInt(buildingId) ? { ...b, status: 'idle' } : b));
+          setProductions((prev: any) => { const next = { ...prev }; delete next[parseInt(buildingId)]; return next; });
+        }
+        gameAPI.getResources(user.id).then(r => setResources(r.data.data.resources)).catch(() => {});
+      } else {
+        showToast(msg || 'Toplanamadı', 'error');
+      }
     }
   };
 
