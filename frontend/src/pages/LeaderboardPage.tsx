@@ -6,10 +6,10 @@ import { leaderboardAPI } from '../services/api';
 // ── Lig yapılandırması ────────────────────────────────────────────────────────
 
 const LEAGUES = [
-  { key: 'Bronz', emoji: '🥉', color: '#f97316', min: 0,     label: '0 – 1.999'    },
-  { key: 'Gumus', emoji: '🥈', color: '#94a3b8', min: 2000,  label: '2.000 – 4.999' },
-  { key: 'Altin', emoji: '🥇', color: '#f59e0b', min: 5000,  label: '5.000 – 9.999' },
-  { key: 'Elmas', emoji: '💎', color: '#06b6d4', min: 10000, label: '10.000+'        },
+  { key: 'Bronz', emoji: '🥉', color: '#f97316', min: 0,       label: '0 – 249.999'           },
+  { key: 'Gumus', emoji: '🥈', color: '#94a3b8', min: 250000,  label: '250.000 – 749.999'     },
+  { key: 'Altin', emoji: '🥇', color: '#f59e0b', min: 750000,  label: '750.000 – 1.499.999'   },
+  { key: 'Elmas', emoji: '💎', color: '#06b6d4', min: 1500000, label: '1.500.000+'             },
 ];
 
 function leagueFor(gold: number) {

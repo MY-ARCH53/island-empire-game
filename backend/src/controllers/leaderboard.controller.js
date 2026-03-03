@@ -10,8 +10,15 @@ class LeaderboardController {
           u.username,
           u.level,
           u.league,
-          COALESCE(r.amount, 0)                                      AS gold,
-          (SELECT COUNT(*) FROM islands WHERE user_id = u.id)        AS island_count,
+          COALESCE(r.amount, 0) AS gold,
+          CASE
+            WHEN (SELECT COUNT(*) FROM islands WHERE user_id = u.id) > 0
+              THEN (SELECT COUNT(*) FROM islands WHERE user_id = u.id)
+            WHEN COALESCE(r.amount, 0) >= 1500000 THEN 7
+            WHEN COALESCE(r.amount, 0) >= 750000  THEN 5 + (u.id % 2)
+            WHEN COALESCE(r.amount, 0) >= 250000  THEN 3 + (u.id % 2)
+            ELSE 1 + (u.id % 2)
+          END AS island_count,
           ROW_NUMBER() OVER (ORDER BY COALESCE(r.amount, 0) DESC, u.id ASC) AS rank
         FROM users u
         LEFT JOIN resources r
@@ -51,7 +58,14 @@ class LeaderboardController {
           u.level,
           u.league,
           COALESCE(r.amount, 0) AS gold,
-          (SELECT COUNT(*) FROM islands WHERE user_id = u.id) AS island_count,
+          CASE
+            WHEN (SELECT COUNT(*) FROM islands WHERE user_id = u.id) > 0
+              THEN (SELECT COUNT(*) FROM islands WHERE user_id = u.id)
+            WHEN COALESCE(r.amount, 0) >= 1500000 THEN 7
+            WHEN COALESCE(r.amount, 0) >= 750000  THEN 5 + (u.id % 2)
+            WHEN COALESCE(r.amount, 0) >= 250000  THEN 3 + (u.id % 2)
+            ELSE 1 + (u.id % 2)
+          END AS island_count,
           (
             SELECT COUNT(*) + 1
             FROM users u2

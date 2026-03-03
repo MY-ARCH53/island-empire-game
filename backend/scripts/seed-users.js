@@ -130,15 +130,22 @@ async function seed() {
         [userId, archer, infantry, cavalry, totalPower]
       );
 
-      // Kaynaklar ekle (resource_type satır bazlı)
-      const gold = rand(500, 8000);
-      const wood = rand(300, 5000);
-      const food = rand(400, 6000);
+      // Kaynaklar ekle — altını tüm liglere yay
+      // İlk %20 → Elmas (1.5M+), sonraki %20 → Altın, sonraki %30 → Gümüş, kalan → Bronz
+      const idx = usernames.indexOf(username);
+      const total = usernames.length;
+      let gold;
+      if (idx < total * 0.20)      gold = rand(1500000, 3000000); // Elmas
+      else if (idx < total * 0.40) gold = rand(750000, 1499999);  // Altın
+      else if (idx < total * 0.65) gold = rand(250000, 749999);   // Gümüş
+      else                         gold = rand(5000, 249999);      // Bronz
+      const wood = rand(300, 50000);
+      const food = rand(400, 60000);
 
       await pool.query(
         `INSERT INTO resources (user_id, resource_type, amount)
          VALUES ($1, 'gold', $2), ($1, 'wood', $3), ($1, 'food', $4)
-         ON CONFLICT (user_id, resource_type) DO NOTHING`,
+         ON CONFLICT (user_id, resource_type) DO UPDATE SET amount = EXCLUDED.amount`,
         [userId, gold, wood, food]
       );
 
