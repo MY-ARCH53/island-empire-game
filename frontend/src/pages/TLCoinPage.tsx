@@ -15,8 +15,8 @@ const PRIZES = [
   },
   {
     id: 'giftcard',
-    name: 'Hediye Çeki 500₺',
-    cost: 500,
+    name: 'Hediye Çeki 10.000₺',
+    cost: 10000,
     emoji: '🎁',
     image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'İstediğin markette kullanabileceğin hediye çeki',
