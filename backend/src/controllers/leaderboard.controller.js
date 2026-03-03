@@ -23,6 +23,7 @@ class LeaderboardController {
         FROM users u
         LEFT JOIN resources r
           ON r.user_id = u.id AND r.resource_type = 'gold'
+        WHERE u.is_admin = FALSE
         ORDER BY gold DESC
         LIMIT 50
       `;
