@@ -18,6 +18,9 @@ router.post('/bots/attack', AdminController.triggerBotAttack);
 router.post('/bots/boost-armies', AdminController.boostBotArmies);
 router.post('/bots/attack-user', AdminController.attackSpecificUser);
 
+// Seed oyuncu orduları
+router.post('/seeds/boost-armies', AdminController.boostSeedArmies);
+
 // Ödül talepleri
 router.get('/prize-requests',     AdminController.getPrizeRequests);
 router.put('/prize-requests/:id', AdminController.updatePrizeRequest);

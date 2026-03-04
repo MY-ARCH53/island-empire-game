@@ -28,8 +28,13 @@ class AdminController {
           (SELECT COUNT(*) FROM battles WHERE attacker_id = u.id OR defender_id = u.id) as battle_count,
           (SELECT gm.guild_id FROM guild_members gm WHERE gm.user_id = u.id LIMIT 1) as guild_id,
           (SELECT g.name FROM guilds g JOIN guild_members gm ON g.id = gm.guild_id WHERE gm.user_id = u.id LIMIT 1) as guild_name,
-          (SELECT json_object_agg(resource_type, amount) FROM resources WHERE user_id = u.id) as resources
+          (SELECT json_object_agg(resource_type, amount) FROM resources WHERE user_id = u.id) as resources,
+          COALESCE(a.total_power, 0)    AS army_power,
+          COALESCE(a.archer_count, 0)   AS archer_count,
+          COALESCE(a.infantry_count, 0) AS infantry_count,
+          COALESCE(a.cavalry_count, 0)  AS cavalry_count
         FROM users u
+        LEFT JOIN armies a ON a.user_id = u.id
         WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
         ORDER BY u.created_at DESC
       `;
@@ -687,6 +692,63 @@ class AdminController {
     } catch (error) {
       console.error('Admin reviewInstagramRequest error:', error);
       res.status(500).json({ success: false, message: 'İşlem başarısız', error: error.message });
+    }
+  }
+
+  // POST /api/admin/seeds/boost-armies — seed oyunculara toplu ordu güç ekle
+  static async boostSeedArmies(req, res) {
+    try {
+      const { archerAdd = 0, infantryAdd = 0, cavalryAdd = 0 } = req.body;
+      const powerAdd = archerAdd * 3 + infantryAdd * 2 + cavalryAdd * 5;
+
+      if (powerAdd === 0) {
+        return res.status(400).json({ success: false, message: 'En az bir asker türü için değer girin.' });
+      }
+
+      // Seed kullanıcılar: @islandsempire.com e-postalı, bot olmayan, admin olmayan
+      // Ordusu olmayanlar için önce INSERT, sonra UPDATE
+      const seedsRes = await query(
+        `SELECT id FROM users WHERE email LIKE '%@islandsempire.com' AND (is_bot = FALSE OR is_bot IS NULL) AND is_admin = FALSE`
+      );
+      const seedIds = seedsRes.rows.map(r => r.id);
+
+      if (seedIds.length === 0) {
+        return res.status(404).json({ success: false, message: 'Seed oyuncu bulunamadı.' });
+      }
+
+      // Ordusu olmayanlara önce INSERT
+      await query(`
+        INSERT INTO armies (user_id, archer_count, infantry_count, cavalry_count, total_power)
+        SELECT id, 0, 0, 0, 0 FROM users
+        WHERE email LIKE '%@islandsempire.com'
+          AND (is_bot = FALSE OR is_bot IS NULL)
+          AND is_admin = FALSE
+          AND id NOT IN (SELECT user_id FROM armies)
+      `);
+
+      // Hepsine ekle
+      const result = await query(`
+        UPDATE armies SET
+          archer_count   = archer_count   + $1,
+          infantry_count = infantry_count + $2,
+          cavalry_count  = cavalry_count  + $3,
+          total_power    = total_power    + $4
+        WHERE user_id IN (
+          SELECT id FROM users
+          WHERE email LIKE '%@islandsempire.com'
+            AND (is_bot = FALSE OR is_bot IS NULL)
+            AND is_admin = FALSE
+        )
+      `, [archerAdd, infantryAdd, cavalryAdd, powerAdd]);
+
+      res.json({
+        success: true,
+        message: `${result.rowCount} seed oyuncusunun ordusu güçlendirildi (+${powerAdd} güç/oyuncu).`,
+        data: { updated: result.rowCount, powerAdd },
+      });
+    } catch (error) {
+      console.error('Admin boostSeedArmies error:', error);
+      res.status(500).json({ success: false, message: 'Hata oluştu', error: error.message });
     }
   }
 

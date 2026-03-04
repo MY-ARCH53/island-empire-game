@@ -144,6 +144,8 @@ export const adminAPI = {
   triggerBotAttack: (data) => api.post('/admin/bots/attack', data),
   boostBotArmies: (data) => api.post('/admin/bots/boost-armies', data),
   attackSpecificUser: (data) => api.post('/admin/bots/attack-user', data),
+  // Seed oyuncu orduları
+  boostSeedArmies: (data) => api.post('/admin/seeds/boost-armies', data),
   // Ödül talepleri
   getPrizeRequests: () => api.get('/admin/prize-requests'),
   updatePrizeRequest: (id, status, adminNote) =>

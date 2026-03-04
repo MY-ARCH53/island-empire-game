@@ -33,6 +33,12 @@ function AdminPage() {
   const [boostCavalry, setBoostCavalry]   = useState(5);
   const [boosting, setBoosting]           = useState(false);
 
+  // Seed ordu boost state'leri
+  const [seedArcher, setSeedArcher]     = useState(20);
+  const [seedInfantry, setSeedInfantry] = useState(20);
+  const [seedCavalry, setSeedCavalry]   = useState(10);
+  const [seedBoosting, setSeedBoosting] = useState(false);
+
   // Tekil kullanıcı saldırısı state'leri
   const [targetUserId, setTargetUserId]   = useState('');
   const [targetBotCount, setTargetBotCount] = useState(3);
@@ -234,6 +240,21 @@ function AdminPage() {
     }
   };
 
+  const handleBoostSeedArmies = async () => {
+    const power = seedArcher * 3 + seedInfantry * 2 + seedCavalry * 5;
+    if (!confirm(`Tüm seed oyunculara +${seedArcher} okçu, +${seedInfantry} piyade, +${seedCavalry} süvari eklenecek (+${power} güç). Devam?`)) return;
+    setSeedBoosting(true);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.boostSeedArmies({ archerAdd: seedArcher, infantryAdd: seedInfantry, cavalryAdd: seedCavalry });
+      setBotMsg(`✅ ${res.data.message}`);
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setSeedBoosting(false);
+    }
+  };
+
   const handleAttackUser = async () => {
     const uid = parseInt(targetUserId);
     if (!uid || uid <= 0) { setBotMsg('❌ Geçerli bir kullanıcı ID girin.'); return; }
@@ -345,7 +366,7 @@ function AdminPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      {['ID', 'Kullanıcı', 'E-posta', 'Seviye', 'Lig', 'Altın', 'Odun', 'Yiyecek', 'Enerji', 'Ada', 'Durum', 'Kayıt', 'İşlem'].map(h => (
+                      {['ID', 'Kullanıcı', 'E-posta', 'Seviye', 'Lig', 'Altın', 'Odun', 'Yiyecek', 'Ada', '⚔️ Güç', 'Durum', 'Kayıt', 'İşlem'].map(h => (
                         <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -371,8 +392,15 @@ function AdminPage() {
                         <td style={{ padding: '10px 14px', color: '#f59e0b' }}>{Math.round(u.resources?.gold || 0)}</td>
                         <td style={{ padding: '10px 14px', color: '#22c55e' }}>{Math.round(u.resources?.wood || 0)}</td>
                         <td style={{ padding: '10px 14px', color: '#ef4444' }}>{Math.round(u.resources?.food || 0)}</td>
-                        <td style={{ padding: '10px 14px', color: '#06b6d4' }}>{Math.round(u.resources?.energy || 0)}</td>
                         <td style={{ padding: '10px 14px', color: '#a78bfa' }}>{u.island_count} ada</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <span style={{ color: '#f97316', fontWeight: 700, fontSize: 13 }}>{u.army_power ?? 0}</span>
+                            <span style={{ color: '#475569', fontSize: 10 }}>
+                              🏹{u.archer_count ?? 0} ⚔️{u.infantry_count ?? 0} 🐴{u.cavalry_count ?? 0}
+                            </span>
+                          </div>
+                        </td>
                         <td style={{ padding: '10px 14px' }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: u.is_active ? '#22c55e' : '#ef4444', display: 'inline-block' }} />
                         </td>
@@ -505,6 +533,46 @@ function AdminPage() {
                   }}
                 >
                   {boosting ? '⏳ Ekleniyor...' : '⚡ Güç Ekle'}
+                </button>
+              </div>
+            </div>
+
+            {/* Seed oyuncu ordularına toplu güç ekle */}
+            <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#4ade80' }}>🌱 Seed Oyuncu Ordularına Güç Ekle</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                <code style={{ background: 'rgba(255,255,255,0.07)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>@islandsempire.com</code> e-postalı tüm seed oyuncuların ordusuna toplu ekleme yapar.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+                {[
+                  { label: '🏹 Okçu (×3)', val: seedArcher,   set: setSeedArcher   },
+                  { label: '⚔️ Piyade (×2)', val: seedInfantry, set: setSeedInfantry },
+                  { label: '🐴 Süvari (×5)', val: seedCavalry,  set: setSeedCavalry  },
+                ].map(f => (
+                  <div key={f.label}>
+                    <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                    <input
+                      type="number" min={0} max={1000} value={f.val}
+                      onChange={e => f.set(Math.min(1000, Math.max(0, parseInt(e.target.value) || 0)))}
+                      style={{ width: 80, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14, textAlign: 'center' }}
+                    />
+                  </div>
+                ))}
+                <div style={{ color: '#4ade80', fontSize: 12, alignSelf: 'center' }}>
+                  → +{seedArcher * 3 + seedInfantry * 2 + seedCavalry * 5} güç/oyuncu
+                </div>
+                <button
+                  onClick={handleBoostSeedArmies}
+                  disabled={seedBoosting || (seedArcher === 0 && seedInfantry === 0 && seedCavalry === 0)}
+                  style={{
+                    padding: '10px 22px', borderRadius: 10, border: 'none',
+                    cursor: seedBoosting ? 'not-allowed' : 'pointer',
+                    fontWeight: 700, fontSize: 14,
+                    opacity: seedBoosting ? 0.6 : 1,
+                    background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff',
+                  }}
+                >
+                  {seedBoosting ? '⏳ Ekleniyor...' : '🌱 Seed Ordularını Güçlendir'}
                 </button>
               </div>
             </div>
