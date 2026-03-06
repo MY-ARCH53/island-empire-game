@@ -15,6 +15,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
 import TLCoinPage from './pages/TLCoinPage';
 import ProfilePage from './pages/ProfilePage';
+import BattleDemoPage from './pages/BattleDemoPage';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/tlcoin" element={<TLCoinPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/battle-demo" element={<BattleDemoPage />} />
           </Routes>
         </div>
       </Router>

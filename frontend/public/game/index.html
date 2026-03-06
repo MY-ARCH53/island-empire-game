@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D İzometrik Savaş</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bungee&family=Exo+2:wght@400;600;700;900&display=swap');
+  :root{--gold:#ffd700;--red:#e94560;--green:#4ade80;--blue:#60a5fa;--bg:#080c16;--panel:#0f1629;--border:#1c2844}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);font-family:'Exo 2',sans-serif;overflow:hidden;height:100vh;user-select:none;color:#e2e8f0}
+  canvas{display:block}
+  #topHUD{position:fixed;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:center;z-index:10}
+  .hud-box{background:linear-gradient(135deg,rgba(15,22,41,.95),rgba(8,12,22,.95));border:2px solid var(--border);border-radius:10px;padding:6px 16px;backdrop-filter:blur(8px);display:flex;align-items:center;gap:8px}
+  .hud-timer{border-color:var(--red)} .hud-timer span{font-family:'Bungee',cursive;font-size:20px;color:#fff}
+  .hud-percent{border-color:var(--gold)} .hud-percent span{font-family:'Bungee',cursive;font-size:18px;color:var(--gold)}
+  .hud-stars{display:flex;gap:4px}
+  .hud-star{width:32px;height:32px;transition:all .4s;filter:drop-shadow(0 0 2px rgba(255,215,0,.2))}
+  .hud-star.earned{filter:drop-shadow(0 0 10px rgba(255,215,0,.8));animation:starBounce .5s ease}
+  @keyframes starBounce{0%{transform:scale(.3) rotate(-30deg)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+  #actionBtns{position:fixed;top:10px;right:14px;display:flex;gap:8px;z-index:10}
+  .action-btn{padding:8px 20px;border-radius:8px;font-family:'Bungee',cursive;font-size:14px;border:none;cursor:pointer;transition:all .2s;letter-spacing:1px}
+  .action-btn:hover{transform:scale(1.05)}
+  .btn-battle{background:linear-gradient(135deg,#e94560,#c2185b);color:#fff;box-shadow:0 4px 16px rgba(233,69,96,.4)}
+  .btn-reset{background:linear-gradient(135deg,#334155,#1e293b);color:#94a3b8;border:1px solid #475569}
+  #troopBar{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(8,12,22,.98),rgba(15,22,41,.92));border-top:2px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:8px;z-index:10}
+  .troop-slot{position:relative;width:64px;height:74px;background:linear-gradient(145deg,#162040,#101830);border:2px solid #253560;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+  .troop-slot:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:0 4px 16px rgba(255,215,0,.15)}
+  .troop-slot.selected{border-color:var(--gold);background:linear-gradient(145deg,#1e2a50,#162040);box-shadow:0 0 16px rgba(255,215,0,.2)}
+  .troop-slot.hero{border-color:#a855f7}.troop-slot.hero.selected{border-color:#c084fc;box-shadow:0 0 20px rgba(168,85,247,.3)}
+  .troop-icon{font-size:24px}.troop-name{font-size:8px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:1px}
+  .troop-count{position:absolute;bottom:3px;right:5px;background:var(--red);color:#fff;font-size:10px;font-weight:900;padding:1px 5px;border-radius:6px}
+  .troop-slot.hero .troop-count{background:#7c3aed}
+  #instructions{position:fixed;top:58px;left:50%;transform:translateX(-50%);color:#64748b;font-size:12px;z-index:10;background:rgba(8,12,22,.85);padding:5px 14px;border-radius:6px;transition:opacity .4s}
+  #loadingOverlay{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  #loadingOverlay h2{font-family:'Bungee',cursive;font-size:24px;color:var(--gold);margin-bottom:16px}
+  #loadingBar{width:300px;height:8px;background:#1e293b;border-radius:4px;overflow:hidden}
+  #loadingFill{height:100%;background:linear-gradient(90deg,var(--gold),#ff6b35);width:0%;transition:width .3s}
+  #loadingText{color:#64748b;font-size:12px;margin-top:8px}
+  #resultOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:50;flex-direction:column;align-items:center;justify-content:center}
+  #resultOverlay.show{display:flex}
+  .result-title{font-family:'Bungee',cursive;font-size:48px;text-shadow:0 0 30px rgba(255,215,0,.4);margin-bottom:16px}
+  .result-stats{color:#94a3b8;font-size:16px;text-align:center;line-height:2}
+  .result-btn{margin-top:24px;padding:12px 36px;border-radius:10px;font-family:'Bungee',cursive;font-size:16px;border:none;cursor:pointer;background:linear-gradient(135deg,#4ade80,#16a34a);color:#fff;box-shadow:0 4px 16px rgba(74,222,128,.3)}
+  #soundToggle{position:fixed;bottom:96px;right:14px;z-index:10;width:36px;height:36px;border-radius:50%;background:var(--panel);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+  #assetError{display:none;position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#991b1b;color:#fca5a5;padding:8px 16px;border-radius:8px;font-size:12px;z-index:20}
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <h2>⚔️ Yükleniyor...</h2>
+  <div id="loadingBar"><div id="loadingFill"></div></div>
+  <div id="loadingText">Başlatılıyor...</div>
+</div>
+
+<div id="topHUD">
+  <div class="hud-box"><div class="hud-stars">
+    <svg class="hud-star" id="star1" viewBox="0 0 24 24"><polygon points="12,2 15,9 22,9 16.5,14 18.5,21 12,17 5.5,21 7.5,14 2,9 9,9" fill="#333"/></svg>
+    <svg class="hud-star" id="star2" viewBox="0 0 24 24"><polygon points="12,2 15,9 22,9 16.5,14 18.5,21 12,17 5.5,21 7.5,14 2,9 9,9" fill="#333"/></svg>
+    <svg class="hud-star" id="star3" viewBox="0 0 24 24"><polygon points="12,2 15,9 22,9 16.5,14 18.5,21 12,17 5.5,21 7.5,14 2,9 9,9" fill="#333"/></svg>
+  </div></div>
+  <div class="hud-box hud-timer"><span id="timerText">3:00</span></div>
+  <div class="hud-box hud-percent"><span id="percentText">0%</span></div>
+</div>
+
+<div id="actionBtns">
+  <button class="action-btn btn-reset" onclick="resetGame()">↺ Sıfırla</button>
+  <button class="action-btn btn-battle" id="battleBtn" onclick="startBattle()">⚔ SAVAŞ</button>
+</div>
+
+<div id="instructions">Birlik seç → haritaya tıkla → SAVAŞ!</div>
+
+<div id="troopBar">
+  <div class="troop-slot selected" data-troop="infantry" onclick="selectTroop('infantry')">
+    <div class="troop-icon">🛡️</div><div class="troop-name">Piyade</div>
+    <div class="troop-count" id="cnt-infantry">0</div>
+  </div>
+  <div class="troop-slot" data-troop="archer" onclick="selectTroop('archer')">
+    <div class="troop-icon">🏹</div><div class="troop-name">Okçu</div>
+    <div class="troop-count" id="cnt-archer">0</div>
+  </div>
+  <div class="troop-slot" data-troop="cavalry" onclick="selectTroop('cavalry')">
+    <div class="troop-icon">🐴</div><div class="troop-name">Süvari</div>
+    <div class="troop-count" id="cnt-cavalry">0</div>
+  </div>
+  <div class="troop-slot" data-troop="healer" onclick="selectTroop('healer')">
+    <div class="troop-icon">💊</div><div class="troop-name">Şifacı</div>
+    <div class="troop-count" id="cnt-healer">3</div>
+  </div>
+  <div class="troop-slot hero" data-troop="hero" onclick="selectTroop('hero')">
+    <div class="troop-icon">👑</div><div class="troop-name">Kral</div>
+    <div class="troop-count" id="cnt-hero">1</div>
+  </div>
+</div>
+
+<div id="soundToggle" onclick="toggleSound()">🔊</div>
+<div id="assetError"></div>
+
+<div id="resultOverlay">
+  <div class="result-title" id="resultTitle">ZAFER!</div>
+  <div class="result-stats" id="resultStats"></div>
+  <button class="result-btn" onclick="resetGame()">🔄 Tekrar Dene</button>
+</div>
+
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
+
+// ================================================================
+//  URL PARAMS — ordu sayıları oyuncunun gerçek verisinden gelir
+// ================================================================
+const _p = new URLSearchParams(window.location.search);
+const _infantry = Math.min(200, Math.max(1, parseInt(_p.get('infantry')) || 20));
+const _archer   = Math.min(200, Math.max(0, parseInt(_p.get('archer'))   || 15));
+const _cavalry  = Math.min(100, Math.max(0, parseInt(_p.get('cavalry'))  || 8));
+const _healer   = Math.min(20,  Math.max(0, parseInt(_p.get('healer'))   || 3));
+
+// ================================================================
+//  CONFIG
+// ================================================================
+const GRID = 22, CELL = 2;
+const ASSET_BASE = './assets/';
+
+const CHAR_MODELS = {
+  infantry: 'characters/Knight.glb',
+  archer:   'characters/Ranger.glb',
+  cavalry:  'characters/Barbarian.glb',
+  healer:   'characters/Mage.glb',
+  hero:     'characters/Rogue_Hooded.glb',
+};
+
+const BLDG_MODELS = {
+  townhall:       'buildings/blue/building_castle_blue.gltf',
+  cannon:         'buildings/blue/building_tower_catapult_blue.gltf',
+  archer_tower:   'buildings/blue/building_tower_A_blue.gltf',
+  mortar:         'buildings/blue/building_tower_B_blue.gltf',
+  gold_storage:   'buildings/blue/building_mine_blue.gltf',
+  elixir_storage: 'buildings/blue/building_church_blue.gltf',
+  barracks:       'buildings/blue/building_barracks_blue.gltf',
+  wall:           'buildings/neutral/wall_straight.gltf',
+};
+
+const DESTROYED_MODEL = 'buildings/neutral/building_destroyed.gltf';
+
+// ================================================================
+//  GAME STATE
+// ================================================================
+let scene, camera, renderer, clock, gltfLoader;
+let groundMesh;
+const troopMeshes = new Map();
+const buildingMeshes = new Map();
+const modelCache = new Map();
+
+let mode='battle', gameState='setup', selectedTroop='infantry';
+let troops=[], buildings=[], projectiles=[];
+let battleTimer=180, stars=0, destructionPct=0, townHallDead=false, animT=0;
+
+// Ordu sayıları URL'den okunuyor
+let troopCounts = {infantry:_infantry, archer:_archer, cavalry:_cavalry, healer:_healer, hero:1};
+const INIT_COUNTS = {infantry:_infantry, archer:_archer, cavalry:_cavalry, healer:_healer, hero:1};
+
+// Troop bar sayılarını güncelle
+document.getElementById('cnt-infantry').textContent = _infantry;
+document.getElementById('cnt-archer').textContent   = _archer;
+document.getElementById('cnt-cavalry').textContent  = _cavalry;
+document.getElementById('cnt-healer').textContent   = _healer;
+
+const TROOP_DEF={
+  infantry:{name:'Piyade',hp:100,dmg:20,spd:1.6,range:1.5,atkSpd:.9,color:'#3B82F6',size:9,priority:'nearest',armor:.1,modelScale:.7},
+  archer:{name:'Okçu',hp:50,dmg:16,spd:1.4,range:6,atkSpd:1,color:'#10B981',size:7,priority:'nearest',modelScale:.7},
+  cavalry:{name:'Süvari',hp:180,dmg:35,spd:2.8,range:1.8,atkSpd:1.3,color:'#8B5CF6',size:13,priority:'defense',charge:true,chargeDmgMult:2,modelScale:.9},
+  healer:{name:'Şifacı',hp:60,dmg:0,spd:1,range:5,atkSpd:1.5,color:'#4ade80',size:7,priority:'heal',healAmt:22,modelScale:.7},
+  hero:{name:'Kral',hp:650,dmg:55,spd:1.5,range:1.5,atkSpd:1.1,color:'#EAB308',size:16,priority:'nearest',armor:.15,modelScale:.9,
+    ability:{cooldown:14,duration:5,dmgBoost:1.5,speedBoost:1.3,radius:4}},
+};
+
+const BLDG_DEF={
+  townhall:{name:'Belediye',hp:1500,w:2,h:2,isDef:false,val:30,modelScale:1.2},
+  cannon:{name:'Top',hp:400,w:1,h:1,isDef:true,dmg:22,range:6,atkSpd:1,modelScale:.8},
+  archer_tower:{name:'Okçu Kulesi',hp:350,w:1,h:1,isDef:true,dmg:15,range:8,atkSpd:.8,modelScale:.8},
+  mortar:{name:'Havan',hp:300,w:1,h:1,isDef:true,dmg:35,range:7,atkSpd:3,splash:2,minRange:3,modelScale:.8},
+  gold_storage:{name:'Altın Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:.8},
+  elixir_storage:{name:'İksir Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:.8},
+  wall:{name:'Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:.5},
+  barracks:{name:'Kışla',hp:350,w:1,h:1,isDef:false,val:5,modelScale:.8},
+};
+
+const gDist=(a,b)=>Math.sqrt((a.gx-b.gx)**2+(a.gy-b.gy)**2);
+const g2w=(gx,gy)=>({x:(gx-GRID/2)*CELL, y:0, z:(gy-GRID/2)*CELL});
+const w2g=(x,z)=>({gx:x/CELL+GRID/2, gy:z/CELL+GRID/2});
+
+// ================================================================
+//  LOADING
+// ================================================================
+function setLoading(pct,txt){
+  document.getElementById('loadingFill').style.width=pct+'%';
+  document.getElementById('loadingText').textContent=txt;
+}
+
+function showAssetError(msg){
+  const el=document.getElementById('assetError');
+  el.style.display='block'; el.textContent='⚠️ '+msg;
+  setTimeout(()=>el.style.display='none',5000);
+}
+
+async function loadModel(path){
+  if(modelCache.has(path)) return modelCache.get(path).clone();
+  return new Promise((resolve,reject)=>{
+    gltfLoader.load(ASSET_BASE+path,
+      gltf=>{
+        const model=gltf.scene;
+        model.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;}});
+        modelCache.set(path,model);
+        resolve(model.clone());
+      },
+      undefined,
+      err=>{
+        console.warn(`Model yüklenemedi: ${path}`,err);
+        reject(err);
+      }
+    );
+  });
+}
+
+function createFallbackBuilding(type){
+  const g=new THREE.Group();
+  const d=BLDG_DEF[type];
+  const s=d.modelScale||1;
+  const mat=new THREE.MeshStandardMaterial({color:type==='wall'?0x8D6E63:0x607D8B,roughness:.7});
+  const box=new THREE.Mesh(new THREE.BoxGeometry(CELL*s*.8,CELL*s,CELL*s*.8),mat);
+  box.position.y=CELL*s*.5; box.castShadow=true;
+  g.add(box);
+  return g;
+}
+
+function createFallbackTroop(type){
+  const g=new THREE.Group();
+  const d=TROOP_DEF[type];
+  const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(d.color)});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.2,.25,.6,8),mat);
+  body.position.y=.3; body.castShadow=true; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.15,8,6),new THREE.MeshStandardMaterial({color:0xFFCC80}));
+  head.position.y=.75; g.add(head);
+  return g;
+}
+
+// ================================================================
+//  THREE.JS SETUP
+// ================================================================
+function initThree(){
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x87CEEB);
+  scene.fog=new THREE.FogExp2(0x87CEEB,.008);
+
+  const aspect=window.innerWidth/window.innerHeight;
+  const frustum=28;
+  camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,.1,200);
+  camera.position.set(30,30,30);
+  camera.lookAt(0,0,0);
+
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.2;
+  document.body.insertBefore(renderer.domElement,document.body.firstChild);
+
+  clock=new THREE.Clock();
+  gltfLoader=new GLTFLoader();
+
+  scene.add(new THREE.AmbientLight(0x88aacc,.5));
+  const sun=new THREE.DirectionalLight(0xffeedd,1.1);
+  sun.position.set(25,35,20);
+  sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.near=.5;sun.shadow.camera.far=120;
+  sun.shadow.camera.left=-35;sun.shadow.camera.right=35;
+  sun.shadow.camera.top=35;sun.shadow.camera.bottom=-35;
+  scene.add(sun);
+  scene.add(new THREE.DirectionalLight(0x4488ff,.25).translateX(-15).translateY(10));
+
+  const gMat=new THREE.MeshStandardMaterial({color:0x4a8c2a,roughness:.9});
+  groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(GRID*CELL+10,GRID*CELL+10),gMat);
+  groundMesh.rotation.x=-Math.PI/2;groundMesh.receiveShadow=true;
+  scene.add(groundMesh);
+
+  const gridMat=new THREE.MeshBasicMaterial({color:0x5a9c3a,wireframe:true,transparent:true,opacity:.12});
+  const gridM=new THREE.Mesh(new THREE.PlaneGeometry(GRID*CELL,GRID*CELL,GRID,GRID),gridMat);
+  gridM.rotation.x=-Math.PI/2;gridM.position.y=.03;scene.add(gridM);
+}
+
+// ================================================================
+//  ASSET LOADING & BUILDING/TROOP CREATION
+// ================================================================
+async function preloadAssets(){
+  setLoading(20,'3D modeller yükleniyor...');
+  let loaded=0;
+  const total=Object.keys(CHAR_MODELS).length+Object.keys(BLDG_MODELS).length+1;
+
+  for(const[type,path] of Object.entries(CHAR_MODELS)){
+    try{await loadModel(path);loaded++;}
+    catch(e){showAssetError(`${type} modeli yüklenemedi, fallback kullanılacak`);loaded++;}
+    setLoading(20+Math.round(loaded/total*60),`Yükleniyor: ${type}...`);
+  }
+
+  for(const[type,path] of Object.entries(BLDG_MODELS)){
+    try{await loadModel(path);loaded++;}
+    catch(e){showAssetError(`${type} bina modeli yüklenemedi`);loaded++;}
+    setLoading(20+Math.round(loaded/total*60),`Yükleniyor: ${type}...`);
+  }
+
+  try{await loadModel(DESTROYED_MODEL);loaded++;}catch(e){loaded++;}
+  setLoading(85,'Üs oluşturuluyor...');
+}
+
+async function createBuildingMesh(b){
+  const d=BLDG_DEF[b.type];
+  const pos=g2w(b.gx,b.gy);
+  let model;
+
+  try{
+    model=await loadModel(BLDG_MODELS[b.type]);
+  }catch(e){
+    model=createFallbackBuilding(b.type);
+  }
+
+  const s=d.modelScale||.8;
+  model.scale.set(s,s,s);
+  model.position.set(pos.x,0,pos.z);
+  model.userData={building:b};
+  scene.add(model);
+  buildingMeshes.set(b,model);
+
+  if(d.isDef){
+    const rangeGeo=new THREE.RingGeometry(0,d.range*CELL,.02,32);
+    const rangeMat=new THREE.MeshBasicMaterial({color:0xff3333,transparent:true,opacity:.06,side:THREE.DoubleSide});
+    const rangeMesh=new THREE.Mesh(rangeGeo,rangeMat);
+    rangeMesh.rotation.x=-Math.PI/2;rangeMesh.position.y=.05;
+    rangeMesh.name='rangeRing';
+    model.add(rangeMesh);
+  }
+
+  if(b.type==='gold_storage'){
+    const gl=new THREE.PointLight(0xffd700,.4,5);gl.position.y=2;model.add(gl);
+  }else if(b.type==='elixir_storage'){
+    const gl=new THREE.PointLight(0xe040fb,.5,5);gl.position.y=2;model.add(gl);
+  }else if(b.type==='townhall'){
+    const gl=new THREE.PointLight(0xffaa44,.4,8);gl.position.y=2;model.add(gl);
+  }
+}
+
+async function createTroopMesh(t){
+  const d=TROOP_DEF[t.type];
+  let model;
+
+  try{
+    model=await loadModel(CHAR_MODELS[t.type]);
+  }catch(e){
+    model=createFallbackTroop(t.type);
+  }
+
+  const s=d.modelScale||.7;
+  model.scale.set(s,s,s);
+
+  const canvas2d=document.createElement('canvas');
+  canvas2d.width=64;canvas2d.height=8;
+  const tex=new THREE.CanvasTexture(canvas2d);
+  const hpSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
+  hpSprite.scale.set(1.2,.15,1);
+  hpSprite.position.y=2*s;
+  hpSprite.name='hpBar';
+  hpSprite.visible=false;
+  hpSprite.userData={canvas:canvas2d,tex};
+  model.add(hpSprite);
+
+  model.userData={troop:t};
+  scene.add(model);
+  troopMeshes.set(t,model);
+}
+
+function updateHpBar(sprite,pct){
+  if(!sprite||!sprite.userData.canvas)return;
+  const c=sprite.userData.canvas;
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,64,8);
+  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,64,8);
+  ctx.fillStyle=pct>.5?'#4caf50':pct>.25?'#ff9800':'#f44336';
+  ctx.fillRect(1,1,62*pct,6);
+  sprite.userData.tex.needsUpdate=true;
+}
+
+// ================================================================
+//  BATTLE LOGIC
+// ================================================================
+function findTarget(tr){
+  const d=TROOP_DEF[tr.type];const alive=buildings.filter(b=>b.hp>0);
+  if(!alive.length)return null;
+  if(d.priority==='heal'){let best=null,bestHp=1;troops.forEach(t=>{if(t!==tr&&t.state!=='dead'&&t.type!=='healer'){const r=t.hp/t.maxHp;if(r<bestHp){bestHp=r;best=t;}}});return best;}
+  if(d.priority==='defense'){const defs=alive.filter(b=>BLDG_DEF[b.type].isDef);const pool=defs.length?defs:alive;let best=null,bestD=Infinity;pool.forEach(b=>{const dd=gDist(tr,b);if(dd<bestD){bestD=dd;best=b;}});return best;}
+  let best=null,bestD=Infinity;alive.forEach(b=>{const dd=gDist(tr,b);if(dd<bestD){bestD=dd;best=b;}});return best;
+}
+
+function updateTroops(dt){
+  troops.forEach(tr=>{
+    if(tr.state==='dead'){tr.deadTimer+=dt;return;}
+    const d=TROOP_DEF[tr.type];tr.anim+=dt*5;
+    if(tr.abilityActive>0){tr.abilityActive-=dt;if(tr.abilityActive<=0){tr.dmgMult=1;tr.spdMult=1;}}
+    if(tr.abilityCd>0)tr.abilityCd-=dt;
+    if(tr._boosted>0){tr._boosted-=dt;if(tr._boosted<=0){tr.dmgMult=1;tr.spdMult=1;}}
+    if(tr.type==='hero'&&tr.hp<tr.maxHp*.5&&tr.abilityCd<=0)activateAbility(tr);
+    if(!tr.target||(tr.target.hp!==undefined&&tr.target.hp<=0)||(tr.target.state&&tr.target.state==='dead')){tr.target=findTarget(tr);if(!tr.target){tr.state='idle';return;}}
+    const dist=gDist(tr,tr.target);
+    if(d.priority==='heal'){
+      if(tr.target.state==='dead'||tr.target.hp>=tr.target.maxHp){tr.target=null;return;}
+      if(dist<=d.range){tr.state='attacking';tr.atkTimer+=dt;if(tr.atkTimer>=d.atkSpd){tr.atkTimer=0;tr.target.hp=Math.min(tr.target.maxHp,tr.target.hp+d.healAmt);SFX.play('place');}}else moveToward(tr,d,dt);return;
+    }
+    if(dist<=d.range){
+      tr.state='attacking';tr.atkTimer+=dt;
+      if(tr.atkTimer>=d.atkSpd){tr.atkTimer=0;let dmg=Math.round(d.dmg*tr.dmgMult);
+        if(d.charge&&!tr._charged){dmg=Math.round(dmg*d.chargeDmgMult);tr._charged=true;SFX.play('star');}
+        if(d.range>2){projectiles.push({from:{gx:tr.gx,gy:tr.gy},target:tr.target,dmg,t:0,splash:d.splash||0});SFX.play('shoot');}
+        else{dealDamage(tr.target,dmg);SFX.play('hit');}
+      }
+    }else moveToward(tr,d,dt);
+  });
+  troops.forEach(t=>{if(t.state==='dead'&&t.deadTimer>2){const m=troopMeshes.get(t);if(m){scene.remove(m);troopMeshes.delete(t);}}});
+  troops=troops.filter(t=>t.state!=='dead'||t.deadTimer<2);
+}
+
+function moveToward(tr,d,dt){
+  tr.state='moving';tr.atkTimer=0;if(!tr.target)return;
+  const dx=tr.target.gx-tr.gx,dy=tr.target.gy-tr.gy,dd=Math.sqrt(dx*dx+dy*dy);
+  if(dd>.1){const mv=d.spd*(tr.spdMult||1)*dt;tr.gx+=(dx/dd)*Math.min(mv,dd);tr.gy+=(dy/dd)*Math.min(mv,dd);}
+  buildings.forEach(b=>{if(b.hp<=0||b.type!=='wall')return;if(gDist(tr,b)<.8)tr.target=b;});
+}
+
+function activateAbility(hero){
+  if(hero.abilityCd>0||hero.abilityActive>0)return;
+  const ab=TROOP_DEF.hero.ability;hero.abilityActive=ab.duration;hero.abilityCd=ab.cooldown;hero.dmgMult=ab.dmgBoost;hero.spdMult=ab.speedBoost;
+  troops.forEach(t=>{if(t.state!=='dead'&&t!==hero&&gDist(t,hero)<ab.radius){t.dmgMult=ab.dmgBoost;t.spdMult=ab.speedBoost;t._boosted=ab.duration;}});
+  SFX.play('star');
+}
+
+function dealDamage(b,dmg){b.hp-=dmg;if(b.hp<=0){b.hp=0;onDestroyed(b);}}
+
+async function onDestroyed(b){
+  const mesh=buildingMeshes.get(b);
+  if(mesh){mesh.userData.destroying=true;mesh.userData.destroyTimer=0;}
+  updateDestruction();
+  if(b.type==='townhall'){townHallDead=true;checkStars();}
+  SFX.play('destroy');
+}
+
+function updateDestruction(){
+  const total=buildings.filter(b=>!BLDG_DEF[b.type].isWall).length;
+  const dead=buildings.filter(b=>!BLDG_DEF[b.type].isWall&&b.hp<=0).length;
+  destructionPct=total?Math.round(dead/total*100):0;
+  document.getElementById('percentText').textContent=destructionPct+'%';checkStars();
+}
+
+function checkStars(){
+  let s=0;if(destructionPct>=50)s=1;if(townHallDead&&s>=1)s=2;if(destructionPct>=100)s=3;
+  if(s>stars){stars=s;for(let i=1;i<=3;i++){const el=document.getElementById(`star${i}`);if(i<=stars){el.querySelector('polygon').setAttribute('fill','#ffd700');el.classList.add('earned');SFX.play('star');}}}
+}
+
+function updateDefenses(dt){
+  buildings.forEach(b=>{
+    if(b.hp<=0)return;const d=BLDG_DEF[b.type];if(!d.isDef)return;
+    if(!b.atkTimer)b.atkTimer=0;b.atkTimer+=dt;
+    if(b.atkTimer>=d.atkSpd){
+      let near=null,best=Infinity;
+      troops.forEach(t=>{if(t.state==='dead')return;const dd=gDist(t,b);if(d.minRange&&dd<d.minRange)return;if(dd<d.range&&dd<best){best=dd;near=t;}});
+      if(near){b.atkTimer=0;projectiles.push({from:{gx:b.gx,gy:b.gy},troopTarget:near,dmg:d.dmg,t:0,isDef:true,splash:d.splash||0});SFX.play('shoot');}
+    }
+  });
+}
+
+function updateProjectiles(dt){
+  projectiles.forEach(p=>{
+    p.t+=dt*3;
+    if(p.t>=1){
+      p.dead=true;
+      if(p.isDef&&p.troopTarget&&p.troopTarget.state!=='dead'){
+        const armor=TROOP_DEF[p.troopTarget.type].armor||0;
+        p.troopTarget.hp-=Math.round(p.dmg*(1-armor));
+        if(p.troopTarget.hp<=0){p.troopTarget.state='dead';p.troopTarget.deadTimer=0;}
+        SFX.play('hit');
+      }else if(!p.isDef&&p.target&&p.target.hp>0){dealDamage(p.target,p.dmg);SFX.play('hit');}
+      if(p.mesh){scene.remove(p.mesh);p.mesh=null;}
+    }else{
+      if(!p.mesh){
+        const geo=new THREE.SphereGeometry(.15,6,6);
+        const mat=new THREE.MeshBasicMaterial({color:p.isDef?0xff4444:0x60a5fa});
+        p.mesh=new THREE.Mesh(geo,mat);scene.add(p.mesh);
+      }
+      const target=p.troopTarget||p.target;
+      const fp=g2w(p.from.gx,p.from.gy),tp=g2w(target.gx,target.gy);
+      const arc=Math.sin(p.t*Math.PI)*4;
+      p.mesh.position.set(fp.x+(tp.x-fp.x)*p.t, .5+arc, fp.z+(tp.z-fp.z)*p.t);
+    }
+  });
+  projectiles=projectiles.filter(p=>!p.dead);
+}
+
+// ================================================================
+//  3D MESH SYNC
+// ================================================================
+function updateMeshes(dt){
+  troops.forEach(t=>{
+    const mesh=troopMeshes.get(t);if(!mesh)return;
+    const pos=g2w(t.gx,t.gy);
+    if(t.state==='dead'){
+      mesh.position.set(pos.x,0,pos.z);
+      mesh.scale.y=Math.max(.01,1-t.deadTimer*.5);
+      return;
+    }
+    const bob=t.state==='moving'?Math.sin(t.anim*2)*.12:0;
+    mesh.position.set(pos.x,bob,pos.z);
+    if(t.target){
+      const tp=g2w(t.target.gx,t.target.gy);
+      const ang=Math.atan2(tp.x-pos.x,tp.z-pos.z);
+      mesh.rotation.y+=(ang-mesh.rotation.y)*.1;
+    }
+    mesh.rotation.z=t.state==='moving'?Math.sin(t.anim*3)*.04:0;
+    const hpBar=mesh.getObjectByName('hpBar');
+    if(hpBar){
+      if(t.hp<t.maxHp){hpBar.visible=true;updateHpBar(hpBar,t.hp/t.maxHp);}
+      else hpBar.visible=false;
+    }
+    const sc=t.abilityActive>0||t._boosted>0?1+Math.sin(animT*6)*.05:1;
+    const d=TROOP_DEF[t.type];const ms=d.modelScale||.7;
+    mesh.scale.set(ms*sc,ms*(t.state==='dead'?Math.max(.01,1-t.deadTimer*.5):sc),ms*sc);
+  });
+
+  buildings.forEach(b=>{
+    const mesh=buildingMeshes.get(b);if(!mesh)return;
+    if(mesh.userData.destroying){
+      mesh.userData.destroyTimer+=dt;
+      const t=mesh.userData.destroyTimer;
+      const s=Math.max(.01,1-t*.6);
+      mesh.scale.set(s,Math.max(.01,1-t),s);
+      mesh.position.y=-t*.5;
+      if(t>1.5){scene.remove(mesh);buildingMeshes.delete(b);}
+      return;
+    }
+    const ring=mesh.getObjectByName('rangeRing');
+    if(ring)ring.visible=(gameState==='setup');
+    if(BLDG_DEF[b.type].isDef){
+      const near=troops.find(t=>t.state!=='dead'&&gDist(t,b)<(BLDG_DEF[b.type].range||6));
+      if(near){
+        const tp=g2w(near.gx,near.gy),bp=g2w(b.gx,b.gy);
+        const ang=Math.atan2(tp.x-bp.x,tp.z-bp.z);
+        mesh.rotation.y+=(ang-mesh.rotation.y)*.03;
+      }
+    }
+  });
+}
+
+// ================================================================
+//  SFX
+// ================================================================
+const SFX={
+  ctx:null,enabled:true,mg:null,
+  init(){if(this.ctx)return;this.ctx=new(window.AudioContext||window.webkitAudioContext)();this.mg=this.ctx.createGain();this.mg.gain.value=.25;this.mg.connect(this.ctx.destination);},
+  play(type){
+    if(!this.enabled||!this.ctx)return;
+    try{const o=this.ctx.createOscillator(),g=this.ctx.createGain();o.connect(g);g.connect(this.mg);const t=this.ctx.currentTime;
+    if(type==='shoot'){o.type='sawtooth';o.frequency.setValueAtTime(300,t);o.frequency.exponentialRampToValueAtTime(80,t+.1);g.gain.setValueAtTime(.15,t);g.gain.exponentialRampToValueAtTime(.001,t+.12);o.start(t);o.stop(t+.12);}
+    else if(type==='hit'){o.type='square';o.frequency.setValueAtTime(150,t);o.frequency.exponentialRampToValueAtTime(40,t+.08);g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.1);o.start(t);o.stop(t+.1);}
+    else if(type==='destroy'){o.type='sawtooth';o.frequency.setValueAtTime(200,t);o.frequency.exponentialRampToValueAtTime(30,t+.3);g.gain.setValueAtTime(.25,t);g.gain.exponentialRampToValueAtTime(.001,t+.35);o.start(t);o.stop(t+.35);}
+    else if(type==='place'){o.type='sine';o.frequency.setValueAtTime(600,t);o.frequency.exponentialRampToValueAtTime(900,t+.06);g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.08);o.start(t);o.stop(t+.08);}
+    else if(type==='star'){o.type='sine';o.frequency.setValueAtTime(523,t);o.frequency.setValueAtTime(784,t+.2);g.gain.setValueAtTime(.2,t);g.gain.exponentialRampToValueAtTime(.001,t+.4);o.start(t);o.stop(t+.4);}
+    }catch(e){}
+  }
+};
+window.toggleSound=()=>{SFX.enabled=!SFX.enabled;document.getElementById('soundToggle').textContent=SFX.enabled?'🔊':'🔇';};
+
+// ================================================================
+//  BASE & SPAWNING
+// ================================================================
+async function generateBase(){
+  buildings=[];
+  const c=GRID/2;
+  buildings.push({type:'townhall',gx:c-1,gy:c-1,hp:1500,maxHp:1500});
+  buildings.push({type:'cannon',gx:c-3,gy:c-1,hp:400,maxHp:400,atkTimer:0});
+  buildings.push({type:'cannon',gx:c+2,gy:c+1,hp:400,maxHp:400,atkTimer:0});
+  buildings.push({type:'archer_tower',gx:c+1,gy:c-3,hp:350,maxHp:350,atkTimer:0});
+  buildings.push({type:'archer_tower',gx:c-2,gy:c+2,hp:350,maxHp:350,atkTimer:0});
+  buildings.push({type:'mortar',gx:c,gy:c+3,hp:300,maxHp:300,atkTimer:0});
+  buildings.push({type:'gold_storage',gx:c-3,gy:c+2,hp:500,maxHp:500});
+  buildings.push({type:'gold_storage',gx:c+3,gy:c-2,hp:500,maxHp:500});
+  buildings.push({type:'elixir_storage',gx:c+2,gy:c+3,hp:500,maxHp:500});
+  buildings.push({type:'elixir_storage',gx:c-4,gy:c,hp:500,maxHp:500});
+  buildings.push({type:'barracks',gx:c+3,gy:c,hp:350,maxHp:350});
+  for(let i=-4;i<=4;i++){
+    [{gx:c+i,gy:c-4},{gx:c+i,gy:c+4},{gx:c-4,gy:c+i},{gx:c+4,gy:c+i}].forEach(w=>{
+      if(!buildings.some(b=>{const d=BLDG_DEF[b.type];const s=d.isWall?1:Math.ceil(d.w);return w.gx>=b.gx&&w.gx<b.gx+s&&w.gy>=b.gy&&w.gy<b.gy+s;}))
+        if(w.gx>=0&&w.gx<GRID&&w.gy>=0&&w.gy<GRID)
+          buildings.push({type:'wall',gx:w.gx,gy:w.gy,hp:250,maxHp:250});
+    });
+  }
+  for(const b of buildings) await createBuildingMesh(b);
+}
+
+async function spawnTroop(type,gx,gy){
+  if(troopCounts[type]<=0)return;
+  if(gx<-1||gx>GRID+1||gy<-1||gy>GRID+1)return;
+  if(gDist({gx,gy},{gx:GRID/2,gy:GRID/2})<4.5&&gameState==='setup')return;
+  const d=TROOP_DEF[type];
+  const t={type,gx,gy,hp:d.hp,maxHp:d.hp,target:null,state:'idle',atkTimer:0,anim:Math.random()*6.28,deadTimer:0,abilityCd:0,abilityActive:0,dmgMult:1,spdMult:1,_charged:false};
+  troops.push(t);
+  troopCounts[type]--;
+  document.getElementById(`cnt-${type}`).textContent=troopCounts[type];
+  await createTroopMesh(t);
+  SFX.play('place');
+}
+
+// ================================================================
+//  UI
+// ================================================================
+window.selectTroop=t=>{selectedTroop=t;document.querySelectorAll('.troop-slot').forEach(el=>el.classList.toggle('selected',el.dataset.troop===t));};
+window.startBattle=()=>{if(!troops.length)return;SFX.init();gameState='battle';document.getElementById('battleBtn').style.display='none';document.getElementById('instructions').style.opacity='0';};
+window.endBattle=()=>{
+  gameState='ended';document.getElementById('resultOverlay').classList.add('show');
+  document.getElementById('resultTitle').textContent=stars>=1?'ZAFER!':'YENİLGİ!';
+  document.getElementById('resultTitle').style.color=stars>=1?'var(--gold)':'var(--red)';
+  document.getElementById('resultStats').innerHTML=`Yıkım: ${destructionPct}%<br>Yıldız: ${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}`;
+};
+window.resetGame=async()=>{
+  document.getElementById('resultOverlay').classList.remove('show');
+  troopMeshes.forEach(m=>scene.remove(m));troopMeshes.clear();
+  buildingMeshes.forEach(m=>scene.remove(m));buildingMeshes.clear();
+  projectiles.forEach(p=>{if(p.mesh)scene.remove(p.mesh);});
+  troops=[];projectiles=[];battleTimer=180;stars=0;destructionPct=0;townHallDead=false;
+  // URL'den tekrar oku (reset sonrası ordu yenilenir)
+  troopCounts={infantry:_infantry,archer:_archer,cavalry:_cavalry,healer:_healer,hero:1};
+  Object.keys(troopCounts).forEach(k=>{const el=document.getElementById(`cnt-${k}`);if(el)el.textContent=troopCounts[k];});
+  for(let i=1;i<=3;i++){const el=document.getElementById(`star${i}`);el.querySelector('polygon').setAttribute('fill','#333');el.classList.remove('earned');}
+  document.getElementById('percentText').textContent='0%';
+  const m=Math.floor(battleTimer/60),s=Math.floor(battleTimer%60);
+  document.getElementById('timerText').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  document.getElementById('battleBtn').style.display='';document.getElementById('instructions').style.opacity='1';
+  await generateBase();selectTroop('infantry');
+};
+
+// ================================================================
+//  RAYCASTER
+// ================================================================
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+function onClick(e){
+  SFX.init();
+  const rect=renderer.domElement.getBoundingClientRect();
+  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const hits=raycaster.intersectObject(groundMesh);
+  if(hits.length>0){
+    const p=hits[0].point;const g=w2g(p.x,p.z);
+    if(gameState==='setup'||gameState==='battle')spawnTroop(selectedTroop,g.gx,g.gy);
+  }
+}
+
+// ================================================================
+//  GAME LOOP
+// ================================================================
+function gameLoop(){
+  requestAnimationFrame(gameLoop);
+  const dt=Math.min(clock.getDelta(),.05);animT+=dt;
+  if(gameState==='battle'){
+    battleTimer-=dt;
+    const m=Math.floor(Math.max(0,battleTimer)/60),s=Math.floor(Math.max(0,battleTimer)%60);
+    document.getElementById('timerText').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+    updateTroops(dt);updateDefenses(dt);updateProjectiles(dt);
+    const allDead=troops.length>0&&troops.every(t=>t.state==='dead');
+    const noMore=Object.values(troopCounts).every(c=>c===0);
+    if(battleTimer<=0||destructionPct>=100||(allDead&&noMore))endBattle();
+  }
+  updateMeshes(dt);
+  renderer.render(scene,camera);
+}
+
+// ================================================================
+//  INIT
+// ================================================================
+async function init(){
+  setLoading(5,'Three.js başlatılıyor...');
+  initThree();
+  await preloadAssets();
+  await generateBase();
+
+  renderer.domElement.addEventListener('click',onClick);
+  renderer.domElement.addEventListener('touchstart',e=>{e.preventDefault();onClick({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY});});
+
+  window.addEventListener('resize',()=>{
+    const a=window.innerWidth/window.innerHeight,f=28;
+    camera.left=-f*a;camera.right=f*a;camera.top=f;camera.bottom=-f;
+    camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);
+  });
+
+  window.addEventListener('keydown',e=>{
+    if(e.code==='Space'){e.preventDefault();const h=troops.find(t=>t.type==='hero'&&t.state!=='dead');if(h)activateAbility(h);}
+  });
+
+  setLoading(100,'Hazır!');
+  setTimeout(()=>document.getElementById('loadingOverlay').style.display='none',500);
+  gameLoop();
+}
+
+init();
+</script>
+</body>
+</html>
