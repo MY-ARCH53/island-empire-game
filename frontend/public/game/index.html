@@ -116,7 +116,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 // ================================================================
 //  URL PARAMS — ordu sayıları oyuncunun gerçek verisinden gelir
@@ -218,7 +218,7 @@ function showAssetError(msg){
 function cloneModel(model){
   let hasSkin=false;
   model.traverse(c=>{if(c.isSkinnedMesh)hasSkin=true;});
-  return hasSkin ? SkeletonUtils.clone(model) : model.clone();
+  return hasSkin ? skeletonClone(model) : model.clone();
 }
 
 async function loadModel(path){
