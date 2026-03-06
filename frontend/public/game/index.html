@@ -108,13 +108,15 @@
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
-    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js"
+    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js",
+    "three/examples/jsm/loaders/OBJLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/OBJLoader.js"
   }
 }
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
 // ================================================================
 //  URL PARAMS — ordu sayıları oyuncunun gerçek verisinden gelir
@@ -152,10 +154,42 @@ const BLDG_MODELS = {
 
 const DESTROYED_MODEL = 'buildings/neutral/building_destroyed.gltf';
 
+// Her karakter tipine silah(lar) — arm: 'armR' | 'armL'
+// pos/rot: arm mesh'inin local space'inde konum ve rotasyon
+const WEAPON_CONFIG = {
+  infantry: [
+    {path:'weapons/sword_1handed.obj', color:0xd0d0d0, metal:0.8, arm:'armR', pos:{x:.05,y:-.22,z:.08}, rot:{x:-.4,y:0,z:.3}},
+    {path:'weapons/shield_badge.obj',  color:0x3b82f6, metal:0.3, arm:'armL', pos:{x:.02,y:-.18,z:.1},  rot:{x:.1, y:0,z:-.2}},
+  ],
+  archer:  [{path:'weapons/bow_withString.obj', color:0x8b5e3c, metal:0.1, arm:'armL', pos:{x:0,y:-.2,z:.12}, rot:{x:0,y:1.57,z:0}}],
+  cavalry: [{path:'weapons/axe_2handed.obj',    color:0xaaaaaa, metal:0.7, arm:'armR', pos:{x:.06,y:-.25,z:.06}, rot:{x:-.3,y:0,z:.2}}],
+  healer:  [{path:'weapons/staff.obj',          color:0xd4a017, metal:0.2, arm:'armR', pos:{x:.04,y:-.35,z:.04}, rot:{x:0,y:0,z:.1}}],
+  hero:    [{path:'weapons/dagger.obj',          color:0xc8c8c8, metal:0.9, arm:'armR', pos:{x:.04,y:-.2,z:.08},  rot:{x:-.3,y:0,z:.2}}],
+};
+
+function attachWeapons(t, model){
+  const conf=WEAPON_CONFIG[t.type];
+  if(!conf)return;
+  conf.forEach(wc=>{
+    const armMesh=wc.arm==='armL'?t.bp.armL:t.bp.armR;
+    if(!armMesh)return;
+    objLoader.load(ASSET_BASE+wc.path, obj=>{
+      obj.traverse(c=>{
+        if(!c.isMesh)return;
+        c.material=new THREE.MeshStandardMaterial({color:wc.color,roughness:wc.metal>.5?.3:.7,metalness:wc.metal});
+        c.castShadow=true;
+      });
+      obj.position.set(wc.pos.x,wc.pos.y,wc.pos.z);
+      obj.rotation.set(wc.rot.x,wc.rot.y,wc.rot.z);
+      armMesh.add(obj);
+    }, undefined, err=>console.warn('Silah yüklenemedi:',wc.path,err));
+  });
+}
+
 // ================================================================
 //  GAME STATE
 // ================================================================
-let scene, camera, renderer, clock, gltfLoader;
+let scene, camera, renderer, clock, gltfLoader, objLoader;
 let groundMesh;
 const troopMeshes = new Map();
 const buildingMeshes = new Map();
@@ -320,6 +354,7 @@ function initThree(){
 
   clock=new THREE.Clock();
   gltfLoader=new GLTFLoader();
+  objLoader=new OBJLoader();
 
   scene.add(new THREE.AmbientLight(0x88aacc,.5));
   const sun=new THREE.DirectionalLight(0xffeedd,1.1);
@@ -430,6 +465,9 @@ async function createTroopMesh(t){
     else if(n.includes('legleft')||n.includes('leg_left'))t.bp.legL=c;
     else if(n.includes('body')||n.includes('torso'))t.bp.body=c;
   });
+
+  // Silahları kolalara bağla
+  attachWeapons(t, model);
 
   const canvas2d=document.createElement('canvas');
   canvas2d.width=64;canvas2d.height=8;
