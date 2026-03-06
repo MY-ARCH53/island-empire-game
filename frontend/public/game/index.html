@@ -255,9 +255,11 @@ async function loadModelData(path){
       gltf=>{
         const model=gltf.scene;
         model.traverse(child=>{if(child.isMesh||child.isSkinnedMesh){child.castShadow=true;child.receiveShadow=true;}});
-        const data={scene:model, animations:gltf.animations||[]};
+        const anims=gltf.animations||[];
+        console.log(`[ANIM] ${path} → ${anims.length} clip:`, anims.map(a=>a.name));
+        const data={scene:model, animations:anims};
         modelCache.set(path,data);
-        resolve({scene:cloneModel(model), animations:gltf.animations||[]});
+        resolve({scene:cloneModel(model), animations:anims});
       },
       undefined,
       err=>{console.warn(`Model yüklenemedi: ${path}`,err);reject(err);}
