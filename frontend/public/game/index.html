@@ -168,10 +168,16 @@ const WEAPON_CONFIG = {
   hero:    [{gltf:'weapons/dagger.gltf',           bone:'handslot.r', rot:{x:0,y:0,z:0}}],
 };
 
-// Skeleton içinde isimle kemik/node bul
+// Skeleton içinde isimle kemik bul — traverse + skeleton.bones
 function findBone(root, name){
   let found=null;
-  root.traverse(c=>{if(c.name===name)found=c;});
+  root.traverse(c=>{
+    if(c.name===name){found=c;return;}
+    if(c.isSkinnedMesh&&c.skeleton){
+      const b=c.skeleton.bones.find(b=>b.name===name);
+      if(b)found=b;
+    }
+  });
   return found;
 }
 
