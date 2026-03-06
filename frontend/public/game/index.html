@@ -418,8 +418,18 @@ async function createTroopMesh(t){
   const s=d.modelScale||.7;
   model.scale.set(s,s,s);
 
-  // GLB'lerde animasyon yok — procedural animation kullanılıyor
+  // Vücut parçalarını bul ve sakla (procedural animation için)
   t.mixer=null;
+  t.bp={armR:null,armL:null,legR:null,legL:null,body:null};
+  model.traverse(c=>{
+    if(!c.isMesh&&!c.isSkinnedMesh)return;
+    const n=c.name.toLowerCase();
+    if(n.includes('armright')||n.includes('arm_right'))t.bp.armR=c;
+    else if(n.includes('armleft')||n.includes('arm_left'))t.bp.armL=c;
+    else if(n.includes('legright')||n.includes('leg_right'))t.bp.legR=c;
+    else if(n.includes('legleft')||n.includes('leg_left'))t.bp.legL=c;
+    else if(n.includes('body')||n.includes('torso'))t.bp.body=c;
+  });
 
   const canvas2d=document.createElement('canvas');
   canvas2d.width=64;canvas2d.height=8;
@@ -605,32 +615,48 @@ function updateMeshes(dt){
     }
 
     const boost=t.abilityActive>0||t._boosted>0;
-    let sc=boost?1+Math.sin(animT*6)*.06:1;
+    const sc=boost?1+Math.sin(animT*6)*.06:1;
+    mesh.scale.set(ms*sc,ms*sc,ms*sc);
+
+    const bp=t.bp||{};
 
     if(t.state==='attacking'&&t.target){
-      // Saldırı: öne lunge + scale pulse
+      // Saldırı: sağ kol öne vurur, gövde eğilir, sol kol geri
       const atkPct=t.atkTimer/d.atkSpd;
-      const swing=Math.sin(atkPct*Math.PI);
-      const lunge=swing*0.45;
-      const tp=g2w(t.target.gx,t.target.gy);
-      const dx=tp.x-pos.x, dz=tp.z-pos.z;
-      const len=Math.sqrt(dx*dx+dz*dz)||1;
-      mesh.position.set(pos.x+dx/len*lunge, swing*.08, pos.z+dz/len*lunge);
-      mesh.rotation.x=-swing*.25; // öne eğilme
-      sc*=1+swing*.08;
+      const swing=Math.sin(atkPct*Math.PI); // 0→1→0 her vuruşta
+      // Yakın dövüş: kol sallama; menzilli: kol yukarı kaldırma
+      const isRanged=d.range>2;
+      if(bp.armR) bp.armR.rotation.x=isRanged? -swing*1.1 : -swing*1.4;
+      if(bp.armL) bp.armL.rotation.x=isRanged?  swing*0.5 :  swing*0.6;
+      if(bp.body) bp.body.rotation.x=-swing*.2;
+      if(bp.legR) bp.legR.rotation.x=0;
+      if(bp.legL) bp.legL.rotation.x=0;
+      // Gövde öne hafif kayar
+      const tp2=g2w(t.target.gx,t.target.gy);
+      const dx2=tp2.x-pos.x, dz2=tp2.z-pos.z, len2=Math.sqrt(dx2*dx2+dz2*dz2)||1;
+      mesh.position.set(pos.x+dx2/len2*swing*.3, swing*.06, pos.z+dz2/len2*swing*.3);
     } else if(t.state==='moving'){
-      // Yürüyüş: dikey zıplama
-      const bob=Math.abs(Math.sin(t.anim*4))*.18;
-      mesh.position.set(pos.x,bob,pos.z);
-      mesh.rotation.z=Math.sin(t.anim*2)*.05;
+      // Yürüyüş: kollar ve bacaklar ters sallanır
+      const phase=t.anim*4;
+      const swing=Math.sin(phase)*.7;
+      if(bp.armR) bp.armR.rotation.x= swing;
+      if(bp.armL) bp.armL.rotation.x=-swing;
+      if(bp.legR) bp.legR.rotation.x=-swing*.6;
+      if(bp.legL) bp.legL.rotation.x= swing*.6;
+      if(bp.body) bp.body.rotation.x=0;
+      mesh.position.set(pos.x, Math.abs(Math.sin(phase))*.15, pos.z);
+      mesh.rotation.z=Math.sin(phase*.5)*.03;
     } else {
-      // Idle: hafif nefes
+      // Idle: nefes + kolları sıfırla
       const breathe=Math.sin(t.anim*1.8)*.04;
+      if(bp.armR) bp.armR.rotation.x*=.85;
+      if(bp.armL) bp.armL.rotation.x*=.85;
+      if(bp.legR) bp.legR.rotation.x*=.85;
+      if(bp.legL) bp.legL.rotation.x*=.85;
+      if(bp.body) bp.body.rotation.x*=.85;
       mesh.position.set(pos.x,breathe,pos.z);
       mesh.rotation.z=0;
     }
-
-    mesh.scale.set(ms*sc,ms*sc,ms*sc);
   });
 
   buildings.forEach(b=>{
