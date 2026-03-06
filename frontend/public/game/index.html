@@ -235,21 +235,32 @@ function cloneModel(model){
   return hasSkin ? cloneSkinnedMesh(model) : model.clone();
 }
 
-async function loadModel(path){
-  if(modelCache.has(path)) return cloneModel(modelCache.get(path));
+// Animasyon clip'ini isim listesine göre bul (kısmi eşleşme)
+function findClip(animations, names){
+  for(const name of names){
+    const c=animations.find(a=>a.name===name||a.name.toLowerCase().includes(name.toLowerCase()));
+    if(c) return c;
+  }
+  return animations.length ? animations[0] : null;
+}
+
+// {scene, animations} döndürür — animasyonları da cache'ler
+async function loadModelData(path){
+  if(modelCache.has(path)){
+    const cached=modelCache.get(path);
+    return {scene:cloneModel(cached.scene), animations:cached.animations};
+  }
   return new Promise((resolve,reject)=>{
     gltfLoader.load(ASSET_BASE+path,
       gltf=>{
         const model=gltf.scene;
         model.traverse(child=>{if(child.isMesh||child.isSkinnedMesh){child.castShadow=true;child.receiveShadow=true;}});
-        modelCache.set(path,model);
-        resolve(cloneModel(model));
+        const data={scene:model, animations:gltf.animations||[]};
+        modelCache.set(path,data);
+        resolve({scene:cloneModel(model), animations:gltf.animations||[]});
       },
       undefined,
-      err=>{
-        console.warn(`Model yüklenemedi: ${path}`,err);
-        reject(err);
-      }
+      err=>{console.warn(`Model yüklenemedi: ${path}`,err);reject(err);}
     );
   });
 }
@@ -333,18 +344,18 @@ async function preloadAssets(){
   const total=Object.keys(CHAR_MODELS).length+Object.keys(BLDG_MODELS).length+1;
 
   for(const[type,path] of Object.entries(CHAR_MODELS)){
-    try{await loadModel(path);loaded++;}
+    try{await loadModelData(path);loaded++;}
     catch(e){showAssetError(`${type} modeli yüklenemedi, fallback kullanılacak`);loaded++;}
     setLoading(20+Math.round(loaded/total*60),`Yükleniyor: ${type}...`);
   }
 
   for(const[type,path] of Object.entries(BLDG_MODELS)){
-    try{await loadModel(path);loaded++;}
+    try{await loadModelData(path);loaded++;}
     catch(e){showAssetError(`${type} bina modeli yüklenemedi`);loaded++;}
     setLoading(20+Math.round(loaded/total*60),`Yükleniyor: ${type}...`);
   }
 
-  try{await loadModel(DESTROYED_MODEL);loaded++;}catch(e){loaded++;}
+  try{await loadModelData(DESTROYED_MODEL);loaded++;}catch(e){loaded++;}
   setLoading(85,'Üs oluşturuluyor...');
 }
 
@@ -354,7 +365,8 @@ async function createBuildingMesh(b){
   let model;
 
   try{
-    model=await loadModel(BLDG_MODELS[b.type]);
+    const {scene:bs}=await loadModelData(BLDG_MODELS[b.type]);
+    model=bs;
   }catch(e){
     model=createFallbackBuilding(b.type);
   }
@@ -388,14 +400,25 @@ async function createTroopMesh(t){
   const d=TROOP_DEF[t.type];
   let model;
 
+  let clips=[];
   try{
-    model=await loadModel(CHAR_MODELS[t.type]);
+    const {scene:ts,animations}=await loadModelData(CHAR_MODELS[t.type]);
+    model=ts; clips=animations;
   }catch(e){
     model=createFallbackTroop(t.type);
   }
 
   const s=d.modelScale||.7;
   model.scale.set(s,s,s);
+
+  // AnimationMixer — animasyonları çal
+  const mixer=new THREE.AnimationMixer(model);
+  t.mixer=mixer; t.clips=clips; t.currentAnim=null; t.currentAction=null;
+  const idleClip=findClip(clips,['Idle','idle','Stand','TPose']);
+  if(idleClip){
+    const a=mixer.clipAction(idleClip);
+    a.play(); t.currentAnim='idle'; t.currentAction=a;
+  }
 
   const canvas2d=document.createElement('canvas');
   canvas2d.width=64;canvas2d.height=8;
@@ -524,14 +547,24 @@ function updateProjectiles(dt){
       if(p.mesh){scene.remove(p.mesh);p.mesh=null;}
     }else{
       if(!p.mesh){
-        const geo=new THREE.SphereGeometry(.15,6,6);
-        const mat=new THREE.MeshBasicMaterial({color:p.isDef?0xff4444:0x60a5fa});
+        // Ok: silindir (daha görünür), top: küre
+        const geo=p.isDef
+          ? new THREE.SphereGeometry(.22,8,8)
+          : new THREE.CylinderGeometry(.04,.04,.6,6);
+        const mat=new THREE.MeshBasicMaterial({color:p.isDef?0xff4444:0xd4a04a});
         p.mesh=new THREE.Mesh(geo,mat);scene.add(p.mesh);
       }
       const target=p.troopTarget||p.target;
       const fp=g2w(p.from.gx,p.from.gy),tp=g2w(target.gx,target.gy);
-      const arc=Math.sin(p.t*Math.PI)*4;
-      p.mesh.position.set(fp.x+(tp.x-fp.x)*p.t, .5+arc, fp.z+(tp.z-fp.z)*p.t);
+      const arc=Math.sin(p.t*Math.PI)*3;
+      const px=fp.x+(tp.x-fp.x)*p.t, pz=fp.z+(tp.z-fp.z)*p.t;
+      p.mesh.position.set(px, .5+arc, pz);
+      // Ok'u hareket yönüne döndür
+      if(!p.isDef){
+        const dx=tp.x-fp.x, dz=tp.z-fp.z;
+        p.mesh.rotation.z=Math.PI/2;
+        p.mesh.rotation.y=Math.atan2(dx,dz);
+      }
     }
   });
   projectiles=projectiles.filter(p=>!p.dead);
@@ -565,6 +598,26 @@ function updateMeshes(dt){
     const sc=t.abilityActive>0||t._boosted>0?1+Math.sin(animT*6)*.05:1;
     const d=TROOP_DEF[t.type];const ms=d.modelScale||.7;
     mesh.scale.set(ms*sc,ms*(t.state==='dead'?Math.max(.01,1-t.deadTimer*.5):sc),ms*sc);
+
+    // Animasyon durumuna göre clip geçişi
+    if(t.mixer&&t.clips&&t.clips.length){
+      const targetAnim=t.state==='moving'?'walk':t.state==='attacking'?'attack':t.state==='dead'?'death':'idle';
+      if(t.currentAnim!==targetAnim){
+        const names=targetAnim==='walk'?['Walk','walk','Run','run','Walking']:
+                    targetAnim==='attack'?['Attack','attack','Slash','slash','Shoot','shoot','Punch']:
+                    targetAnim==='death'?['Death','death','Die','die','Dead','dead']:
+                    ['Idle','idle','Stand','stand'];
+        const clip=findClip(t.clips,names);
+        if(clip){
+          const newAct=t.mixer.clipAction(clip);
+          if(t.currentAction&&t.currentAction!==newAct) t.currentAction.fadeOut(.15);
+          newAct.reset().fadeIn(.15).play();
+          if(targetAnim==='death'){newAct.setLoop(THREE.LoopOnce,1);newAct.clampWhenFinished=true;}
+          t.currentAction=newAct;
+        }
+        t.currentAnim=targetAnim;
+      }
+    }
   });
 
   buildings.forEach(b=>{
@@ -663,6 +716,7 @@ window.endBattle=()=>{
 };
 window.resetGame=async()=>{
   document.getElementById('resultOverlay').classList.remove('show');
+  troops.forEach(t=>{if(t.mixer)t.mixer.stopAllAction();});
   troopMeshes.forEach(m=>scene.remove(m));troopMeshes.clear();
   buildingMeshes.forEach(m=>scene.remove(m));buildingMeshes.clear();
   projectiles.forEach(p=>{if(p.mesh)scene.remove(p.mesh);});
@@ -707,6 +761,7 @@ function gameLoop(){
     const m=Math.floor(Math.max(0,battleTimer)/60),s=Math.floor(Math.max(0,battleTimer)%60);
     document.getElementById('timerText').textContent=`${m}:${s.toString().padStart(2,'0')}`;
     updateTroops(dt);updateDefenses(dt);updateProjectiles(dt);
+    troops.forEach(t=>{if(t.mixer)t.mixer.update(dt);});
     const allDead=troops.length>0&&troops.every(t=>t.state==='dead');
     const noMore=Object.values(troopCounts).every(c=>c===0);
     if(battleTimer<=0||destructionPct>=100||(allDead&&noMore))endBattle();
