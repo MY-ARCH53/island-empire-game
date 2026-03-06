@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { gameAPI } from '../services/api';
+import { battleAPI } from '../services/api';
 
 export default function BattleDemoPage() {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export default function BattleDemoPage() {
     if (!userData) { navigate('/login'); return; }
     const user = JSON.parse(userData);
 
-    gameAPI.getArmy(user.id)
+    battleAPI.getArmy(user.id)
       .then((res: any) => {
         // backend: { data: { army: {...} } }
         setArmy(res.data.data.army ?? res.data.data ?? {});
