@@ -108,15 +108,13 @@
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
-    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js",
-    "three/examples/jsm/utils/SkeletonUtils.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/utils/SkeletonUtils.js"
+    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js"
   }
 }
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 // ================================================================
 //  URL PARAMS — ordu sayıları oyuncunun gerçek verisinden gelir
@@ -215,10 +213,26 @@ function showAssetError(msg){
   setTimeout(()=>el.style.display='none',5000);
 }
 
+// Inline SkeletonUtils.clone — CDN'deki export format sorununu bypass eder
+function cloneSkinnedMesh(source){
+  const cloned=source.clone();
+  const srcLookup=new Map(), clnLookup=new Map();
+  function parallelTraverse(a,b,cb){cb(a,b);for(let i=0;i<a.children.length;i++)parallelTraverse(a.children[i],b.children[i],cb);}
+  parallelTraverse(source,cloned,(s,c)=>{srcLookup.set(c,s);clnLookup.set(s,c);});
+  cloned.traverse(node=>{
+    if(!node.isSkinnedMesh)return;
+    const src=srcLookup.get(node);
+    node.skeleton=src.skeleton.clone();
+    node.bindMatrix.copy(src.bindMatrix);
+    node.skeleton.bones=src.skeleton.bones.map(b=>clnLookup.get(b)||b);
+    node.bind(node.skeleton,node.bindMatrix);
+  });
+  return cloned;
+}
 function cloneModel(model){
   let hasSkin=false;
   model.traverse(c=>{if(c.isSkinnedMesh)hasSkin=true;});
-  return hasSkin ? skeletonClone(model) : model.clone();
+  return hasSkin ? cloneSkinnedMesh(model) : model.clone();
 }
 
 async function loadModel(path){
