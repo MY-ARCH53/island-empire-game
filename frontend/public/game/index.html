@@ -256,7 +256,12 @@ async function loadModelData(path){
         const model=gltf.scene;
         model.traverse(child=>{if(child.isMesh||child.isSkinnedMesh){child.castShadow=true;child.receiveShadow=true;}});
         const anims=gltf.animations||[];
-        console.log(`[ANIM] ${path} → ${anims.length} clip:`, anims.map(a=>a.name));
+        // Karakter modellerinin içindeki mesh isimlerini logla
+        if(path.includes('characters')){
+          const meshNames=[];
+          model.traverse(c=>{if(c.isMesh||c.isSkinnedMesh)meshNames.push(c.name||'(unnamed)');});
+          console.log(`[MESH] ${path}:`, meshNames);
+        }
         const data={scene:model, animations:anims};
         modelCache.set(path,data);
         resolve({scene:cloneModel(model), animations:anims});
@@ -413,14 +418,8 @@ async function createTroopMesh(t){
   const s=d.modelScale||.7;
   model.scale.set(s,s,s);
 
-  // AnimationMixer — animasyonları çal
-  const mixer=new THREE.AnimationMixer(model);
-  t.mixer=mixer; t.clips=clips; t.currentAnim=null; t.currentAction=null;
-  const idleClip=findClip(clips,['Idle','idle','Stand','TPose']);
-  if(idleClip){
-    const a=mixer.clipAction(idleClip);
-    a.play(); t.currentAnim='idle'; t.currentAction=a;
-  }
+  // GLB'lerde animasyon yok — procedural animation kullanılıyor
+  t.mixer=null;
 
   const canvas2d=document.createElement('canvas');
   canvas2d.width=64;canvas2d.height=8;
@@ -579,47 +578,59 @@ function updateMeshes(dt){
   troops.forEach(t=>{
     const mesh=troopMeshes.get(t);if(!mesh)return;
     const pos=g2w(t.gx,t.gy);
+    const d=TROOP_DEF[t.type];const ms=d.modelScale||.7;
+
+    // Ölüm animasyonu: öne düşme
     if(t.state==='dead'){
-      mesh.position.set(pos.x,0,pos.z);
-      mesh.scale.y=Math.max(.01,1-t.deadTimer*.5);
+      const fall=Math.min(1,t.deadTimer*2.5);
+      mesh.rotation.x=fall*(Math.PI/2);
+      mesh.position.set(pos.x,-(fall*.3),pos.z);
+      mesh.scale.set(ms,ms,ms);
       return;
     }
-    const bob=t.state==='moving'?Math.sin(t.anim*2)*.12:0;
-    mesh.position.set(pos.x,bob,pos.z);
+
+    // Hedefe bak
+    let facingAng=mesh.rotation.y;
     if(t.target){
       const tp=g2w(t.target.gx,t.target.gy);
-      const ang=Math.atan2(tp.x-pos.x,tp.z-pos.z);
-      mesh.rotation.y+=(ang-mesh.rotation.y)*.1;
+      facingAng=Math.atan2(tp.x-pos.x,tp.z-pos.z);
+      mesh.rotation.y+=(facingAng-mesh.rotation.y)*.15;
     }
-    mesh.rotation.z=t.state==='moving'?Math.sin(t.anim*3)*.04:0;
+    mesh.rotation.x=0;
+
     const hpBar=mesh.getObjectByName('hpBar');
     if(hpBar){
       if(t.hp<t.maxHp){hpBar.visible=true;updateHpBar(hpBar,t.hp/t.maxHp);}
       else hpBar.visible=false;
     }
-    const sc=t.abilityActive>0||t._boosted>0?1+Math.sin(animT*6)*.05:1;
-    const d=TROOP_DEF[t.type];const ms=d.modelScale||.7;
-    mesh.scale.set(ms*sc,ms*(t.state==='dead'?Math.max(.01,1-t.deadTimer*.5):sc),ms*sc);
 
-    // Animasyon durumuna göre clip geçişi
-    if(t.mixer&&t.clips&&t.clips.length){
-      const targetAnim=t.state==='moving'?'walk':t.state==='attacking'?'attack':t.state==='dead'?'death':'idle';
-      if(t.currentAnim!==targetAnim){
-        const names=targetAnim==='walk'?['Walk','walk','Run','run','Walking']:
-                    targetAnim==='attack'?['Attack','attack','Slash','slash','Shoot','shoot','Punch']:
-                    targetAnim==='death'?['Death','death','Die','die','Dead','dead']:
-                    ['Idle','idle','Stand','stand'];
-        const clip=findClip(t.clips,names);
-        if(clip){
-          const newAct=t.mixer.clipAction(clip);
-          if(t.currentAction&&t.currentAction!==newAct) t.currentAction.fadeOut(.15);
-          newAct.reset().fadeIn(.15).play();
-          if(targetAnim==='death'){newAct.setLoop(THREE.LoopOnce,1);newAct.clampWhenFinished=true;}
-          t.currentAction=newAct;
-        }
-        t.currentAnim=targetAnim;
-      }
+    const boost=t.abilityActive>0||t._boosted>0;
+    let sc=boost?1+Math.sin(animT*6)*.06:1;
+
+    if(t.state==='attacking'&&t.target){
+      // Saldırı: öne lunge + scale pulse
+      const atkPct=t.atkTimer/d.atkSpd;
+      const swing=Math.sin(atkPct*Math.PI);
+      const lunge=swing*0.45;
+      const tp=g2w(t.target.gx,t.target.gy);
+      const dx=tp.x-pos.x, dz=tp.z-pos.z;
+      const len=Math.sqrt(dx*dx+dz*dz)||1;
+      mesh.position.set(pos.x+dx/len*lunge, swing*.08, pos.z+dz/len*lunge);
+      mesh.rotation.x=-swing*.25; // öne eğilme
+      sc*=1+swing*.08;
+    } else if(t.state==='moving'){
+      // Yürüyüş: dikey zıplama
+      const bob=Math.abs(Math.sin(t.anim*4))*.18;
+      mesh.position.set(pos.x,bob,pos.z);
+      mesh.rotation.z=Math.sin(t.anim*2)*.05;
+    } else {
+      // Idle: hafif nefes
+      const breathe=Math.sin(t.anim*1.8)*.04;
+      mesh.position.set(pos.x,breathe,pos.z);
+      mesh.rotation.z=0;
     }
+
+    mesh.scale.set(ms*sc,ms*sc,ms*sc);
   });
 
   buildings.forEach(b=>{
