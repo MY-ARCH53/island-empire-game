@@ -178,6 +178,17 @@ function findBone(root, name){
       if(b)found=b;
     }
   });
+  if(!found){
+    // İlk SkinnedMesh'in kemik isimlerini logla (sadece ilk karakter için)
+    if(!window._boneDebugDone){
+      window._boneDebugDone=true;
+      root.traverse(c=>{
+        if(c.isSkinnedMesh&&c.skeleton){
+          console.log('[BONES]',c.name,c.skeleton.bones.map(b=>b.name));
+        }
+      });
+    }
+  }
   return found;
 }
 
