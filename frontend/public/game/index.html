@@ -108,13 +108,15 @@
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
-    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js"
+    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js",
+    "three/examples/jsm/utils/SkeletonUtils.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/utils/SkeletonUtils.js"
   }
 }
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 // ================================================================
 //  URL PARAMS — ordu sayıları oyuncunun gerçek verisinden gelir
@@ -213,15 +215,21 @@ function showAssetError(msg){
   setTimeout(()=>el.style.display='none',5000);
 }
 
+function cloneModel(model){
+  let hasSkin=false;
+  model.traverse(c=>{if(c.isSkinnedMesh)hasSkin=true;});
+  return hasSkin ? SkeletonUtils.clone(model) : model.clone();
+}
+
 async function loadModel(path){
-  if(modelCache.has(path)) return modelCache.get(path).clone();
+  if(modelCache.has(path)) return cloneModel(modelCache.get(path));
   return new Promise((resolve,reject)=>{
     gltfLoader.load(ASSET_BASE+path,
       gltf=>{
         const model=gltf.scene;
-        model.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;}});
+        model.traverse(child=>{if(child.isMesh||child.isSkinnedMesh){child.castShadow=true;child.receiveShadow=true;}});
         modelCache.set(path,model);
-        resolve(model.clone());
+        resolve(cloneModel(model));
       },
       undefined,
       err=>{

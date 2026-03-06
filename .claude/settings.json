@@ -11,7 +11,9 @@
       "Read(//c/Users/musta/.claude/projects/c--Users-musta-OneDrive-Desktop-island-empire-game//**)",
       "Bash(sort -k5 -rn)",
       "Bash(python3 -c \":*)",
-      "Bash(xargs grep -l \"league\\\\|seed\\\\|Bronz\")"
+      "Bash(xargs grep -l \"league\\\\|seed\\\\|Bronz\")",
+      "Bash(xargs grep -l \"listen\\\\|PORT\")",
+      "Read(//c/Users/musta/OneDrive/Desktop/assets/**)"
     ]
   }
 }
