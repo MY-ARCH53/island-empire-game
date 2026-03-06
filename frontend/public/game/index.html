@@ -108,15 +108,13 @@
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
-    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js",
-    "three/examples/jsm/loaders/OBJLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/OBJLoader.js"
+    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js"
   }
 }
 </script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
 // ================================================================
 //  URL PARAMS — ordu sayıları oyuncunun gerçek verisinden gelir
@@ -154,42 +152,45 @@ const BLDG_MODELS = {
 
 const DESTROYED_MODEL = 'buildings/neutral/building_destroyed.gltf';
 
-// Her karakter tipine silah(lar) — arm: 'armR' | 'armL'
-// pos/rot: arm mesh'inin local space'inde konum ve rotasyon
+// Rig_Medium animasyon klipleri (preloadAssets'te doldurulur)
+let rigAnims = [];
+
+// Karakter → handslot kemiğine bağlanacak silahlar (GLTF)
+// bone: 'handslot.r' | 'handslot.l'
 const WEAPON_CONFIG = {
   infantry: [
-    {path:'weapons/sword_1handed.obj', color:0xd0d0d0, metal:0.8, arm:'armR', pos:{x:.05,y:-.22,z:.08}, rot:{x:-.4,y:0,z:.3}},
-    {path:'weapons/shield_badge.obj',  color:0x3b82f6, metal:0.3, arm:'armL', pos:{x:.02,y:-.18,z:.1},  rot:{x:.1, y:0,z:-.2}},
+    {gltf:'weapons/sword_1handed.gltf', bone:'handslot.r', rot:{x:0,y:0,z:0}},
+    {gltf:'weapons/shield_badge.gltf',  bone:'handslot.l', rot:{x:0,y:Math.PI,z:0}},
   ],
-  archer:  [{path:'weapons/bow_withString.obj', color:0x8b5e3c, metal:0.1, arm:'armL', pos:{x:0,y:-.2,z:.12}, rot:{x:0,y:1.57,z:0}}],
-  cavalry: [{path:'weapons/axe_2handed.obj',    color:0xaaaaaa, metal:0.7, arm:'armR', pos:{x:.06,y:-.25,z:.06}, rot:{x:-.3,y:0,z:.2}}],
-  healer:  [{path:'weapons/staff.obj',          color:0xd4a017, metal:0.2, arm:'armR', pos:{x:.04,y:-.35,z:.04}, rot:{x:0,y:0,z:.1}}],
-  hero:    [{path:'weapons/dagger.obj',          color:0xc8c8c8, metal:0.9, arm:'armR', pos:{x:.04,y:-.2,z:.08},  rot:{x:-.3,y:0,z:.2}}],
+  archer:  [{gltf:'weapons/bow_withString.gltf', bone:'handslot.l', rot:{x:Math.PI/2,y:0,z:0}}],
+  cavalry: [{gltf:'weapons/axe_2handed.gltf',    bone:'handslot.r', rot:{x:0,y:0,z:0}}],
+  healer:  [{gltf:'weapons/staff.gltf',           bone:'handslot.r', rot:{x:0,y:0,z:0}}],
+  hero:    [{gltf:'weapons/dagger.gltf',           bone:'handslot.r', rot:{x:0,y:0,z:0}}],
 };
 
-function attachWeapons(t, model){
-  const conf=WEAPON_CONFIG[t.type];
-  if(!conf)return;
-  conf.forEach(wc=>{
-    const armMesh=wc.arm==='armL'?t.bp.armL:t.bp.armR;
-    if(!armMesh)return;
-    objLoader.load(ASSET_BASE+wc.path, obj=>{
-      obj.traverse(c=>{
-        if(!c.isMesh)return;
-        c.material=new THREE.MeshStandardMaterial({color:wc.color,roughness:wc.metal>.5?.3:.7,metalness:wc.metal});
-        c.castShadow=true;
-      });
-      obj.position.set(wc.pos.x,wc.pos.y,wc.pos.z);
-      obj.rotation.set(wc.rot.x,wc.rot.y,wc.rot.z);
-      armMesh.add(obj);
-    }, undefined, err=>console.warn('Silah yüklenemedi:',wc.path,err));
-  });
+// Skeleton içinde isimle kemik/node bul
+function findBone(root, name){
+  let found=null;
+  root.traverse(c=>{if(c.name===name)found=c;});
+  return found;
+}
+
+// Silahı handslot kemiğine GLTF olarak bağla
+function attachWeapon(model, wc){
+  const bone=findBone(model, wc.bone);
+  if(!bone){console.warn('Kemik bulunamadı:',wc.bone);return;}
+  gltfLoader.load(ASSET_BASE+wc.gltf, gltf=>{
+    const weapon=gltf.scene;
+    weapon.traverse(c=>{if(c.isMesh){c.castShadow=true;}});
+    weapon.rotation.set(wc.rot.x,wc.rot.y,wc.rot.z);
+    bone.add(weapon);
+  }, undefined, err=>console.warn('Silah yüklenemedi:',wc.gltf,err));
 }
 
 // ================================================================
 //  GAME STATE
 // ================================================================
-let scene, camera, renderer, clock, gltfLoader, objLoader;
+let scene, camera, renderer, clock, gltfLoader;
 let groundMesh;
 const troopMeshes = new Map();
 const buildingMeshes = new Map();
@@ -354,7 +355,6 @@ function initThree(){
 
   clock=new THREE.Clock();
   gltfLoader=new GLTFLoader();
-  objLoader=new OBJLoader();
 
   scene.add(new THREE.AmbientLight(0x88aacc,.5));
   const sun=new THREE.DirectionalLight(0xffeedd,1.1);
@@ -381,6 +381,15 @@ function initThree(){
 //  ASSET LOADING & BUILDING/TROOP CREATION
 // ================================================================
 async function preloadAssets(){
+  setLoading(10,'Animasyonlar yükleniyor...');
+  // Rig_Medium animasyon kliplerini yükle (tüm karakterler paylaşır)
+  try{
+    const g=await loadModelData('animations/Rig_Medium_General.glb');
+    const m=await loadModelData('animations/Rig_Medium_MovementBasic.glb');
+    rigAnims=[...g.animations,...m.animations];
+    console.log('[RIG] Animasyonlar:',rigAnims.map(a=>a.name));
+  }catch(e){console.warn('Rig animasyonları yüklenemedi:',e);}
+
   setLoading(20,'3D modeller yükleniyor...');
   let loaded=0;
   const total=Object.keys(CHAR_MODELS).length+Object.keys(BLDG_MODELS).length+1;
@@ -442,10 +451,9 @@ async function createTroopMesh(t){
   const d=TROOP_DEF[t.type];
   let model;
 
-  let clips=[];
   try{
-    const {scene:ts,animations}=await loadModelData(CHAR_MODELS[t.type]);
-    model=ts; clips=animations;
+    const {scene:ts}=await loadModelData(CHAR_MODELS[t.type]);
+    model=ts;
   }catch(e){
     model=createFallbackTroop(t.type);
   }
@@ -453,21 +461,17 @@ async function createTroopMesh(t){
   const s=d.modelScale||.7;
   model.scale.set(s,s,s);
 
-  // Vücut parçalarını bul ve sakla (procedural animation için)
-  t.mixer=null;
-  t.bp={armR:null,armL:null,legR:null,legL:null,body:null};
-  model.traverse(c=>{
-    if(!c.isMesh&&!c.isSkinnedMesh)return;
-    const n=c.name.toLowerCase();
-    if(n.includes('armright')||n.includes('arm_right'))t.bp.armR=c;
-    else if(n.includes('armleft')||n.includes('arm_left'))t.bp.armL=c;
-    else if(n.includes('legright')||n.includes('leg_right'))t.bp.legR=c;
-    else if(n.includes('legleft')||n.includes('leg_left'))t.bp.legL=c;
-    else if(n.includes('body')||n.includes('torso'))t.bp.body=c;
-  });
+  // AnimationMixer — Rig_Medium kliplerini kullan
+  const mixer=new THREE.AnimationMixer(model);
+  t.mixer=mixer; t.currentAnim=null; t.currentAction=null;
+  if(rigAnims.length){
+    const idle=findClip(rigAnims,['Idle_A','Idle_B','Idle']);
+    if(idle){const a=mixer.clipAction(idle);a.play();t.currentAnim='idle';t.currentAction=a;}
+  }
 
-  // Silahları kolalara bağla
-  attachWeapons(t, model);
+  // Silahları handslot kemiklerine GLTF olarak bağla
+  const weapConf=WEAPON_CONFIG[t.type];
+  if(weapConf) weapConf.forEach(wc=>attachWeapon(model,wc));
 
   const canvas2d=document.createElement('canvas');
   canvas2d.width=64;canvas2d.height=8;
@@ -628,72 +632,46 @@ function updateMeshes(dt){
     const pos=g2w(t.gx,t.gy);
     const d=TROOP_DEF[t.type];const ms=d.modelScale||.7;
 
-    // Ölüm animasyonu: öne düşme
-    if(t.state==='dead'){
-      const fall=Math.min(1,t.deadTimer*2.5);
-      mesh.rotation.x=fall*(Math.PI/2);
-      mesh.position.set(pos.x,-(fall*.3),pos.z);
-      mesh.scale.set(ms,ms,ms);
-      return;
-    }
+    // Pozisyon
+    mesh.position.set(pos.x,0,pos.z);
 
-    // Hedefe bak
-    let facingAng=mesh.rotation.y;
+    // Hedefe dön
     if(t.target){
       const tp=g2w(t.target.gx,t.target.gy);
-      facingAng=Math.atan2(tp.x-pos.x,tp.z-pos.z);
-      mesh.rotation.y+=(facingAng-mesh.rotation.y)*.15;
+      const ang=Math.atan2(tp.x-pos.x,tp.z-pos.z);
+      mesh.rotation.y+=(ang-mesh.rotation.y)*.15;
     }
-    mesh.rotation.x=0;
 
+    // HP bar
     const hpBar=mesh.getObjectByName('hpBar');
     if(hpBar){
       if(t.hp<t.maxHp){hpBar.visible=true;updateHpBar(hpBar,t.hp/t.maxHp);}
       else hpBar.visible=false;
     }
 
+    // Scale (ability boost)
     const boost=t.abilityActive>0||t._boosted>0;
     const sc=boost?1+Math.sin(animT*6)*.06:1;
     mesh.scale.set(ms*sc,ms*sc,ms*sc);
 
-    const bp=t.bp||{};
-
-    if(t.state==='attacking'&&t.target){
-      // Saldırı: sağ kol öne vurur, gövde eğilir, sol kol geri
-      const atkPct=t.atkTimer/d.atkSpd;
-      const swing=Math.sin(atkPct*Math.PI); // 0→1→0 her vuruşta
-      // Yakın dövüş: kol sallama; menzilli: kol yukarı kaldırma
-      const isRanged=d.range>2;
-      if(bp.armR) bp.armR.rotation.x=isRanged? -swing*1.1 : -swing*1.4;
-      if(bp.armL) bp.armL.rotation.x=isRanged?  swing*0.5 :  swing*0.6;
-      if(bp.body) bp.body.rotation.x=-swing*.2;
-      if(bp.legR) bp.legR.rotation.x=0;
-      if(bp.legL) bp.legL.rotation.x=0;
-      // Gövde öne hafif kayar
-      const tp2=g2w(t.target.gx,t.target.gy);
-      const dx2=tp2.x-pos.x, dz2=tp2.z-pos.z, len2=Math.sqrt(dx2*dx2+dz2*dz2)||1;
-      mesh.position.set(pos.x+dx2/len2*swing*.3, swing*.06, pos.z+dz2/len2*swing*.3);
-    } else if(t.state==='moving'){
-      // Yürüyüş: kollar ve bacaklar ters sallanır
-      const phase=t.anim*4;
-      const swing=Math.sin(phase)*.7;
-      if(bp.armR) bp.armR.rotation.x= swing;
-      if(bp.armL) bp.armL.rotation.x=-swing;
-      if(bp.legR) bp.legR.rotation.x=-swing*.6;
-      if(bp.legL) bp.legL.rotation.x= swing*.6;
-      if(bp.body) bp.body.rotation.x=0;
-      mesh.position.set(pos.x, Math.abs(Math.sin(phase))*.15, pos.z);
-      mesh.rotation.z=Math.sin(phase*.5)*.03;
-    } else {
-      // Idle: nefes + kolları sıfırla
-      const breathe=Math.sin(t.anim*1.8)*.04;
-      if(bp.armR) bp.armR.rotation.x*=.85;
-      if(bp.armL) bp.armL.rotation.x*=.85;
-      if(bp.legR) bp.legR.rotation.x*=.85;
-      if(bp.legL) bp.legL.rotation.x*=.85;
-      if(bp.body) bp.body.rotation.x*=.85;
-      mesh.position.set(pos.x,breathe,pos.z);
-      mesh.rotation.z=0;
+    // Animasyon durumu geçişi
+    if(t.mixer&&rigAnims.length){
+      const targetAnim=t.state==='moving'?'walk':t.state==='attacking'?'attack':t.state==='dead'?'death':'idle';
+      if(t.currentAnim!==targetAnim){
+        const names=targetAnim==='walk'?['Walking_A','Walking_B','Running_A']:
+                    targetAnim==='attack'?['Throw','Use_Item','Interact']:
+                    targetAnim==='death'?['Death_A','Death_B']:
+                    ['Idle_A','Idle_B'];
+        const clip=findClip(rigAnims,names);
+        if(clip){
+          const newAct=t.mixer.clipAction(clip);
+          if(t.currentAction&&t.currentAction!==newAct)t.currentAction.fadeOut(.2);
+          newAct.reset().fadeIn(.2).play();
+          if(targetAnim==='death'){newAct.setLoop(THREE.LoopOnce,1);newAct.clampWhenFinished=true;}
+          t.currentAction=newAct;
+        }
+        t.currentAnim=targetAnim;
+      }
     }
   });
 
