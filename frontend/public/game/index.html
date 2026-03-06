@@ -103,10 +103,18 @@
   <button class="result-btn" onclick="resetGame()">🔄 Tekrar Dene</button>
 </div>
 
-<!-- Three.js r128 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Three.js r128 - import map ile bare specifier sorunu çözülüyor -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+    "three/examples/jsm/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js"
+  }
+}
+</script>
 <script type="module">
-import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // ================================================================
 //  URL PARAMS — ordu sayıları oyuncunun gerçek verisinden gelir
