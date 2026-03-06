@@ -162,7 +162,7 @@ const WEAPON_CONFIG = {
     {gltf:'weapons/sword_1handed.gltf', bone:'handslotr', rot:{x:0,y:0,z:0}},
     {gltf:'weapons/shield_badge.gltf',  bone:'handslotl', rot:{x:0,y:Math.PI,z:0}},
   ],
-  archer:  [{gltf:'weapons/bow_withString.gltf', bone:'handslotl', rot:{x:Math.PI/2,y:0,z:0}}],
+  archer:  [{gltf:'weapons/bow_withString.gltf', bone:'handslotl', rot:{x:0,y:0,z:0}}],
   cavalry: [{gltf:'weapons/axe_2handed.gltf',    bone:'handslotr', rot:{x:0,y:0,z:0}}],
   healer:  [{gltf:'weapons/staff.gltf',           bone:'handslotr', rot:{x:0,y:0,z:0}}],
   hero:    [{gltf:'weapons/dagger.gltf',           bone:'handslotr', rot:{x:0,y:0,z:0}}],
@@ -675,8 +675,10 @@ function updateMeshes(dt){
     if(t.mixer&&rigAnims.length){
       const targetAnim=t.state==='moving'?'walk':t.state==='attacking'?'attack':t.state==='dead'?'death':'idle';
       if(t.currentAnim!==targetAnim){
+        // Menzilli birimler Use_Item, yakın dövüş Throw kullanır
+        const isRanged=TROOP_DEF[t.type].range>2;
         const names=targetAnim==='walk'?['Walking_A','Walking_B','Running_A']:
-                    targetAnim==='attack'?['Throw','Use_Item','Interact']:
+                    targetAnim==='attack'?(isRanged?['Use_Item','Interact','Throw']:['Throw','Use_Item','Interact']):
                     targetAnim==='death'?['Death_A','Death_B']:
                     ['Idle_A','Idle_B'];
         const clip=findClip(rigAnims,names);
