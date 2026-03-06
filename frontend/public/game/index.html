@@ -156,16 +156,16 @@ const DESTROYED_MODEL = 'buildings/neutral/building_destroyed.gltf';
 let rigAnims = [];
 
 // Karakter → handslot kemiğine bağlanacak silahlar (GLTF)
-// bone: 'handslot.r' | 'handslot.l'
+// Three.js kemik isimlerinden dot'ları kaldırır: handslot.r → handslotr
 const WEAPON_CONFIG = {
   infantry: [
-    {gltf:'weapons/sword_1handed.gltf', bone:'handslot.r', rot:{x:0,y:0,z:0}},
-    {gltf:'weapons/shield_badge.gltf',  bone:'handslot.l', rot:{x:0,y:Math.PI,z:0}},
+    {gltf:'weapons/sword_1handed.gltf', bone:'handslotr', rot:{x:0,y:0,z:0}},
+    {gltf:'weapons/shield_badge.gltf',  bone:'handslotl', rot:{x:0,y:Math.PI,z:0}},
   ],
-  archer:  [{gltf:'weapons/bow_withString.gltf', bone:'handslot.l', rot:{x:Math.PI/2,y:0,z:0}}],
-  cavalry: [{gltf:'weapons/axe_2handed.gltf',    bone:'handslot.r', rot:{x:0,y:0,z:0}}],
-  healer:  [{gltf:'weapons/staff.gltf',           bone:'handslot.r', rot:{x:0,y:0,z:0}}],
-  hero:    [{gltf:'weapons/dagger.gltf',           bone:'handslot.r', rot:{x:0,y:0,z:0}}],
+  archer:  [{gltf:'weapons/bow_withString.gltf', bone:'handslotl', rot:{x:Math.PI/2,y:0,z:0}}],
+  cavalry: [{gltf:'weapons/axe_2handed.gltf',    bone:'handslotr', rot:{x:0,y:0,z:0}}],
+  healer:  [{gltf:'weapons/staff.gltf',           bone:'handslotr', rot:{x:0,y:0,z:0}}],
+  hero:    [{gltf:'weapons/dagger.gltf',           bone:'handslotr', rot:{x:0,y:0,z:0}}],
 };
 
 // Skeleton içinde isimle kemik bul — traverse + skeleton.bones
