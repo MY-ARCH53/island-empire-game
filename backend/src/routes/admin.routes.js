@@ -30,4 +30,10 @@ router.get('/instagram-requests',               AdminController.getInstagramRequ
 router.put('/instagram-requests/:userId',       AdminController.reviewInstagramRequest);
 router.put('/instagram-requests/:userId/revoke', AdminController.revokeInstagramBoost);
 
+// Admin2 - Detaylı raporlar
+router.get('/admin2/players',         AdminController.getDetailedPlayers);
+router.get('/admin2/players/:id',     AdminController.getPlayerDetail);
+router.get('/admin2/battles',         AdminController.getAllBattles);
+router.get('/admin2/activity',        AdminController.getActivityMetrics);
+
 module.exports = router;

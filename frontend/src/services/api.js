@@ -156,6 +156,14 @@ export const adminAPI = {
   revokeInstagramBoost: (userId) => api.put(`/admin/instagram-requests/${userId}/revoke`, {}),
 };
 
+// Admin2 API
+export const admin2API = {
+  getPlayers:       ()         => api.get('/admin/admin2/players'),
+  getPlayerDetail:  (id)       => api.get(`/admin/admin2/players/${id}`),
+  getAllBattles:     (limit, offset) => api.get(`/admin/admin2/battles?limit=${limit || 200}&offset=${offset || 0}`),
+  getActivityMetrics: ()       => api.get('/admin/admin2/activity'),
+};
+
 // TLCoin API
 export const tlcoinAPI = {
   getBalance:    (userId) => api.get(`/tlcoin/balance?userId=${userId}`),

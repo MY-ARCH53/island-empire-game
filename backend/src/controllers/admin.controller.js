@@ -771,6 +771,197 @@ class AdminController {
       res.status(500).json({ success: false, message: 'İptal başarısız', error: error.message });
     }
   }
+
+  // ── ADMIN2: Detaylı oyuncu listesi ────────────────────────────────────────
+  static async getDetailedPlayers(req, res) {
+    try {
+      const sql = `
+        SELECT
+          u.id,
+          u.username,
+          u.email,
+          u.level,
+          u.experience,
+          u.created_at,
+          u.last_login,
+          u.is_active,
+          COALESCE(a.total_power, 0)    AS army_power,
+          COALESCE(a.archer_count, 0)   AS archer_count,
+          COALESCE(a.infantry_count, 0) AS infantry_count,
+          COALESCE(a.cavalry_count, 0)  AS cavalry_count,
+          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'gold'  LIMIT 1), 0) AS gold,
+          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'food'  LIMIT 1), 0) AS food,
+          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'wood'  LIMIT 1), 0) AS wood,
+          (SELECT COUNT(*) FROM battles WHERE attacker_id = u.id OR defender_id = u.id)::int AS total_battles,
+          (SELECT COUNT(*) FROM battles WHERE winner = u.id)::int                            AS battle_wins,
+          (SELECT COUNT(*) FROM islands WHERE user_id = u.id)::int                          AS island_count
+        FROM users u
+        LEFT JOIN armies a ON a.user_id = u.id
+        WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
+        ORDER BY u.created_at DESC
+      `;
+      const result = await query(sql);
+      res.json({ success: true, data: { players: result.rows } });
+    } catch (error) {
+      console.error('Admin2 getDetailedPlayers error:', error);
+      res.status(500).json({ success: false, message: 'Oyuncular getirilemedi', error: error.message });
+    }
+  }
+
+  // ── ADMIN2: Tek oyuncu detayı + savaşları ─────────────────────────────────
+  static async getPlayerDetail(req, res) {
+    try {
+      const { id } = req.params;
+
+      const [playerRes, battlesRes] = await Promise.all([
+        query(`
+          SELECT
+            u.id, u.username, u.email, u.level, u.experience,
+            u.created_at, u.last_login, u.is_active,
+            COALESCE(a.total_power, 0)    AS army_power,
+            COALESCE(a.archer_count, 0)   AS archer_count,
+            COALESCE(a.infantry_count, 0) AS infantry_count,
+            COALESCE(a.cavalry_count, 0)  AS cavalry_count,
+            COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'gold' LIMIT 1), 0) AS gold,
+            COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'food' LIMIT 1), 0) AS food,
+            COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'wood' LIMIT 1), 0) AS wood
+          FROM users u
+          LEFT JOIN armies a ON a.user_id = u.id
+          WHERE u.id = $1
+        `, [id]),
+        query(`
+          SELECT
+            b.*,
+            a.username AS attacker_name,
+            d.username AS defender_name,
+            w.username AS winner_name
+          FROM battles b
+          JOIN users a ON a.id = b.attacker_id
+          JOIN users d ON d.id = b.defender_id
+          LEFT JOIN users w ON w.id = b.winner
+          WHERE b.attacker_id = $1 OR b.defender_id = $1
+          ORDER BY b.created_at DESC
+        `, [id]),
+      ]);
+
+      if (playerRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Oyuncu bulunamadi' });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          player: playerRes.rows[0],
+          battles: battlesRes.rows,
+        },
+      });
+    } catch (error) {
+      console.error('Admin2 getPlayerDetail error:', error);
+      res.status(500).json({ success: false, message: 'Oyuncu detayi getirilemedi', error: error.message });
+    }
+  }
+
+  // ── ADMIN2: Tüm savaşlar ──────────────────────────────────────────────────
+  static async getAllBattles(req, res) {
+    try {
+      const limit  = Math.min(parseInt(req.query.limit)  || 200, 500);
+      const offset = parseInt(req.query.offset) || 0;
+
+      const [battlesRes, countRes] = await Promise.all([
+        query(`
+          SELECT
+            b.id,
+            b.battle_type,
+            b.attacker_power,
+            b.defender_power,
+            b.reward_gold,
+            b.reward_wood,
+            b.reward_food,
+            b.reward_xp,
+            b.created_at,
+            a.username  AS attacker_name,
+            a.id        AS attacker_id,
+            d.username  AS defender_name,
+            d.id        AS defender_id,
+            w.username  AS winner_name,
+            w.id        AS winner_id
+          FROM battles b
+          JOIN users a ON a.id = b.attacker_id
+          JOIN users d ON d.id = b.defender_id
+          LEFT JOIN users w ON w.id = b.winner
+          ORDER BY b.created_at DESC
+          LIMIT $1 OFFSET $2
+        `, [limit, offset]),
+        query('SELECT COUNT(*) AS total FROM battles'),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          battles: battlesRes.rows,
+          total: parseInt(countRes.rows[0].total),
+          limit,
+          offset,
+        },
+      });
+    } catch (error) {
+      console.error('Admin2 getAllBattles error:', error);
+      res.status(500).json({ success: false, message: 'Savaslar getirilemedi', error: error.message });
+    }
+  }
+
+  // ── ADMIN2: Aktivite metrikleri ───────────────────────────────────────────
+  static async getActivityMetrics(req, res) {
+    try {
+      const [
+        totalRes, todayRes, weekRes, neverRes,
+        last30Res, onlineRes,
+        topBattlersRes, topResourcesRes,
+      ] = await Promise.all([
+        query("SELECT COUNT(*) AS total FROM users WHERE (is_bot = FALSE OR is_bot IS NULL)"),
+        query("SELECT COUNT(*) AS total FROM users WHERE last_login > NOW() - INTERVAL '24 hours' AND (is_bot = FALSE OR is_bot IS NULL)"),
+        query("SELECT COUNT(*) AS total FROM users WHERE last_login > NOW() - INTERVAL '7 days'  AND (is_bot = FALSE OR is_bot IS NULL)"),
+        query("SELECT COUNT(*) AS total FROM users WHERE last_login IS NULL AND (is_bot = FALSE OR is_bot IS NULL)"),
+        query("SELECT COUNT(*) AS total FROM users WHERE created_at > NOW() - INTERVAL '30 days' AND (is_bot = FALSE OR is_bot IS NULL)"),
+        query("SELECT COUNT(*) AS total FROM users WHERE last_login > NOW() - INTERVAL '5 minutes' AND (is_bot = FALSE OR is_bot IS NULL)"),
+        query(`
+          SELECT u.id, u.username, COUNT(b.id)::int AS battle_count,
+                 SUM(CASE WHEN b.winner = u.id THEN 1 ELSE 0 END)::int AS wins
+          FROM users u
+          JOIN battles b ON b.attacker_id = u.id OR b.defender_id = u.id
+          WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
+          GROUP BY u.id, u.username
+          ORDER BY battle_count DESC
+          LIMIT 10
+        `),
+        query(`
+          SELECT u.id, u.username,
+                 COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'gold' LIMIT 1), 0) AS gold
+          FROM users u
+          WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
+          ORDER BY gold DESC
+          LIMIT 10
+        `),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          total_players:       parseInt(totalRes.rows[0].total),
+          active_today:        parseInt(todayRes.rows[0].total),
+          active_week:         parseInt(weekRes.rows[0].total),
+          never_logged_in:     parseInt(neverRes.rows[0].total),
+          registered_last_30d: parseInt(last30Res.rows[0].total),
+          online_now:          parseInt(onlineRes.rows[0].total),
+          top_battlers:        topBattlersRes.rows,
+          top_by_gold:         topResourcesRes.rows,
+        },
+      });
+    } catch (error) {
+      console.error('Admin2 getActivityMetrics error:', error);
+      res.status(500).json({ success: false, message: 'Metrikler getirilemedi', error: error.message });
+    }
+  }
 }
 
 module.exports = AdminController;

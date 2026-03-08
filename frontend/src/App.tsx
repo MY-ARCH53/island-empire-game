@@ -13,6 +13,7 @@ import BattlePage from './pages/BattlePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
+import Admin2Page from './pages/Admin2Page';
 import TLCoinPage from './pages/TLCoinPage';
 import ProfilePage from './pages/ProfilePage';
 import BattleDemoPage from './pages/BattleDemoPage';
@@ -36,6 +37,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin2" element={<Admin2Page />} />
             <Route path="/tlcoin" element={<TLCoinPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/battle-demo" element={<BattleDemoPage />} />
