@@ -793,8 +793,10 @@ class AdminController {
           COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'food'  LIMIT 1), 0) AS food,
           COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'wood'  LIMIT 1), 0) AS wood,
           (SELECT COUNT(*) FROM battles WHERE attacker_id = u.id OR defender_id = u.id)::int AS total_battles,
-          (SELECT COUNT(*) FROM battles WHERE winner = u.id)::int                            AS battle_wins,
-          (SELECT COUNT(*) FROM islands WHERE user_id = u.id)::int                          AS island_count
+          (SELECT COUNT(*) FROM battles
+           WHERE (attacker_id = u.id AND winner = 'attacker')
+              OR (defender_id = u.id AND winner = 'defender'))::int AS battle_wins,
+          (SELECT COUNT(*) FROM islands WHERE user_id = u.id)::int  AS island_count
         FROM users u
         LEFT JOIN armies a ON a.user_id = u.id
         WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
@@ -834,11 +836,15 @@ class AdminController {
             b.*,
             a.username AS attacker_name,
             d.username AS defender_name,
-            w.username AS winner_name
+            CASE WHEN b.winner = 'attacker' THEN a.username
+                 WHEN b.winner = 'defender' THEN d.username
+                 ELSE NULL END AS winner_name,
+            CASE WHEN b.winner = 'attacker' THEN b.attacker_id
+                 WHEN b.winner = 'defender' THEN b.defender_id
+                 ELSE NULL END AS winner_id
           FROM battles b
           JOIN users a ON a.id = b.attacker_id
-          JOIN users d ON d.id = b.defender_id
-          LEFT JOIN users w ON w.id = b.winner
+          LEFT JOIN users d ON d.id = b.defender_id
           WHERE b.attacker_id = $1 OR b.defender_id = $1
           ORDER BY b.created_at DESC
         `, [id]),
@@ -883,12 +889,15 @@ class AdminController {
             a.id        AS attacker_id,
             d.username  AS defender_name,
             d.id        AS defender_id,
-            w.username  AS winner_name,
-            w.id        AS winner_id
+            CASE WHEN b.winner = 'attacker' THEN a.username
+                 WHEN b.winner = 'defender' THEN d.username
+                 ELSE NULL END AS winner_name,
+            CASE WHEN b.winner = 'attacker' THEN b.attacker_id
+                 WHEN b.winner = 'defender' THEN b.defender_id
+                 ELSE NULL END AS winner_id
           FROM battles b
           JOIN users a ON a.id = b.attacker_id
-          JOIN users d ON d.id = b.defender_id
-          LEFT JOIN users w ON w.id = b.winner
+          LEFT JOIN users d ON d.id = b.defender_id
           ORDER BY b.created_at DESC
           LIMIT $1 OFFSET $2
         `, [limit, offset]),
@@ -926,7 +935,9 @@ class AdminController {
         query("SELECT COUNT(*) AS total FROM users WHERE last_login > NOW() - INTERVAL '5 minutes' AND (is_bot = FALSE OR is_bot IS NULL)"),
         query(`
           SELECT u.id, u.username, COUNT(b.id)::int AS battle_count,
-                 SUM(CASE WHEN b.winner = u.id THEN 1 ELSE 0 END)::int AS wins
+                 SUM(CASE WHEN (b.attacker_id = u.id AND b.winner = 'attacker')
+                               OR (b.defender_id = u.id AND b.winner = 'defender')
+                          THEN 1 ELSE 0 END)::int AS wins
           FROM users u
           JOIN battles b ON b.attacker_id = u.id OR b.defender_id = u.id
           WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
