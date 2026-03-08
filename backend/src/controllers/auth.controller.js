@@ -112,6 +112,8 @@ class AuthController {
         return res.status(401).json({ success: false, message: 'Hatali sifre' });
       }
 
+      await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+
       const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
       res.json({
