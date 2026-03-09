@@ -26,6 +26,11 @@ router.post('/seeds/set-resources',   AdminController.setSeedResources);
 // Zorla savaş
 router.post('/force-battle', AdminController.forceBattle);
 
+// Otomatik saldırı kuralları
+router.get('/auto-attack-rules',          AdminController.getAutoAttackRules);
+router.post('/auto-attack-rules/toggle',  AdminController.toggleAutoAttackRule);
+router.post('/auto-attack-rules/custom',  AdminController.setCustomThreshold);
+
 // Ödül talepleri
 router.get('/prize-requests',     AdminController.getPrizeRequests);
 router.put('/prize-requests/:id', AdminController.updatePrizeRequest);

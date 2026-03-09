@@ -32,7 +32,8 @@ class AdminController {
           COALESCE(a.total_power, 0)    AS army_power,
           COALESCE(a.archer_count, 0)   AS archer_count,
           COALESCE(a.infantry_count, 0) AS infantry_count,
-          COALESCE(a.cavalry_count, 0)  AS cavalry_count
+          COALESCE(a.cavalry_count, 0)  AS cavalry_count,
+          COALESCE(u.tlcoin_balance, 0) AS tlcoin_balance
         FROM users u
         LEFT JOIN armies a ON a.user_id = u.id
         WHERE (u.is_bot = FALSE OR u.is_bot IS NULL) AND u.is_active = TRUE
@@ -930,6 +931,28 @@ class AdminController {
       console.error('Admin revokeInstagramBoost error:', error);
       res.status(500).json({ success: false, message: 'İptal başarısız', error: error.message });
     }
+  }
+
+  // ── OTOMATİK SALDIRI KURALLARI ────────────────────────────────────────────
+  static async getAutoAttackRules(req, res) {
+    const { getRules } = require('../services/autoAttackWorker');
+    res.json({ success: true, data: { rules: getRules() } });
+  }
+
+  static async toggleAutoAttackRule(req, res) {
+    const { toggleRule } = require('../services/autoAttackWorker');
+    const { id } = req.body;
+    const rule = toggleRule(id);
+    if (!rule) return res.status(404).json({ success: false, message: 'Kural bulunamadı' });
+    res.json({ success: true, data: { rule }, message: `${rule.label} ${rule.active ? 'aktif' : 'pasif'} edildi` });
+  }
+
+  static async setCustomThreshold(req, res) {
+    const { setCustomThreshold, getRules } = require('../services/autoAttackWorker');
+    const threshold = parseInt(req.body.threshold);
+    if (!threshold || threshold < 1) return res.status(400).json({ success: false, message: 'Geçersiz eşik değeri' });
+    setCustomThreshold(threshold);
+    res.json({ success: true, data: { rules: getRules() }, message: `Özel eşik ${threshold.toLocaleString('tr-TR')} olarak güncellendi` });
   }
 
   // ── BAN YÖNETİMİ ──────────────────────────────────────────────────────────

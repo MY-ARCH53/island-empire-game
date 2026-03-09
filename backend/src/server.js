@@ -20,6 +20,7 @@ const spinRoutes   = require('./routes/spin.routes');
 const { startWorker } = require('./services/autoProductionWorker');
 const instagramRoutes = require('./routes/instagram.routes');
 const { startInstagramWorker } = require('./services/instagramWorker');
+const { startAutoAttackWorker } = require('./services/autoAttackWorker');
 const banCheck = require('./middleware/banCheck.middleware');
 
 const app = express();
@@ -63,4 +64,5 @@ app.listen(PORT, () => {
   console.log('Server calisiyor: http://localhost:' + PORT);
   startWorker();
   startInstagramWorker();
+  startAutoAttackWorker();
 });

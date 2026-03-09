@@ -65,6 +65,11 @@ function AdminPage() {
   const [setFoodMax, setSetFoodMax] = useState(450000);
   const [setResLoading, setSetResLoading] = useState(false);
 
+  // Otomatik saldırı kuralları state'leri
+  const [autoAttackRules, setAutoAttackRules] = useState<any[]>([]);
+  const [customThreshold, setCustomThreshold] = useState(3000000);
+  const [autoAttackLoading, setAutoAttackLoading] = useState(false);
+
   // Ödül talepleri state'leri
   const [prizeRequests, setPrizeRequests]       = useState<any[]>([]);
   const [prizeLoading, setPrizeLoading]         = useState(false);
@@ -208,7 +213,7 @@ function AdminPage() {
 
   const handleTabChange = (tab: 'users' | 'bots' | 'prizes' | 'instagram' | 'banned') => {
     setActiveTab(tab);
-    if (tab === 'bots' && bots.length === 0) loadBots();
+    if (tab === 'bots') { if (bots.length === 0) loadBots(); loadAutoAttackRules(); }
     if (tab === 'prizes') loadPrizeRequests();
     if (tab === 'instagram') loadIgRequests();
     if (tab === 'banned') loadBannedUsers();
@@ -351,6 +356,34 @@ function AdminPage() {
     }
   };
 
+  const loadAutoAttackRules = async () => {
+    try {
+      const r = await adminAPI.getAutoAttackRules();
+      setAutoAttackRules(r.data.data.rules);
+      const custom = r.data.data.rules.find((x: any) => x.id === 'custom');
+      if (custom) setCustomThreshold(custom.threshold);
+    } catch { /* ignore */ }
+  };
+
+  const handleToggleRule = async (id: string) => {
+    setAutoAttackLoading(true);
+    try {
+      const r = await adminAPI.toggleAutoAttackRule(id);
+      setAutoAttackRules(prev => prev.map(rule => rule.id === id ? r.data.data.rule : rule));
+    } catch { alert('Kural değiştirilemedi'); }
+    setAutoAttackLoading(false);
+  };
+
+  const handleSetCustomThreshold = async () => {
+    setAutoAttackLoading(true);
+    try {
+      const r = await adminAPI.setCustomAttackThreshold(customThreshold);
+      setAutoAttackRules(r.data.data.rules);
+      setBotMsg(`✅ ${r.data.message}`);
+    } catch { setBotMsg('❌ Hata oluştu'); }
+    setAutoAttackLoading(false);
+  };
+
   const handleBoostSeedArmies = async () => {
     const power = seedArcher * 3 + seedInfantry * 2 + seedCavalry * 5;
     if (!confirm(`Tüm seed oyunculara +${seedArcher} okçu, +${seedInfantry} piyade, +${seedCavalry} süvari eklenecek (+${power} güç). Devam?`)) return;
@@ -478,7 +511,7 @@ function AdminPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      {['ID', 'Kullanıcı', 'E-posta', 'Seviye', 'Lig', 'Altın', 'Odun', 'Yiyecek', 'Ada', '⚔️ Güç', 'Durum', 'Kayıt', 'İşlem'].map(h => (
+                      {['ID', 'Kullanıcı', 'E-posta', 'Seviye', 'Lig', 'Altın', 'Odun', 'Yiyecek', 'TLCoin', 'Ada', '⚔️ Güç', 'Durum', 'Kayıt', 'İşlem'].map(h => (
                         <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -504,6 +537,7 @@ function AdminPage() {
                         <td style={{ padding: '10px 14px', color: '#f59e0b' }}>{Math.round(u.resources?.gold || 0)}</td>
                         <td style={{ padding: '10px 14px', color: '#22c55e' }}>{Math.round(u.resources?.wood || 0)}</td>
                         <td style={{ padding: '10px 14px', color: '#ef4444' }}>{Math.round(u.resources?.food || 0)}</td>
+                        <td style={{ padding: '10px 14px', color: '#38bdf8', fontWeight: 600 }}>{Math.round(u.tlcoin_balance || 0)}</td>
                         <td style={{ padding: '10px 14px', color: '#a78bfa' }}>{u.island_count} ada</td>
                         <td style={{ padding: '10px 14px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -740,6 +774,69 @@ function AdminPage() {
                 style={{ padding: '10px 22px', borderRadius: 10, border: 'none', cursor: setResLoading ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, opacity: setResLoading ? 0.6 : 1, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff' }}>
                 {setResLoading ? '⏳ Atanıyor...' : '🎲 Kaynakları Ata'}
               </button>
+            </div>
+
+            {/* Otomatik Saldırı Kuralları */}
+            <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#f87171' }}>🤖 Otomatik Saldırı Kuralları</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 16px' }}>
+                Aktif kurallar her 5 dakikada kontrol edilir. Kalkanı olan oyunculara saldırılmaz.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {autoAttackRules.filter(r => r.id !== 'custom').map(rule => (
+                  <div key={rule.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 16px', borderRadius: 10,
+                    background: rule.active ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${rule.active ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                    <div>
+                      <span style={{ fontWeight: 600, color: rule.active ? '#f87171' : '#94a3b8', fontSize: 14 }}>{rule.label}</span>
+                      <span style={{ marginLeft: 10, fontSize: 12, color: '#475569' }}>
+                        {rule.active ? '● Aktif' : '○ Pasif'}
+                      </span>
+                    </div>
+                    <button onClick={() => handleToggleRule(rule.id)} disabled={autoAttackLoading}
+                      style={{
+                        padding: '6px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                        background: rule.active ? '#ef4444' : '#22c55e', color: '#fff', opacity: autoAttackLoading ? 0.6 : 1,
+                      }}>
+                      {rule.active ? 'Pasif Et' : 'Aktif Et'}
+                    </button>
+                  </div>
+                ))}
+
+                {/* Custom threshold */}
+                {autoAttackRules.filter(r => r.id === 'custom').map(rule => (
+                  <div key={rule.id} style={{
+                    padding: '12px 16px', borderRadius: 10,
+                    background: rule.active ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${rule.active ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <span style={{ fontWeight: 600, color: rule.active ? '#f87171' : '#94a3b8', fontSize: 14 }}>Özel Eşik</span>
+                      <span style={{ fontSize: 12, color: '#475569' }}>{rule.active ? '● Aktif' : '○ Pasif'}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>Altın Eşiği</label>
+                        <input type="number" min={1} value={customThreshold}
+                          onChange={e => setCustomThreshold(Math.max(1, parseInt(e.target.value) || 1))}
+                          style={{ width: 140, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14 }} />
+                      </div>
+                      <button onClick={handleSetCustomThreshold} disabled={autoAttackLoading}
+                        style={{ padding: '7px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#334155', color: '#e2e8f0', fontSize: 13, marginTop: 16 }}>
+                        Güncelle
+                      </button>
+                      <button onClick={() => handleToggleRule(rule.id)} disabled={autoAttackLoading}
+                        style={{ padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: rule.active ? '#ef4444' : '#22c55e', color: '#fff', marginTop: 16 }}>
+                        {rule.active ? 'Pasif Et' : 'Aktif Et'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Zorla savaş */}

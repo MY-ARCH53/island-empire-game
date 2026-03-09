@@ -150,6 +150,10 @@ export const adminAPI = {
   setSeedResources:   (data) => api.post('/admin/seeds/set-resources', data),
   // Zorla savaş
   forceBattle: (attackerId, defenderId) => api.post('/admin/force-battle', { attackerId, defenderId }),
+  // Otomatik saldırı kuralları
+  getAutoAttackRules:       ()           => api.get('/admin/auto-attack-rules'),
+  toggleAutoAttackRule:     (id)         => api.post('/admin/auto-attack-rules/toggle', { id }),
+  setCustomAttackThreshold: (threshold)  => api.post('/admin/auto-attack-rules/custom', { threshold }),
   // Ödül talepleri
   getPrizeRequests: () => api.get('/admin/prize-requests'),
   updatePrizeRequest: (id, status, adminNote) =>
