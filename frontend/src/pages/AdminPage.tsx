@@ -44,6 +44,18 @@ function AdminPage() {
   const [targetBotCount, setTargetBotCount] = useState(3);
   const [attackingUser, setAttackingUser] = useState(false);
 
+  // Seed kaynak boost state'leri
+  const [seedGold, setSeedGold]     = useState(1000);
+  const [seedWood, setSeedWood]     = useState(1000);
+  const [seedFood, setSeedFood]     = useState(1000);
+  const [seedResLoading, setSeedResLoading] = useState(false);
+
+  // Zorla savaş state'leri
+  const [forceAttackerId, setForceAttackerId] = useState('');
+  const [forceDefenderId, setForceDefenderId] = useState('');
+  const [forceBattleLoading, setForceBattleLoading] = useState(false);
+  const [forceBattleResult, setForceBattleResult] = useState<any>(null);
+
   // Ödül talepleri state'leri
   const [prizeRequests, setPrizeRequests]       = useState<any[]>([]);
   const [prizeLoading, setPrizeLoading]         = useState(false);
@@ -281,6 +293,38 @@ function AdminPage() {
       setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
     } finally {
       setBoosting(false);
+    }
+  };
+
+  const handleBoostSeedResources = async () => {
+    if (!seedGold && !seedWood && !seedFood) return;
+    if (!confirm(`Tüm seed oyunculara +${seedGold} altın, +${seedWood} odun, +${seedFood} yiyecek eklenecek. Devam?`)) return;
+    setSeedResLoading(true);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.boostSeedResources({ goldAdd: seedGold, woodAdd: seedWood, foodAdd: seedFood });
+      setBotMsg(`✅ ${res.data.message}`);
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setSeedResLoading(false);
+    }
+  };
+
+  const handleForceBattle = async () => {
+    if (!forceAttackerId || !forceDefenderId) { setBotMsg('❌ Her iki oyuncu ID\'si gerekli.'); return; }
+    if (!confirm(`#${forceAttackerId} vs #${forceDefenderId} savaşı başlatılacak. Devam?`)) return;
+    setForceBattleLoading(true);
+    setForceBattleResult(null);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.forceBattle(parseInt(forceAttackerId), parseInt(forceDefenderId));
+      setForceBattleResult(res.data.data);
+      setBotMsg(`✅ ${res.data.message}`);
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setForceBattleLoading(false);
     }
   };
 
@@ -620,6 +664,69 @@ function AdminPage() {
                   {seedBoosting ? '⏳ Ekleniyor...' : '🌱 Seed Ordularını Güçlendir'}
                 </button>
               </div>
+            </div>
+
+            {/* Seed oyunculara toplu kaynak ekle */}
+            <div style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#fbbf24' }}>🌱 Seed Oyunculara Toplu Kaynak Ekle</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                Tüm <code style={{ background: 'rgba(255,255,255,0.07)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>@islandsempire.com</code> seed oyuncularına kaynak ekler.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+                {[
+                  { label: '💰 Altın', val: seedGold, set: setSeedGold },
+                  { label: '🪵 Odun',  val: seedWood,  set: setSeedWood },
+                  { label: '🍎 Yiyecek', val: seedFood, set: setSeedFood },
+                ].map(f => (
+                  <div key={f.label}>
+                    <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                    <input type="number" min={0} value={f.val} onChange={e => f.set(Math.max(0, parseInt(e.target.value) || 0))}
+                      style={{ width: 90, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14, textAlign: 'center' }} />
+                  </div>
+                ))}
+                <button onClick={handleBoostSeedResources} disabled={seedResLoading}
+                  style={{ padding: '10px 22px', borderRadius: 10, border: 'none', cursor: seedResLoading ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, opacity: seedResLoading ? 0.6 : 1, background: 'linear-gradient(135deg,#f59e0b,#fbbf24)', color: '#000' }}>
+                  {seedResLoading ? '⏳ Ekleniyor...' : '💰 Kaynakları Ekle'}
+                </button>
+              </div>
+            </div>
+
+            {/* Zorla savaş */}
+            <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#f87171' }}>⚔️ İki Oyuncuyu Savaştır</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                Herhangi iki oyuncuyu savaştır. Kalkan/limit kontrolü yoktur.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+                <div>
+                  <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Saldıran ID</label>
+                  <input type="number" min={1} value={forceAttackerId} onChange={e => setForceAttackerId(e.target.value)} placeholder="Örn: 5"
+                    style={{ width: 100, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Savunan ID</label>
+                  <input type="number" min={1} value={forceDefenderId} onChange={e => setForceDefenderId(e.target.value)} placeholder="Örn: 12"
+                    style={{ width: 100, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14 }} />
+                </div>
+                <button onClick={handleForceBattle} disabled={forceBattleLoading || !forceAttackerId || !forceDefenderId}
+                  style={{ padding: '10px 22px', borderRadius: 10, border: 'none', cursor: (forceBattleLoading || !forceAttackerId || !forceDefenderId) ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, opacity: (forceBattleLoading || !forceAttackerId || !forceDefenderId) ? 0.6 : 1, background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff' }}>
+                  {forceBattleLoading ? '⏳ Savaşıyor...' : '⚔️ Savaşı Başlat'}
+                </button>
+              </div>
+              {forceBattleResult && (
+                <div style={{ marginTop: 14, padding: '12px 16px', background: 'rgba(0,0,0,0.3)', borderRadius: 10, fontSize: 13 }}>
+                  <div style={{ marginBottom: 6, fontWeight: 700, color: '#f87171' }}>Savaş Sonucu</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, color: '#94a3b8' }}>
+                    <span>Saldıran: <strong style={{ color: '#e2e8f0' }}>{forceBattleResult.attacker}</strong> ({forceBattleResult.attackerPower} güç)</span>
+                    <span>Savunan: <strong style={{ color: '#e2e8f0' }}>{forceBattleResult.defender}</strong> ({forceBattleResult.defenderPower} güç)</span>
+                    <span style={{ gridColumn: '1/-1', color: '#34d399', fontWeight: 700 }}>Kazanan: {forceBattleResult.winner}</span>
+                    <span>💰 {forceBattleResult.rewardGold} altın</span>
+                    <span>🪵 {forceBattleResult.rewardWood} odun</span>
+                    <span>🍎 {forceBattleResult.rewardFood} yiyecek</span>
+                    <span>⭐ {forceBattleResult.rewardXp} XP</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Belirli kullanıcıya bot saldırısı */}

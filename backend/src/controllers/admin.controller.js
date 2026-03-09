@@ -752,6 +752,125 @@ class AdminController {
     }
   }
 
+  // Seed oyunculara toplu kaynak ekle
+  static async boostSeedResources(req, res) {
+    try {
+      const { goldAdd = 0, woodAdd = 0, foodAdd = 0 } = req.body;
+
+      if (!goldAdd && !woodAdd && !foodAdd) {
+        return res.status(400).json({ success: false, message: 'En az bir kaynak türü için değer girin.' });
+      }
+
+      const seedsRes = await query(
+        `SELECT id FROM users WHERE email LIKE '%@islandsempire.com' AND (is_bot = FALSE OR is_bot IS NULL) AND is_admin = FALSE`
+      );
+      const seedIds = seedsRes.rows.map(r => r.id);
+
+      if (seedIds.length === 0) {
+        return res.status(404).json({ success: false, message: 'Seed oyuncu bulunamadı.' });
+      }
+
+      for (const [type, amount] of [['gold', goldAdd], ['wood', woodAdd], ['food', foodAdd]]) {
+        if (!amount) continue;
+        await query(`
+          UPDATE resources SET amount = LEAST(amount + $1, capacity)
+          WHERE user_id = ANY($2) AND resource_type = $3
+        `, [amount, seedIds, type]);
+      }
+
+      res.json({
+        success: true,
+        message: `${seedIds.length} seed oyuncusuna kaynak eklendi.`,
+        data: { updated: seedIds.length, goldAdd, woodAdd, foodAdd },
+      });
+    } catch (error) {
+      console.error('Admin boostSeedResources error:', error);
+      res.status(500).json({ success: false, message: 'Hata oluştu', error: error.message });
+    }
+  }
+
+  // İki oyuncuyu zorla savaştır (limit/kalkan kontrolü yok)
+  static async forceBattle(req, res) {
+    try {
+      const { attackerId, defenderId } = req.body;
+
+      if (!attackerId || !defenderId) {
+        return res.status(400).json({ success: false, message: 'attackerId ve defenderId gerekli.' });
+      }
+      if (parseInt(attackerId) === parseInt(defenderId)) {
+        return res.status(400).json({ success: false, message: 'İki oyuncu aynı olamaz.' });
+      }
+
+      const [attackerRes, defenderRes, attackerArmyRes, defenderArmyRes] = await Promise.all([
+        query('SELECT id, username FROM users WHERE id = $1', [attackerId]),
+        query('SELECT id, username FROM users WHERE id = $1', [defenderId]),
+        query('SELECT * FROM armies WHERE user_id = $1', [attackerId]),
+        query('SELECT * FROM armies WHERE user_id = $1', [defenderId]),
+      ]);
+
+      if (!attackerRes.rows[0]) return res.status(404).json({ success: false, message: 'Saldıran oyuncu bulunamadı.' });
+      if (!defenderRes.rows[0]) return res.status(404).json({ success: false, message: 'Savunan oyuncu bulunamadı.' });
+
+      const attacker = attackerRes.rows[0];
+      const defender = defenderRes.rows[0];
+      const attackerArmy = attackerArmyRes.rows[0] || { total_power: 0 };
+      const defenderArmy = defenderArmyRes.rows[0] || { total_power: 0 };
+
+      const attackerPower = Math.max(1, attackerArmy.total_power) + Math.floor(Math.random() * 30) - 15;
+      const defenderPower = Math.max(1, defenderArmy.total_power) + Math.floor(Math.random() * 30) - 15;
+      const winner = attackerPower >= defenderPower ? 'attacker' : 'defender';
+      const winnerId = winner === 'attacker' ? attacker.id : defender.id;
+      const loserId  = winner === 'attacker' ? defender.id : attacker.id;
+
+      // Kaybeden oyuncudan kaynak al
+      const lootRate = 0.1 + Math.random() * 0.1;
+      const [goldRes, woodRes, foodRes] = await Promise.all([
+        query(`SELECT amount FROM resources WHERE user_id = $1 AND resource_type = 'gold'`, [loserId]),
+        query(`SELECT amount FROM resources WHERE user_id = $1 AND resource_type = 'wood'`,  [loserId]),
+        query(`SELECT amount FROM resources WHERE user_id = $1 AND resource_type = 'food'`,  [loserId]),
+      ]);
+      const rewardGold = Math.floor((goldRes.rows[0]?.amount || 0) * lootRate);
+      const rewardWood = Math.floor((woodRes.rows[0]?.amount || 0) * lootRate);
+      const rewardFood = Math.floor((foodRes.rows[0]?.amount || 0) * lootRate);
+      const rewardXp   = Math.floor(Math.random() * 50) + 20;
+
+      // Kaynakları transfer et
+      if (rewardGold > 0 || rewardWood > 0 || rewardFood > 0) {
+        await Promise.all([
+          rewardGold && query(`UPDATE resources SET amount = amount - $1 WHERE user_id = $2 AND resource_type = 'gold'`, [rewardGold, loserId]),
+          rewardWood && query(`UPDATE resources SET amount = amount - $1 WHERE user_id = $2 AND resource_type = 'wood'`,  [rewardWood, loserId]),
+          rewardFood && query(`UPDATE resources SET amount = amount - $1 WHERE user_id = $2 AND resource_type = 'food'`,  [rewardFood, loserId]),
+          rewardGold && query(`UPDATE resources SET amount = LEAST(amount + $1, capacity) WHERE user_id = $2 AND resource_type = 'gold'`, [rewardGold, winnerId]),
+          rewardWood && query(`UPDATE resources SET amount = LEAST(amount + $1, capacity) WHERE user_id = $2 AND resource_type = 'wood'`,  [rewardWood, winnerId]),
+          rewardFood && query(`UPDATE resources SET amount = LEAST(amount + $1, capacity) WHERE user_id = $2 AND resource_type = 'food'`,  [rewardFood, winnerId]),
+        ].filter(Boolean));
+      }
+
+      // XP ekle
+      await query('UPDATE users SET experience = experience + $1 WHERE id = $2', [rewardXp, winnerId]);
+
+      // Savaşı kaydet
+      await query(`
+        INSERT INTO battles (attacker_id, defender_id, battle_type, attacker_power, defender_power, winner, reward_gold, reward_wood, reward_food, reward_xp)
+        VALUES ($1, $2, 'pvp', $3, $4, $5, $6, $7, $8, $9)
+      `, [attacker.id, defender.id, attackerPower, defenderPower, winner, rewardGold, rewardWood, rewardFood, rewardXp]);
+
+      res.json({
+        success: true,
+        message: `Savaş tamamlandı! Kazanan: ${winner === 'attacker' ? attacker.username : defender.username}`,
+        data: {
+          attacker: attacker.username, attackerPower,
+          defender: defender.username, defenderPower,
+          winner: winner === 'attacker' ? attacker.username : defender.username,
+          rewardGold, rewardWood, rewardFood, rewardXp,
+        },
+      });
+    } catch (error) {
+      console.error('Admin forceBattle error:', error);
+      res.status(500).json({ success: false, message: 'Savaş başlatılamadı', error: error.message });
+    }
+  }
+
   // PUT /api/admin/instagram-requests/:userId/revoke  — aktif bostu iptal et
   static async revokeInstagramBoost(req, res) {
     try {

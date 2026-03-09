@@ -18,8 +18,12 @@ router.post('/bots/attack', AdminController.triggerBotAttack);
 router.post('/bots/boost-armies', AdminController.boostBotArmies);
 router.post('/bots/attack-user', AdminController.attackSpecificUser);
 
-// Seed oyuncu orduları
-router.post('/seeds/boost-armies', AdminController.boostSeedArmies);
+// Seed oyuncu orduları ve kaynakları
+router.post('/seeds/boost-armies',    AdminController.boostSeedArmies);
+router.post('/seeds/boost-resources', AdminController.boostSeedResources);
+
+// Zorla savaş
+router.post('/force-battle', AdminController.forceBattle);
 
 // Ödül talepleri
 router.get('/prize-requests',     AdminController.getPrizeRequests);
