@@ -154,6 +154,10 @@ export const adminAPI = {
   getInstagramRequests: () => api.get('/admin/instagram-requests'),
   reviewInstagramRequest: (userId, action) => api.put(`/admin/instagram-requests/${userId}`, { action }),
   revokeInstagramBoost: (userId) => api.put(`/admin/instagram-requests/${userId}/revoke`, {}),
+  // Ban yönetimi
+  getBannedUsers: () => api.get('/admin/banned'),
+  banUser: (id, reason) => api.post(`/admin/users/${id}/ban`, { reason }),
+  unbanUser: (id) => api.post(`/admin/users/${id}/unban`, {}),
 };
 
 // Admin2 API

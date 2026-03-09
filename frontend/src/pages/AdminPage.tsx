@@ -4,7 +4,7 @@ import { adminAPI } from '../services/api';
 
 function AdminPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram' | 'banned'>('users');
 
   // Kullanıcı tab state'leri
   const [stats, setStats]       = useState<any>(null);
@@ -53,6 +53,12 @@ function AdminPage() {
   const [igRequests, setIgRequests]             = useState<any[]>([]);
   const [igLoading, setIgLoading]               = useState(false);
   const [igActionId, setIgActionId]             = useState<number | null>(null);
+
+  // Ban state'leri
+  const [bannedUsers, setBannedUsers]           = useState<any[]>([]);
+  const [bannedLoading, setBannedLoading]       = useState(false);
+  const [banReason, setBanReason]               = useState('');
+  const [banningId, setBanningId]               = useState<number | null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -142,11 +148,49 @@ function AdminPage() {
     }
   };
 
-  const handleTabChange = (tab: 'users' | 'bots' | 'prizes' | 'instagram') => {
+  const loadBannedUsers = async () => {
+    setBannedLoading(true);
+    try {
+      const r = await adminAPI.getBannedUsers();
+      setBannedUsers(r.data.data.users);
+    } catch { /* ignore */ }
+    setBannedLoading(false);
+  };
+
+  const handleBanUser = async (user: any) => {
+    const reason = prompt(`"${user.username}" kullanıcısını banlamak istediğinize emin misiniz?\n\nBan sebebini yazın (zorunlu değil):`);
+    if (reason === null) return; // iptal
+    setBanningId(user.id);
+    try {
+      await adminAPI.banUser(user.id, reason.trim() || undefined);
+      setEditUser(null);
+      await loadData();
+      await loadBannedUsers();
+    } catch {
+      alert('Ban işlemi başarısız');
+    }
+    setBanningId(null);
+  };
+
+  const handleUnbanUser = async (user: any) => {
+    if (!confirm(`"${user.username}" kullanıcısının banını kaldırmak istiyor musunuz?`)) return;
+    setBanningId(user.id);
+    try {
+      await adminAPI.unbanUser(user.id);
+      await loadBannedUsers();
+      await loadData();
+    } catch {
+      alert('Ban kaldırma başarısız');
+    }
+    setBanningId(null);
+  };
+
+  const handleTabChange = (tab: 'users' | 'bots' | 'prizes' | 'instagram' | 'banned') => {
     setActiveTab(tab);
     if (tab === 'bots' && bots.length === 0) loadBots();
     if (tab === 'prizes') loadPrizeRequests();
     if (tab === 'instagram') loadIgRequests();
+    if (tab === 'banned') loadBannedUsers();
   };
 
   const openEdit = (user: any) => {
@@ -332,6 +376,7 @@ function AdminPage() {
             { key: 'bots',      label: '🤖 Bot Yönetimi' },
             { key: 'prizes',    label: '🎁 Ödül Talepleri' },
             { key: 'instagram', label: '📸 Instagram Boost' },
+            { key: 'banned',    label: '🚫 Banlanan Oyuncular' },
           ].map(t => (
             <button
               key={t.key}
@@ -949,16 +994,92 @@ function AdminPage() {
               >
                 {saving ? 'Kaydediliyor...' : '💾 Kaydet'}
               </button>
-              <button
-                onClick={() => deleteUser(editUser)}
-                style={{ background: '#ef4444', border: 'none', color: '#fff', padding: '12px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
-              >
-                🗑️
-              </button>
+              {editUser && !editUser.is_active ? (
+                <button
+                  onClick={() => handleUnbanUser(editUser)}
+                  disabled={banningId === editUser?.id}
+                  style={{ background: '#22c55e', border: 'none', color: '#fff', padding: '12px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+                >
+                  {banningId === editUser?.id ? '...' : '✅ Banı Kaldır'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleBanUser(editUser)}
+                  disabled={banningId === editUser?.id}
+                  style={{ background: '#ef4444', border: 'none', color: '#fff', padding: '12px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+                >
+                  {banningId === editUser?.id ? '...' : '🚫 Banla'}
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
+        {/* ── BANLANAN OYUNCULAR SEKMESİ ─────────────────────────────────── */}
+        {activeTab === 'banned' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <p style={{ color: '#64748b', fontSize: 13 }}>
+                Banlanan oyuncuların tüm verileri burda saklanır. Kanıt olarak kullanabilirsiniz.
+              </p>
+              <button onClick={loadBannedUsers} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                Yenile
+              </button>
+            </div>
+
+            {bannedLoading ? (
+              <p style={{ color: '#64748b' }}>Yükleniyor...</p>
+            ) : bannedUsers.length === 0 ? (
+              <p style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Banlanan oyuncu yok.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      {['ID', 'Kullanıcı', 'Email', 'Ban Tarihi', 'Ban Sebebi', 'Sev.', 'Altın', 'Odun', 'Yiyecek', 'Ordu Gücü', 'Piyade', 'Okçu', 'Süvari', 'Savaş', 'Galibiyet', 'İşlem'].map(h => (
+                        <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bannedUsers.map((u, i) => (
+                      <tr key={u.id} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,0,0,0.03)' }}>
+                        <td style={{ padding: '8px 12px', color: '#64748b' }}>{u.id}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 600, color: '#f87171' }}>{u.username}</td>
+                        <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{u.email}</td>
+                        <td style={{ padding: '8px 12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                          {u.banned_at ? new Date(u.banned_at).toLocaleString('tr-TR') : '—'}
+                        </td>
+                        <td style={{ padding: '8px 12px', color: '#fbbf24', maxWidth: 200 }}>
+                          {u.ban_reason || <span style={{ color: '#475569' }}>Sebep belirtilmedi</span>}
+                        </td>
+                        <td style={{ padding: '8px 12px', color: '#06b6d4' }}>{u.level}</td>
+                        <td style={{ padding: '8px 12px', color: '#f59e0b' }}>{Number(u.gold).toLocaleString('tr-TR')}</td>
+                        <td style={{ padding: '8px 12px', color: '#22c55e' }}>{Number(u.wood).toLocaleString('tr-TR')}</td>
+                        <td style={{ padding: '8px 12px', color: '#ef4444' }}>{Number(u.food).toLocaleString('tr-TR')}</td>
+                        <td style={{ padding: '8px 12px', color: '#f97316', fontWeight: 700 }}>{u.army_power}</td>
+                        <td style={{ padding: '8px 12px' }}>{u.infantry_count}</td>
+                        <td style={{ padding: '8px 12px' }}>{u.archer_count}</td>
+                        <td style={{ padding: '8px 12px' }}>{u.cavalry_count}</td>
+                        <td style={{ padding: '8px 12px' }}>{u.total_battles}</td>
+                        <td style={{ padding: '8px 12px', color: '#34d399' }}>{u.battle_wins}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <button
+                            onClick={() => handleUnbanUser(u)}
+                            disabled={banningId === u.id}
+                            style={{ background: '#22c55e', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+                          >
+                            {banningId === u.id ? '...' : 'Banı Kaldır'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
     </div>
   );
 }

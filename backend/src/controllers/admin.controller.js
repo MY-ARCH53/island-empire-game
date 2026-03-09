@@ -772,6 +772,95 @@ class AdminController {
     }
   }
 
+  // ── BAN YÖNETİMİ ──────────────────────────────────────────────────────────
+
+  // Oyuncuyu banla
+  static async banUser(req, res) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      const result = await query(
+        `UPDATE users
+         SET is_active = FALSE, ban_reason = $1, banned_at = NOW()
+         WHERE id = $2 AND (is_bot = FALSE OR is_bot IS NULL)
+         RETURNING id, username`,
+        [reason || null, id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Oyuncu bulunamadi' });
+      }
+
+      res.json({ success: true, message: `${result.rows[0].username} banlandi` });
+    } catch (error) {
+      console.error('Admin banUser error:', error);
+      res.status(500).json({ success: false, message: 'Ban islemi basarisiz', error: error.message });
+    }
+  }
+
+  // Banı kaldır
+  static async unbanUser(req, res) {
+    try {
+      const { id } = req.params;
+
+      const result = await query(
+        `UPDATE users
+         SET is_active = TRUE, ban_reason = NULL, banned_at = NULL
+         WHERE id = $1
+         RETURNING id, username`,
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Oyuncu bulunamadi' });
+      }
+
+      res.json({ success: true, message: `${result.rows[0].username} bani kaldirildi` });
+    } catch (error) {
+      console.error('Admin unbanUser error:', error);
+      res.status(500).json({ success: false, message: 'Ban kaldirma basarisiz', error: error.message });
+    }
+  }
+
+  // Banlı oyuncuları getir
+  static async getBannedUsers(req, res) {
+    try {
+      const sql = `
+        SELECT
+          u.id,
+          u.username,
+          u.email,
+          u.level,
+          u.experience,
+          u.created_at,
+          u.last_login,
+          u.ban_reason,
+          u.banned_at,
+          COALESCE(a.total_power, 0)    AS army_power,
+          COALESCE(a.archer_count, 0)   AS archer_count,
+          COALESCE(a.infantry_count, 0) AS infantry_count,
+          COALESCE(a.cavalry_count, 0)  AS cavalry_count,
+          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'gold' LIMIT 1), 0) AS gold,
+          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'food' LIMIT 1), 0) AS food,
+          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'wood' LIMIT 1), 0) AS wood,
+          (SELECT COUNT(*) FROM battles WHERE attacker_id = u.id OR defender_id = u.id)::int AS total_battles,
+          (SELECT COUNT(*) FROM battles
+           WHERE (attacker_id = u.id AND winner = 'attacker')
+              OR (defender_id = u.id AND winner = 'defender'))::int AS battle_wins
+        FROM users u
+        LEFT JOIN armies a ON a.user_id = u.id
+        WHERE u.is_active = FALSE AND (u.is_bot = FALSE OR u.is_bot IS NULL)
+        ORDER BY u.banned_at DESC NULLS LAST
+      `;
+      const result = await query(sql);
+      res.json({ success: true, data: { users: result.rows } });
+    } catch (error) {
+      console.error('Admin getBannedUsers error:', error);
+      res.status(500).json({ success: false, message: 'Banli oyuncular getirilemedi', error: error.message });
+    }
+  }
+
   // ── ADMIN2: Detaylı oyuncu listesi ────────────────────────────────────────
   static async getDetailedPlayers(req, res) {
     try {

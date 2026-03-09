@@ -30,6 +30,11 @@ router.get('/instagram-requests',               AdminController.getInstagramRequ
 router.put('/instagram-requests/:userId',       AdminController.reviewInstagramRequest);
 router.put('/instagram-requests/:userId/revoke', AdminController.revokeInstagramBoost);
 
+// Ban yönetimi
+router.get('/banned',          AdminController.getBannedUsers);
+router.post('/users/:id/ban',  AdminController.banUser);
+router.post('/users/:id/unban', AdminController.unbanUser);
+
 // Admin2 - Detaylı raporlar
 router.get('/admin2/players',         AdminController.getDetailedPlayers);
 router.get('/admin2/players/:id',     AdminController.getPlayerDetail);

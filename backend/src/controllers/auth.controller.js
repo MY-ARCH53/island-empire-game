@@ -106,6 +106,16 @@ class AuthController {
       }
 
       const user = userResult.rows[0];
+
+      if (user.is_active === false) {
+        return res.status(403).json({
+          success: false,
+          message: user.ban_reason
+            ? `Hesabınız banlandı: ${user.ban_reason}`
+            : 'Hesabınız banlandı. Lütfen yönetici ile iletişime geçin.',
+        });
+      }
+
       const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
       if (!isValidPassword) {
