@@ -138,6 +138,12 @@ class BattleController {
     try {
       const { userId, pirateId } = req.body;
 
+      // Saldıran oyuncunun koruma kalkanı varsa iptal et
+      await query(
+        `UPDATE users SET shield_until = NULL WHERE id = $1 AND shield_until > NOW()`,
+        [userId]
+      );
+
       const armySql = `SELECT * FROM armies WHERE user_id = $1`;
       const armyResult = await query(armySql, [userId]);
 
@@ -443,6 +449,12 @@ class BattleController {
           message: 'Bu oyuncu koruma kalkani altinda'
         });
       }
+
+      // Saldıran oyuncunun koruma kalkanı varsa iptal et
+      await query(
+        `UPDATE users SET shield_until = NULL WHERE id = $1 AND shield_until > NOW()`,
+        [attackerId]
+      );
 
       const attackerArmySql = `SELECT * FROM armies WHERE user_id = $1`;
       const attackerArmyResult = await query(attackerArmySql, [attackerId]);
