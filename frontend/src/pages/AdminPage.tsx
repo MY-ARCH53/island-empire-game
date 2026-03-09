@@ -56,6 +56,15 @@ function AdminPage() {
   const [forceBattleLoading, setForceBattleLoading] = useState(false);
   const [forceBattleResult, setForceBattleResult] = useState<any>(null);
 
+  // Seed kaynak SET state'leri
+  const [setGoldMin, setSetGoldMin] = useState(250000);
+  const [setGoldMax, setSetGoldMax] = useState(450000);
+  const [setWoodMin, setSetWoodMin] = useState(250000);
+  const [setWoodMax, setSetWoodMax] = useState(450000);
+  const [setFoodMin, setSetFoodMin] = useState(250000);
+  const [setFoodMax, setSetFoodMax] = useState(450000);
+  const [setResLoading, setSetResLoading] = useState(false);
+
   // Ödül talepleri state'leri
   const [prizeRequests, setPrizeRequests]       = useState<any[]>([]);
   const [prizeLoading, setPrizeLoading]         = useState(false);
@@ -298,7 +307,7 @@ function AdminPage() {
 
   const handleBoostSeedResources = async () => {
     if (!seedGold && !seedWood && !seedFood) return;
-    if (!confirm(`Tüm seed oyunculara +${seedGold} altın, +${seedWood} odun, +${seedFood} yiyecek eklenecek. Devam?`)) return;
+    if (!confirm(`Tüm seed oyunculara +${seedGold} altın, +${seedWood} odun, +${seedFood} yiyecek eklenecek (mevcut üzerine eklenir). Devam?`)) return;
     setSeedResLoading(true);
     setBotMsg('');
     try {
@@ -308,6 +317,20 @@ function AdminPage() {
       setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
     } finally {
       setSeedResLoading(false);
+    }
+  };
+
+  const handleSetSeedResources = async () => {
+    if (!confirm(`Tüm seed oyuncuların kaynakları rastgele aralıkta belirlenecek:\nAltın: ${setGoldMin.toLocaleString()} - ${setGoldMax.toLocaleString()}\nOdun: ${setWoodMin.toLocaleString()} - ${setWoodMax.toLocaleString()}\nYiyecek: ${setFoodMin.toLocaleString()} - ${setFoodMax.toLocaleString()}\nDevam?`)) return;
+    setSetResLoading(true);
+    setBotMsg('');
+    try {
+      const res = await adminAPI.setSeedResources({ goldMin: setGoldMin, goldMax: setGoldMax, woodMin: setWoodMin, woodMax: setWoodMax, foodMin: setFoodMin, foodMax: setFoodMax });
+      setBotMsg(`✅ ${res.data.message}`);
+    } catch (e: any) {
+      setBotMsg(`❌ ${e.response?.data?.message || 'Hata oluştu'}`);
+    } finally {
+      setSetResLoading(false);
     }
   };
 
@@ -689,6 +712,34 @@ function AdminPage() {
                   {seedResLoading ? '⏳ Ekleniyor...' : '💰 Kaynakları Ekle'}
                 </button>
               </div>
+            </div>
+
+            {/* Seed kaynaklarını aralıkta ata */}
+            <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.25)', borderRadius: 14, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#c084fc' }}>🎲 Seed Kaynaklarını Aralıkta Ata (SET)</h3>
+              <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>
+                Her seed oyuncusuna min-max arasında rastgele kaynak atar. Mevcut değerin üzerine yazar.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+                {[
+                  { label: '💰 Altın Min', val: setGoldMin, set: setSetGoldMin },
+                  { label: '💰 Altın Max', val: setGoldMax, set: setSetGoldMax },
+                  { label: '🪵 Odun Min',  val: setWoodMin, set: setSetWoodMin },
+                  { label: '🪵 Odun Max',  val: setWoodMax, set: setSetWoodMax },
+                  { label: '🍎 Yiyecek Min', val: setFoodMin, set: setSetFoodMin },
+                  { label: '🍎 Yiyecek Max', val: setFoodMax, set: setSetFoodMax },
+                ].map(f => (
+                  <div key={f.label}>
+                    <label style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                    <input type="number" min={0} value={f.val} onChange={e => f.set(Math.max(0, parseInt(e.target.value) || 0))}
+                      style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: '#f1f5f9', fontSize: 14, boxSizing: 'border-box' }} />
+                  </div>
+                ))}
+              </div>
+              <button onClick={handleSetSeedResources} disabled={setResLoading}
+                style={{ padding: '10px 22px', borderRadius: 10, border: 'none', cursor: setResLoading ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, opacity: setResLoading ? 0.6 : 1, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff' }}>
+                {setResLoading ? '⏳ Atanıyor...' : '🎲 Kaynakları Ata'}
+              </button>
             </div>
 
             {/* Zorla savaş */}

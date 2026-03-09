@@ -147,6 +147,7 @@ export const adminAPI = {
   // Seed oyuncu orduları ve kaynakları
   boostSeedArmies:    (data) => api.post('/admin/seeds/boost-armies', data),
   boostSeedResources: (data) => api.post('/admin/seeds/boost-resources', data),
+  setSeedResources:   (data) => api.post('/admin/seeds/set-resources', data),
   // Zorla savaş
   forceBattle: (attackerId, defenderId) => api.post('/admin/force-battle', { attackerId, defenderId }),
   // Ödül talepleri

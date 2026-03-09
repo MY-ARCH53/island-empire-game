@@ -21,6 +21,7 @@ router.post('/bots/attack-user', AdminController.attackSpecificUser);
 // Seed oyuncu orduları ve kaynakları
 router.post('/seeds/boost-armies',    AdminController.boostSeedArmies);
 router.post('/seeds/boost-resources', AdminController.boostSeedResources);
+router.post('/seeds/set-resources',   AdminController.setSeedResources);
 
 // Zorla savaş
 router.post('/force-battle', AdminController.forceBattle);

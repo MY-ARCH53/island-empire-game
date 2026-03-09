@@ -772,8 +772,9 @@ class AdminController {
 
       for (const [type, amount] of [['gold', goldAdd], ['wood', woodAdd], ['food', foodAdd]]) {
         if (!amount) continue;
+        // Kapasiteyi de güncelle (admin sınır gözetmez)
         await query(`
-          UPDATE resources SET amount = LEAST(amount + $1, capacity)
+          UPDATE resources SET amount = amount + $1, capacity = GREATEST(capacity, amount + $1)
           WHERE user_id = ANY($2) AND resource_type = $3
         `, [amount, seedIds, type]);
       }
@@ -785,6 +786,46 @@ class AdminController {
       });
     } catch (error) {
       console.error('Admin boostSeedResources error:', error);
+      res.status(500).json({ success: false, message: 'Hata oluştu', error: error.message });
+    }
+  }
+
+  // Seed oyunculara rastgele aralıkta kaynak ata (SET, not ADD)
+  static async setSeedResources(req, res) {
+    try {
+      const { goldMin = 0, goldMax = 0, woodMin = 0, woodMax = 0, foodMin = 0, foodMax = 0 } = req.body;
+
+      const seedsRes = await query(
+        `SELECT id FROM users WHERE email LIKE '%@islandsempire.com' AND (is_bot = FALSE OR is_bot IS NULL) AND is_admin = FALSE`
+      );
+      const seedIds = seedsRes.rows.map(r => r.id);
+
+      if (seedIds.length === 0) {
+        return res.status(404).json({ success: false, message: 'Seed oyuncu bulunamadı.' });
+      }
+
+      let updated = 0;
+      for (const userId of seedIds) {
+        const gold = goldMin + Math.floor(Math.random() * (goldMax - goldMin + 1));
+        const wood = woodMin + Math.floor(Math.random() * (woodMax - woodMin + 1));
+        const food = foodMin + Math.floor(Math.random() * (foodMax - foodMin + 1));
+
+        for (const [type, amount] of [['gold', gold], ['wood', wood], ['food', food]]) {
+          await query(
+            `UPDATE resources SET amount = $1, capacity = GREATEST(capacity, $1) WHERE user_id = $2 AND resource_type = $3`,
+            [amount, userId, type]
+          );
+        }
+        updated++;
+      }
+
+      res.json({
+        success: true,
+        message: `${updated} seed oyuncusunun kaynakları güncellendi.`,
+        data: { updated, goldMin, goldMax, woodMin, woodMax, foodMin, foodMax },
+      });
+    } catch (error) {
+      console.error('Admin setSeedResources error:', error);
       res.status(500).json({ success: false, message: 'Hata oluştu', error: error.message });
     }
   }
