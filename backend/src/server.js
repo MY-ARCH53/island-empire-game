@@ -20,6 +20,7 @@ const spinRoutes   = require('./routes/spin.routes');
 const { startWorker } = require('./services/autoProductionWorker');
 const instagramRoutes = require('./routes/instagram.routes');
 const { startInstagramWorker } = require('./services/instagramWorker');
+const banCheck = require('./middleware/banCheck.middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,22 +37,22 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/islands', islandRoutes);
-app.use('/api/resources', resourceRoutes);
-app.use('/api/buildings', buildingRoutes);
-app.use('/api/production', productionRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/islands',         banCheck, islandRoutes);
+app.use('/api/resources',       banCheck, resourceRoutes);
+app.use('/api/buildings',       banCheck, buildingRoutes);
+app.use('/api/production',      banCheck, productionRoutes);
+app.use('/api/tasks',           banCheck, taskRoutes);
+app.use('/api/marketplace',     banCheck, marketplaceRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
-app.use('/api/daily-reward', dailyRewardRoutes);
-app.use('/api/friends', friendRoutes);
-app.use('/api/guilds', guildRoutes);
-app.use('/api/battles', battleRoutes);
-app.use('/api/auto-production', autoProductionRoutes);
+app.use('/api/daily-reward',    banCheck, dailyRewardRoutes);
+app.use('/api/friends',         banCheck, friendRoutes);
+app.use('/api/guilds',          banCheck, guildRoutes);
+app.use('/api/battles',         banCheck, battleRoutes);
+app.use('/api/auto-production', banCheck, autoProductionRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/tlcoin', tlcoinRoutes);
-app.use('/api/trade',  tradeRoutes);
-app.use('/api/spin',      spinRoutes);
+app.use('/api/tlcoin',          banCheck, tlcoinRoutes);
+app.use('/api/trade',           banCheck, tradeRoutes);
+app.use('/api/spin',            banCheck, spinRoutes);
 app.use('/api/instagram', instagramRoutes);
 
 app.use((req, res) => {

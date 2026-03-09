@@ -1011,6 +1011,13 @@ function AdminPage() {
                   {banningId === editUser?.id ? '...' : '🚫 Banla'}
                 </button>
               )}
+              <button
+                onClick={() => deleteUser(editUser)}
+                title="Kalıcı Sil"
+                style={{ background: '#1e293b', border: '1px solid #ef4444', color: '#ef4444', padding: '12px 14px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}
+              >
+                🗑️
+              </button>
             </div>
           </div>
         </div>

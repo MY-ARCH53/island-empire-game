@@ -35,7 +35,7 @@ class AdminController {
           COALESCE(a.cavalry_count, 0)  AS cavalry_count
         FROM users u
         LEFT JOIN armies a ON a.user_id = u.id
-        WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
+        WHERE (u.is_bot = FALSE OR u.is_bot IS NULL) AND u.is_active = TRUE
         ORDER BY u.created_at DESC
       `;
       const result = await query(sql);
