@@ -178,6 +178,17 @@ function BattlePage() {
     } catch {}
   };
 
+  const handleAdComplete = useCallback(async () => {
+    try {
+      const uid = userIdRef.current;
+      if (uid) await battleAPI.watchAdReward(uid);
+      setPirateAttacksToday(0);
+      showToast('Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.', 'success');
+    } catch {}
+    setShowAdModal(false);
+    setAdCountdown(5);
+  }, []);
+
   // GD SDK event handler (window.GD_OPTIONS ile ayarlandı, index.html'de)
   useEffect(() => {
     (window as any).gdEventHandler = (event: any) => {
@@ -195,17 +206,6 @@ function BattlePage() {
       (window as any).gdEventHandler = null;
     };
   }, [handleAdComplete]);
-
-  const handleAdComplete = useCallback(async () => {
-    try {
-      const uid = userIdRef.current;
-      if (uid) await battleAPI.watchAdReward(uid);
-      setPirateAttacksToday(0);
-      showToast('Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.', 'success');
-    } catch {}
-    setShowAdModal(false);
-    setAdCountdown(5);
-  }, []);
 
   const showRewardedAd = () => {
     try {
