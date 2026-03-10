@@ -1,4 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+// GameDistribution SDK
+const GD_GAME_ID = 'f318a8f7db7a43c7bb4dced57e3ac91f';
+declare const gdsdk: any;
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { battleAPI } from '../services/api';
@@ -176,6 +180,58 @@ function BattlePage() {
       setPirateAttacksToday(piratesRes.data.data.attacks_today ?? 0);
       setUnreadCount(unreadRes.data.data.count);
     } catch {}
+  };
+
+  // GD SDK başlat (bir kez)
+  useEffect(() => {
+    try {
+      if (typeof gdsdk !== 'undefined') {
+        gdsdk.init({
+          gameId: GD_GAME_ID,
+          onEvent: (event: any) => {
+            switch (event.name) {
+              case 'SDK_READY':
+                break;
+              case 'SDK_REWARDED_WATCH_COMPLETE':
+                // Reklam tamamlandı → ödül ver
+                handleAdComplete();
+                break;
+              case 'SDK_REWARDED_WATCH_INCOMPLETE':
+              case 'SDK_ERROR':
+                setShowAdModal(false);
+                break;
+            }
+          },
+        });
+      }
+    } catch {}
+  }, []);
+
+  const handleAdComplete = useCallback(async () => {
+    try {
+      const uid = userIdRef.current;
+      if (uid) await battleAPI.watchAdReward(uid);
+      setPirateAttacksToday(0);
+      showToast('Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.', 'success');
+    } catch {}
+    setShowAdModal(false);
+    setAdCountdown(5);
+  }, []);
+
+  const showRewardedAd = () => {
+    try {
+      if (typeof gdsdk !== 'undefined') {
+        setShowAdModal(true);
+        gdsdk.showAd(gdsdk.AdType.Rewarded);
+      } else {
+        // SDK yüklenemedi, simüle et
+        setAdCountdown(5);
+        setShowAdModal(true);
+      }
+    } catch {
+      setAdCountdown(5);
+      setShowAdModal(true);
+    }
   };
 
   const loadPvp = async () => {
@@ -500,7 +556,7 @@ function BattlePage() {
                         </div>
                         {limitReached ? (
                           <button
-                            onClick={() => { setAdCountdown(5); setShowAdModal(true); }}
+                            onClick={showRewardedAd}
                             style={{ padding: '8px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}
                           >
                             📺 Reklam İzle
@@ -876,16 +932,7 @@ function BattlePage() {
         <AdModal
           countdown={adCountdown}
           onTick={() => setAdCountdown(p => p - 1)}
-          onComplete={async () => {
-            try {
-              const uid = userIdRef.current;
-              if (uid) await battleAPI.watchAdReward(uid);
-              setPirateAttacksToday(0);
-              showToast('Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.', 'success');
-            } catch {}
-            setShowAdModal(false);
-            setAdCountdown(5);
-          }}
+          onComplete={handleAdComplete}
         />
       )}
     </div>
