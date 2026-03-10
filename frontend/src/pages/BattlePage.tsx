@@ -1,8 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-
-// GameDistribution SDK
-const GD_GAME_ID = 'f318a8f7db7a43c7bb4dced57e3ac91f';
-declare const gdsdk: any;
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { battleAPI } from '../services/api';
@@ -213,11 +209,11 @@ function BattlePage() {
 
   const showRewardedAd = () => {
     try {
-      if (typeof gdsdk !== 'undefined') {
+      const gd = (window as any).gdsdk;
+      if (gd && typeof gd.showAd === 'function') {
         setShowAdModal(true);
-        gdsdk.showAd(gdsdk.AdType.Rewarded);
+        gd.showAd(gd.AdType.Rewarded);
       } else {
-        // SDK yüklenemedi, simüle et
         setAdCountdown(5);
         setShowAdModal(true);
       }
