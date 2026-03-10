@@ -182,30 +182,23 @@ function BattlePage() {
     } catch {}
   };
 
-  // GD SDK başlat (bir kez)
+  // GD SDK event handler (window.GD_OPTIONS ile ayarlandı, index.html'de)
   useEffect(() => {
-    try {
-      if (typeof gdsdk !== 'undefined') {
-        gdsdk.init({
-          gameId: GD_GAME_ID,
-          onEvent: (event: any) => {
-            switch (event.name) {
-              case 'SDK_READY':
-                break;
-              case 'SDK_REWARDED_WATCH_COMPLETE':
-                // Reklam tamamlandı → ödül ver
-                handleAdComplete();
-                break;
-              case 'SDK_REWARDED_WATCH_INCOMPLETE':
-              case 'SDK_ERROR':
-                setShowAdModal(false);
-                break;
-            }
-          },
-        });
+    (window as any).gdEventHandler = (event: any) => {
+      switch (event.name) {
+        case 'SDK_REWARDED_WATCH_COMPLETE':
+          handleAdComplete();
+          break;
+        case 'SDK_REWARDED_WATCH_INCOMPLETE':
+        case 'SDK_ERROR':
+          setShowAdModal(false);
+          break;
       }
-    } catch {}
-  }, []);
+    };
+    return () => {
+      (window as any).gdEventHandler = null;
+    };
+  }, [handleAdComplete]);
 
   const handleAdComplete = useCallback(async () => {
     try {
