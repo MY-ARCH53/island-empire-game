@@ -117,12 +117,22 @@ class BattleController {
   // Tüm korsanları listele
   static async listPirates(req, res) {
     try {
+      const { userId } = req.query;
       const sql = `SELECT * FROM pirates ORDER BY power ASC`;
       const result = await query(sql);
 
+      let attacks_today = 0;
+      if (userId) {
+        const countRes = await query(
+          `SELECT COUNT(*) FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
+          [userId]
+        );
+        attacks_today = parseInt(countRes.rows[0].count) || 0;
+      }
+
       res.json({
         success: true,
-        data: { pirates: result.rows }
+        data: { pirates: result.rows, attacks_today }
       });
     } catch (error) {
       console.error('List pirates error:', error);
@@ -137,6 +147,18 @@ class BattleController {
   static async attackPirate(req, res) {
     try {
       const { userId, pirateId } = req.body;
+
+      // Günlük limit kontrolü
+      const limitRes = await query(
+        `SELECT COUNT(*) FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
+        [userId]
+      );
+      if (parseInt(limitRes.rows[0].count) >= 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Günlük korsan saldırı limitine ulaştınız (10/10)'
+        });
+      }
 
       // Saldıran oyuncunun koruma kalkanı varsa iptal et
       await query(
@@ -219,6 +241,9 @@ class BattleController {
 
       const battleSql = `INSERT INTO battles (attacker_id, pirate_id, battle_type, attacker_power, defender_power, winner, reward_gold, reward_wood, reward_food, reward_xp) VALUES ($1, $2, 'pirate', $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
       const battleResult = await query(battleSql, [userId, pirateId, attackerPower, defenderPower, winner, rewardGold, rewardWood, rewardFood, rewardXp]);
+
+      // Günlük saldırı sayacına kayıt ekle
+      await query(`INSERT INTO pirate_attacks (attacker_id) VALUES ($1)`, [userId]);
 
       // Günlük saldırı görevini ilerlet
       try {
@@ -608,6 +633,24 @@ class BattleController {
         success: false,
         message: 'Saldiri basarisiz'
       });
+    }
+  }
+
+  // Reklam izleme ödülü — korsan saldırı sayacını sıfırla
+  static async watchAdReward(req, res) {
+    try {
+      const { userId } = req.body;
+      await query(
+        `DELETE FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
+        [userId]
+      );
+      res.json({
+        success: true,
+        message: 'Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.'
+      });
+    } catch (error) {
+      console.error('Watch ad reward error:', error);
+      res.status(500).json({ success: false, message: 'Hata oluştu' });
     }
   }
 

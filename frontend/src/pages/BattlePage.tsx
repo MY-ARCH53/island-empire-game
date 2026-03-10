@@ -116,6 +116,11 @@ function BattlePage() {
   const [pvpAttacksToday, setPvpAttacksToday] = useState(0);
   const [pvpLoading, setPvpLoading] = useState(false);
 
+  // Günlük korsan saldırı sayacı
+  const [pirateAttacksToday, setPirateAttacksToday] = useState(0);
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(5);
+
   // Recruit
   const [recruitType, setRecruitType]   = useState('infantry');
   const [recruitCount, setRecruitCount] = useState(10);
@@ -163,11 +168,12 @@ function BattlePage() {
     try {
       const [armyRes, piratesRes, unreadRes] = await Promise.all([
         battleAPI.getArmy(uid),
-        battleAPI.listPirates(),
+        battleAPI.listPirates(uid),
         battleAPI.getUnreadAttacks(uid),
       ]);
       setArmy(armyRes.data.data.army);
       setPirates(piratesRes.data.data.pirates);
+      setPirateAttacksToday(piratesRes.data.data.attacks_today ?? 0);
       setUnreadCount(unreadRes.data.data.count);
     } catch {}
   };
@@ -232,9 +238,12 @@ function BattlePage() {
       showToast(res.data.message, res.data.data.winner === 'attacker' ? 'success' : 'error');
       setBattleResult(res.data.data);
 
-      // PvP sayacı güncelle
+      // Sayaçları güncelle
       if (battleType === 'pvp' && res.data.data.attacks_today !== undefined) {
         setPvpAttacksToday(res.data.data.attacks_today);
+      }
+      if (battleType === 'pirate') {
+        setPirateAttacksToday(prev => prev + 1);
       }
 
       const armyRes = await battleAPI.getArmy(user.id);
@@ -449,7 +458,26 @@ function BattlePage() {
         {/* ── KORSANLAR ────────────────────────────────────────────────────── */}
         {tab === 'pirates' && (
           <div style={{ ...CARD }}>
-            <p style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>🏴‍☠️ Korsan Kampları</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <p style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>🏴‍☠️ Korsan Kampları</p>
+              {/* Günlük saldırı sayacı */}
+              <div style={{
+                background: pirateAttacksToday >= 10 ? 'rgba(239,68,68,0.1)' : 'rgba(249,115,22,0.08)',
+                border: `1px solid ${pirateAttacksToday >= 10 ? 'rgba(239,68,68,0.3)' : 'rgba(249,115,22,0.2)'}`,
+                borderRadius: 8, padding: '5px 10px',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: i < pirateAttacksToday ? '#ef4444' : 'rgba(255,255,255,0.15)' }} />
+                  ))}
+                </div>
+                <span style={{ color: pirateAttacksToday >= 10 ? '#ef4444' : '#94a3b8', fontSize: 11, fontWeight: 700 }}>
+                  {pirateAttacksToday}/10
+                </span>
+              </div>
+            </div>
+
             {pirates.length === 0 ? (
               <p style={{ color: '#475569', textAlign: 'center', padding: '24px 0' }}>Korsan bulunamadı</p>
             ) : (
@@ -457,6 +485,7 @@ function BattlePage() {
                 {pirates.map((p: any) => {
                   const diff = DIFF_CFG[p.difficulty] ?? DIFF_CFG.medium;
                   const canAttack = army && army.total_power >= p.power * 0.5;
+                  const limitReached = pirateAttacksToday >= 10;
                   const powerRatio = army ? Math.min(100, Math.round((army.total_power / Math.max(1, p.power)) * 100)) : 0;
                   return (
                     <div key={p.id} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '12px 14px' }}>
@@ -469,13 +498,22 @@ function BattlePage() {
                           </div>
                           <p style={{ color: '#64748b', fontSize: 12 }}>⚔️ {p.power} güç &nbsp;|&nbsp; 💰 {p.reward_gold} ödül{p.reward_xp > 0 ? ` · ✨ ${p.reward_xp} XP` : ''}</p>
                         </div>
-                        <button
-                          disabled={!canAttack}
-                          onClick={() => { setBattleTarget(p); setBattleType('pirate'); }}
-                          style={{ padding: '8px 14px', borderRadius: 10, border: 'none', cursor: canAttack ? 'pointer' : 'not-allowed', background: canAttack ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.08)', color: canAttack ? '#fff' : '#475569', fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}
-                        >
-                          {canAttack ? 'Saldır' : 'Güçsüz'}
-                        </button>
+                        {limitReached ? (
+                          <button
+                            onClick={() => { setAdCountdown(5); setShowAdModal(true); }}
+                            style={{ padding: '8px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}
+                          >
+                            📺 Reklam İzle
+                          </button>
+                        ) : (
+                          <button
+                            disabled={!canAttack}
+                            onClick={() => { setBattleTarget(p); setBattleType('pirate'); }}
+                            style={{ padding: '8px 14px', borderRadius: 10, border: 'none', cursor: canAttack ? 'pointer' : 'not-allowed', background: canAttack ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'rgba(255,255,255,0.08)', color: canAttack ? '#fff' : '#475569', fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}
+                          >
+                            {canAttack ? 'Saldır' : 'Güçsüz'}
+                          </button>
+                        )}
                       </div>
                       {/* Güç karşılaştırma bar (mini) */}
                       {army && (
@@ -832,6 +870,67 @@ function BattlePage() {
           </div>
         </div>
       )}
+
+      {/* ── REKLAM MODAL ─────────────────────────────────────────────────────── */}
+      {showAdModal && (
+        <AdModal
+          countdown={adCountdown}
+          onTick={() => setAdCountdown(p => p - 1)}
+          onComplete={async () => {
+            try {
+              const uid = userIdRef.current;
+              if (uid) await battleAPI.watchAdReward(uid);
+              setPirateAttacksToday(0);
+              showToast('Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.', 'success');
+            } catch {}
+            setShowAdModal(false);
+            setAdCountdown(5);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Reklam Sayaç Modalı ───────────────────────────────────────────────────────
+function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick: () => void; onComplete: () => void }) {
+  useEffect(() => {
+    if (countdown <= 0) { onComplete(); return; }
+    const timer = setTimeout(onTick, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const pct = Math.round(((5 - countdown) / 5) * 100);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{
+        background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 24, padding: '40px 32px', textAlign: 'center', minWidth: 280, maxWidth: 340,
+      }}>
+        <div style={{ fontSize: 56, marginBottom: 8 }}>📺</div>
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Reklam İzleniyor</div>
+        <div style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>
+          Reklam bitince 10 saldırı hakkın yenilenir
+        </div>
+
+        {/* Büyük sayaç */}
+        <div style={{ fontSize: 56, fontWeight: 900, color: '#fbbf24', lineHeight: 1, marginBottom: 20 }}>
+          {countdown}
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', width: `${pct}%`,
+            background: 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+            borderRadius: 99, transition: 'width 0.9s linear',
+          }} />
+        </div>
+        <div style={{ color: '#475569', fontSize: 12, marginTop: 12 }}>
+          Lütfen bekleyin...
+        </div>
+      </div>
     </div>
   );
 }

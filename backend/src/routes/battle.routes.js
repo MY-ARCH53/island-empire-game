@@ -6,6 +6,7 @@ router.get('/army', BattleController.getArmy);
 router.post('/recruit', BattleController.recruitSoldiers);
 router.get('/pirates', BattleController.listPirates);
 router.post('/attack-pirate', BattleController.attackPirate);
+router.post('/watch-ad-reward', BattleController.watchAdReward);
 router.get('/history', BattleController.getBattleHistory);
 router.get('/pvp-targets', BattleController.listPvpTargets);
 router.post('/attack-player', BattleController.attackPlayer);

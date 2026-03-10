@@ -112,8 +112,9 @@ export const guildAPI = {
 export const battleAPI = {
   getArmy: (userId) => api.get(`/battles/army?userId=${userId}`),
   recruit: (userId, type, count) => api.post('/battles/recruit', { userId, type, count }),
-  listPirates: () => api.get('/battles/pirates'),
+  listPirates: (userId) => api.get(`/battles/pirates?userId=${userId}`),
   attackPirate: (userId, pirateId) => api.post('/battles/attack-pirate', { userId, pirateId }),
+  watchAdReward: (userId) => api.post('/battles/watch-ad-reward', { userId }),
   getHistory: (userId) => api.get(`/battles/history?userId=${userId}`),
   // PvP - YENİ
   listPvpTargets: (userId) => api.get(`/battles/pvp-targets?userId=${userId}`),
