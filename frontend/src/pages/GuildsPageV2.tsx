@@ -128,7 +128,7 @@ function GuildsPageV2() {
       const r = await guildAPI.getUserGuild(userId);
       const g = r.data.data.guild;
       setMyGuild(g);
-      if (!g) setTab('list');
+      if (!g) { setTab('list'); loadGuilds(); }
     } catch {}
   };
 
