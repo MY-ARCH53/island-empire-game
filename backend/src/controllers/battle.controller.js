@@ -617,9 +617,9 @@ class BattleController {
       const { userId, hours } = req.body;
 
       const costs = {
-        3: 500,
-        8: 1000,
-        24: 2000
+        3: 500000,
+        8: 1000000,
+        24: 2400000
       };
 
       const cost = costs[hours];

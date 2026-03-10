@@ -28,9 +28,9 @@ const DIFF_CFG: any = {
 };
 
 const SHIELD_OPTIONS = [
-  { hours: 3,  gold: 500,  label: '3 Saat'  },
-  { hours: 8,  gold: 1000, label: '8 Saat'  },
-  { hours: 24, gold: 2000, label: '24 Saat' },
+  { hours: 3,  gold: 500000,  label: '3 Saat'  },
+  { hours: 8,  gold: 1000000, label: '8 Saat'  },
+  { hours: 24, gold: 2400000, label: '24 Saat' },
 ];
 
 // Animasyon fazları
@@ -431,7 +431,7 @@ function BattlePage() {
                         ⏱ {countdown}
                       </p>
                     ) : (
-                      <p style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>3s·500💰 &nbsp;|&nbsp; 8s·1000💰 &nbsp;|&nbsp; 24s·2000💰</p>
+                      <p style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>3s·500K💰 &nbsp;|&nbsp; 8s·1M💰 &nbsp;|&nbsp; 24s·2.4M💰</p>
                     )}
                   </div>
                   <button
