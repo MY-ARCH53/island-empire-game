@@ -10,6 +10,7 @@ interface Player {
   experience: number;
   created_at: string;
   last_login: string | null;
+  last_seen: string | null;
   is_active: boolean;
   army_power: number;
   archer_count: number;
@@ -224,6 +225,7 @@ export default function Admin2Page() {
                       { label: 'XP',       key: 'experience' },
                       { label: 'Kaya',     key: 'created_at' },
                       { label: 'Son Giris', key: 'last_login' },
+                      { label: 'Son Aktif', key: 'last_seen' },
                       { label: 'Piyade',   key: 'infantry_count' },
                       { label: 'Okcu',     key: 'archer_count' },
                       { label: 'Suvari',   key: 'cavalry_count' },
@@ -257,6 +259,7 @@ export default function Admin2Page() {
                       <td style={{ padding: '6px 10px', color: '#94a3b8', textAlign: 'right' }}>{fmt(p.experience)}</td>
                       <td style={{ padding: '6px 10px', color: '#64748b', whiteSpace: 'nowrap' }}>{dt(p.created_at)}</td>
                       <td style={{ padding: '6px 10px', color: p.last_login ? '#34d399' : '#f87171', whiteSpace: 'nowrap' }}>{ago(p.last_login)}</td>
+                      <td style={{ padding: '6px 10px', color: p.last_seen ? '#38bdf8' : '#475569', whiteSpace: 'nowrap' }}>{ago(p.last_seen)}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right' }}>{fmt(p.infantry_count)}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right' }}>{fmt(p.archer_count)}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right' }}>{fmt(p.cavalry_count)}</td>

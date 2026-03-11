@@ -1056,6 +1056,7 @@ class AdminController {
           u.experience,
           u.created_at,
           u.last_login,
+          u.last_seen,
           u.is_active,
           COALESCE(a.total_power, 0)    AS army_power,
           COALESCE(a.archer_count, 0)   AS archer_count,
@@ -1204,7 +1205,7 @@ class AdminController {
         query("SELECT COUNT(*) AS total FROM users WHERE last_login > NOW() - INTERVAL '7 days'  AND (is_bot = FALSE OR is_bot IS NULL)"),
         query("SELECT COUNT(*) AS total FROM users WHERE last_login IS NULL AND (is_bot = FALSE OR is_bot IS NULL)"),
         query("SELECT COUNT(*) AS total FROM users WHERE created_at > NOW() - INTERVAL '30 days' AND (is_bot = FALSE OR is_bot IS NULL)"),
-        query("SELECT COUNT(*) AS total FROM users WHERE last_seen > NOW() - INTERVAL '5 minutes' AND (is_bot = FALSE OR is_bot IS NULL)"),
+        query("SELECT COUNT(*) AS total FROM users WHERE (last_seen > NOW() - INTERVAL '5 minutes' OR last_login > NOW() - INTERVAL '5 minutes') AND (is_bot = FALSE OR is_bot IS NULL)"),
         query(`
           SELECT u.id, u.username, COUNT(b.id)::int AS battle_count,
                  SUM(CASE WHEN (b.attacker_id = u.id AND b.winner = 'attacker')
