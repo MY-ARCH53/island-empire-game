@@ -1204,7 +1204,7 @@ class AdminController {
         query("SELECT COUNT(*) AS total FROM users WHERE last_login > NOW() - INTERVAL '7 days'  AND (is_bot = FALSE OR is_bot IS NULL)"),
         query("SELECT COUNT(*) AS total FROM users WHERE last_login IS NULL AND (is_bot = FALSE OR is_bot IS NULL)"),
         query("SELECT COUNT(*) AS total FROM users WHERE created_at > NOW() - INTERVAL '30 days' AND (is_bot = FALSE OR is_bot IS NULL)"),
-        query("SELECT COUNT(*) AS total FROM users WHERE last_login > NOW() - INTERVAL '5 minutes' AND (is_bot = FALSE OR is_bot IS NULL)"),
+        query("SELECT COUNT(*) AS total FROM users WHERE last_seen > NOW() - INTERVAL '5 minutes' AND (is_bot = FALSE OR is_bot IS NULL)"),
         query(`
           SELECT u.id, u.username, COUNT(b.id)::int AS battle_count,
                  SUM(CASE WHEN (b.attacker_id = u.id AND b.winner = 'attacker')

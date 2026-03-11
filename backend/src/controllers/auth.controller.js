@@ -337,6 +337,17 @@ class AuthController {
       res.status(500).json({ success: false, message: 'Profil yuklenemedi', error: error.message });
     }
   }
+
+  static async heartbeat(req, res) {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ success: false });
+      await query('UPDATE users SET last_seen = NOW() WHERE id = $1', [userId]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false });
+    }
+  }
 }
 
 module.exports = AuthController;

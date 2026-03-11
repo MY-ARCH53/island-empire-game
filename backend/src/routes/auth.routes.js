@@ -8,5 +8,6 @@ router.post('/start-game', AuthController.startGame);
 router.post('/forgot-password', AuthController.forgotPassword);
 router.post('/reset-password', AuthController.resetPassword);
 router.get('/profile', AuthController.getProfile);
+router.post('/heartbeat', AuthController.heartbeat);
 
 module.exports = router;

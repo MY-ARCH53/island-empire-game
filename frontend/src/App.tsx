@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
 import { ToastProvider } from './contexts/ToastContext';
+import { authAPI } from './services/api';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -19,6 +21,16 @@ import ProfilePage from './pages/ProfilePage';
 import BattleDemoPage from './pages/BattleDemoPage';
 
 function App() {
+  useEffect(() => {
+    const sendHeartbeat = () => {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (user?.id) authAPI.heartbeat(user.id).catch(() => {});
+    };
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <ToastProvider>
       <Router>
