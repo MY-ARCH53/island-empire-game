@@ -50,6 +50,7 @@ export default function TLCoinPage() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const [tlcoinBalance, setTlcoinBalance] = useState(0);
+  const [lastConvertAt, setLastConvertAt] = useState<string | null>(null);
   const [goldToConvert, setGoldToConvert] = useState(1000);
   const [converting, setConverting] = useState(false);
   const [requesting, setRequesting] = useState<string | null>(null);
@@ -68,6 +69,7 @@ export default function TLCoinPage() {
         tlcoinAPI.getMyRequests(user.id),
       ]);
       setTlcoinBalance(balRes.data.data.tlcoin_balance);
+      setLastConvertAt(balRes.data.data.last_convert_at || null);
       setMyRequests(reqRes.data.data.requests);
     } catch {
       showToast('Veri yüklenemedi', 'error');
@@ -151,9 +153,35 @@ export default function TLCoinPage() {
         <div style={{ width: '100%', maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 22 }}>
 
         {/* Dönüşüm Kartı */}
+        {(() => {
+          const canConvertNow = !lastConvertAt || (Date.now() - new Date(lastConvertAt).getTime()) >= 7 * 24 * 60 * 60 * 1000;
+          const nextConvertDate = lastConvertAt
+            ? new Date(new Date(lastConvertAt).getTime() + 7 * 24 * 60 * 60 * 1000)
+            : null;
+          return (
         <div style={{ background: 'linear-gradient(135deg,rgba(225,29,72,0.12),rgba(190,18,60,0.06))', border: '1px solid rgba(225,29,72,0.30)', borderRadius: 18, padding: 20 }}>
           <p style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>💰 Altın → TLCoin Dönüşümü</p>
-          <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 18 }}>1.000 Altın = 1 🪙 TLCoin</p>
+          <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 8 }}>1.000 Altın = 1 🪙 TLCoin</p>
+
+          {/* Haftalık limit bilgisi */}
+          <div style={{
+            background: canConvertNow ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.10)',
+            border: `1px solid ${canConvertNow ? 'rgba(34,197,94,0.30)' : 'rgba(245,158,11,0.30)'}`,
+            borderRadius: 10, padding: '8px 12px', marginBottom: 18,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 16 }}>{canConvertNow ? '✅' : '⏳'}</span>
+            <div>
+              <p style={{ color: canConvertNow ? '#86efac' : '#fcd34d', fontSize: 12, fontWeight: 600 }}>
+                {canConvertNow ? 'Bu hafta dönüşüm hakkın mevcut' : 'Bu haftaki dönüşüm hakkın kullanıldı'}
+              </p>
+              <p style={{ color: '#64748b', fontSize: 11 }}>
+                {canConvertNow
+                  ? 'Haftada 1 kez dönüşüm yapabilirsin'
+                  : `Sonraki hak: ${nextConvertDate?.toLocaleDateString('tr-TR')}`}
+              </p>
+            </div>
+          </div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
             <div style={{ flex: 1 }}>
@@ -183,19 +211,21 @@ export default function TLCoinPage() {
 
           <button
             onClick={handleConvert}
-            disabled={converting}
+            disabled={converting || !canConvertNow}
             style={{
               width: '100%',
-              background: converting ? 'rgba(225,29,72,0.30)' : 'linear-gradient(135deg,#e11d48,#be123c)',
+              background: (converting || !canConvertNow) ? 'rgba(225,29,72,0.30)' : 'linear-gradient(135deg,#e11d48,#be123c)',
               border: 'none', borderRadius: 13, color: '#fff',
               fontWeight: 700, fontSize: 15, padding: '14px 0',
-              cursor: converting ? 'not-allowed' : 'pointer',
-              boxShadow: converting ? 'none' : '0 4px 18px rgba(225,29,72,0.40)',
+              cursor: (converting || !canConvertNow) ? 'not-allowed' : 'pointer',
+              boxShadow: (converting || !canConvertNow) ? 'none' : '0 4px 18px rgba(225,29,72,0.40)',
             }}
           >
-            {converting ? 'Dönüştürülüyor...' : '🪙 Dönüştür'}
+            {converting ? 'Dönüştürülüyor...' : !canConvertNow ? `⏳ ${nextConvertDate?.toLocaleDateString('tr-TR')} tarihinde açılır` : '🪙 Dönüştür'}
           </button>
         </div>
+          );
+        })()}
 
         {/* Ödüller */}
         <div>

@@ -6,13 +6,13 @@ class TLCoinController {
     try {
       const { userId } = req.query;
       const result = await query(
-        'SELECT tlcoin_balance FROM users WHERE id = $1',
+        'SELECT tlcoin_balance, last_convert_at FROM users WHERE id = $1',
         [userId]
       );
       if (!result.rows[0]) {
         return res.status(404).json({ success: false, message: 'Kullanici bulunamadi' });
       }
-      res.json({ success: true, data: { tlcoin_balance: result.rows[0].tlcoin_balance } });
+      res.json({ success: true, data: { tlcoin_balance: result.rows[0].tlcoin_balance, last_convert_at: result.rows[0].last_convert_at } });
     } catch (error) {
       console.error('TLCoin getBalance error:', error);
       res.status(500).json({ success: false, message: 'Bakiye alinamadi', error: error.message });
@@ -32,6 +32,25 @@ class TLCoinController {
 
       const tlcoin = amount / 1000;
 
+      // Haftalık limit kontrolü
+      const weekCheck = await query(
+        'SELECT last_convert_at FROM users WHERE id = $1',
+        [userId]
+      );
+      const lastConvert = weekCheck.rows[0]?.last_convert_at;
+      if (lastConvert) {
+        const diffMs = Date.now() - new Date(lastConvert).getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        if (diffDays < 7) {
+          const nextConvert = new Date(new Date(lastConvert).getTime() + 7 * 24 * 60 * 60 * 1000);
+          return res.status(400).json({
+            success: false,
+            message: `Haftada 1 kez dönüşüm yapabilirsiniz. Sonraki hakkınız: ${nextConvert.toLocaleDateString('tr-TR')}`,
+            next_convert_at: nextConvert.toISOString(),
+          });
+        }
+      }
+
       // Altın bakiyesi yeterli mi?
       const goldRes = await query(
         'SELECT amount FROM resources WHERE user_id = $1 AND resource_type = $2',
@@ -47,7 +66,7 @@ class TLCoinController {
         [amount, userId, 'gold']
       );
       await query(
-        'UPDATE users SET tlcoin_balance = tlcoin_balance + $1 WHERE id = $2',
+        'UPDATE users SET tlcoin_balance = tlcoin_balance + $1, last_convert_at = NOW() WHERE id = $2',
         [tlcoin, userId]
       );
 
