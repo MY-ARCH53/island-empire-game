@@ -28,7 +28,7 @@ export default function BattleDemoPage() {
   const inf = army?.infantry_count ?? 20;
   const arc = army?.archer_count ?? 15;
   const cav = army?.cavalry_count ?? 8;
-  const gameUrl = `/game/index.html?infantry=${inf}&archer=${arc}&cavalry=${cav}`;
+  const gameUrl = `/game/index.html?infantry=${inf}&archer=${arc}&cavalry=${cav}&_=${Date.now()}`;
 
   if (loading) return (
     <div style={{
