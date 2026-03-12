@@ -237,14 +237,14 @@ const TROOP_DEF={
 };
 
 const BLDG_DEF={
-  townhall:{name:'Belediye',hp:1500,w:2,h:2,isDef:false,val:30,modelScale:1.2},
-  cannon:{name:'Top',hp:400,w:1,h:1,isDef:true,dmg:22,range:6,atkSpd:1,modelScale:.8},
-  archer_tower:{name:'Okçu Kulesi',hp:350,w:1,h:1,isDef:true,dmg:15,range:8,atkSpd:.8,modelScale:.8},
-  mortar:{name:'Havan',hp:300,w:1,h:1,isDef:true,dmg:35,range:7,atkSpd:3,splash:2,minRange:3,modelScale:.8},
-  gold_storage:{name:'Altın Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:.8},
-  elixir_storage:{name:'İksir Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:.8},
-  wall:{name:'Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:.5},
-  barracks:{name:'Kışla',hp:350,w:1,h:1,isDef:false,val:5,modelScale:.8},
+  townhall:{name:'Belediye',hp:1500,w:2,h:2,isDef:false,val:30,modelScale:1.8},
+  cannon:{name:'Top',hp:400,w:1,h:1,isDef:true,dmg:22,range:6,atkSpd:1,modelScale:1.1},
+  archer_tower:{name:'Okçu Kulesi',hp:350,w:1,h:1,isDef:true,dmg:15,range:8,atkSpd:.8,modelScale:1.1},
+  mortar:{name:'Havan',hp:300,w:1,h:1,isDef:true,dmg:35,range:7,atkSpd:3,splash:2,minRange:3,modelScale:1.0},
+  gold_storage:{name:'Altın Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:1.0},
+  elixir_storage:{name:'İksir Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:1.0},
+  wall:{name:'Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:.75},
+  barracks:{name:'Kışla',hp:350,w:1,h:1,isDef:false,val:5,modelScale:1.0},
 };
 
 const gDist=(a,b)=>Math.sqrt((a.gx-b.gx)**2+(a.gy-b.gy)**2);
@@ -384,14 +384,48 @@ function initThree(){
   scene.add(sun);
   scene.add(new THREE.DirectionalLight(0x4488ff,.25).translateX(-15).translateY(10));
 
-  const gMat=new THREE.MeshStandardMaterial({color:0x4a8c2a,roughness:.9});
+  // Procedural grass texture
+  const gtCanvas=document.createElement('canvas');
+  gtCanvas.width=512;gtCanvas.height=512;
+  const gtCtx=gtCanvas.getContext('2d');
+  // Base grass
+  gtCtx.fillStyle='#3a7a1e';gtCtx.fillRect(0,0,512,512);
+  // Varied patches
+  const patchColors=['#4a9228','#2e6b18','#56a830','#3d8520','#266010'];
+  for(let i=0;i<300;i++){
+    gtCtx.fillStyle=patchColors[Math.floor(Math.random()*patchColors.length)];
+    const px=Math.random()*512,py=Math.random()*512;
+    const pr=8+Math.random()*32;
+    gtCtx.beginPath();gtCtx.ellipse(px,py,pr,pr*.6,Math.random()*Math.PI,0,Math.PI*2);gtCtx.fill();
+  }
+  // Dirt path tiles (subtle grid hints)
+  gtCtx.strokeStyle='rgba(101,67,33,0.15)';gtCtx.lineWidth=1;
+  for(let g=0;g<=512;g+=32){gtCtx.beginPath();gtCtx.moveTo(g,0);gtCtx.lineTo(g,512);gtCtx.stroke();gtCtx.beginPath();gtCtx.moveTo(0,g);gtCtx.lineTo(512,g);gtCtx.stroke();}
+  // Small stones/pebbles
+  for(let i=0;i<80;i++){
+    gtCtx.fillStyle=`rgba(${80+Math.random()*40},${80+Math.random()*40},${60+Math.random()*30},0.4)`;
+    const sx=Math.random()*512,sy=Math.random()*512;
+    gtCtx.beginPath();gtCtx.ellipse(sx,sy,2+Math.random()*3,1+Math.random()*2,Math.random()*Math.PI,0,Math.PI*2);gtCtx.fill();
+  }
+  const gtTex=new THREE.CanvasTexture(gtCanvas);
+  gtTex.wrapS=gtTex.wrapT=THREE.RepeatWrapping;gtTex.repeat.set(6,6);
+  const gMat=new THREE.MeshStandardMaterial({map:gtTex,roughness:.95,metalness:0});
   groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(GRID*CELL+10,GRID*CELL+10),gMat);
   groundMesh.rotation.x=-Math.PI/2;groundMesh.receiveShadow=true;
   scene.add(groundMesh);
 
-  const gridMat=new THREE.MeshBasicMaterial({color:0x5a9c3a,wireframe:true,transparent:true,opacity:.12});
-  const gridM=new THREE.Mesh(new THREE.PlaneGeometry(GRID*CELL,GRID*CELL,GRID,GRID),gridMat);
-  gridM.rotation.x=-Math.PI/2;gridM.position.y=.03;scene.add(gridM);
+  // Subtle dirt path overlay inside base area
+  const pathCanvas=document.createElement('canvas');
+  pathCanvas.width=256;pathCanvas.height=256;
+  const pCtx=pathCanvas.getContext('2d');
+  pCtx.fillStyle='rgba(0,0,0,0)';pCtx.fillRect(0,0,256,256);
+  pCtx.strokeStyle='rgba(139,90,43,0.18)';pCtx.lineWidth=6;
+  for(let g=0;g<=256;g+=32){pCtx.beginPath();pCtx.moveTo(g,0);pCtx.lineTo(g,256);pCtx.stroke();pCtx.beginPath();pCtx.moveTo(0,g);pCtx.lineTo(256,g);pCtx.stroke();}
+  const pathTex=new THREE.CanvasTexture(pathCanvas);
+  pathTex.wrapS=pathTex.wrapT=THREE.RepeatWrapping;pathTex.repeat.set(GRID/4,GRID/4);
+  const overlayMat=new THREE.MeshBasicMaterial({map:pathTex,transparent:true,opacity:1,depthWrite:false});
+  const overlayM=new THREE.Mesh(new THREE.PlaneGeometry(GRID*CELL,GRID*CELL),overlayMat);
+  overlayM.rotation.x=-Math.PI/2;overlayM.position.y=.02;scene.add(overlayM);
 }
 
 // ================================================================
@@ -439,9 +473,10 @@ async function createBuildingMesh(b){
     model=createFallbackBuilding(b.type);
   }
 
-  const s=d.modelScale||.8;
+  const s=d.modelScale||1.0;
   model.scale.set(s,s,s);
   model.position.set(pos.x,0,pos.z);
+  if(b.type==='wall'&&b.wallRot!==undefined) model.rotation.y=b.wallRot;
   model.userData={building:b};
   scene.add(model);
   buildingMeshes.set(b,model);
@@ -755,10 +790,17 @@ async function generateBase(){
   buildings.push({type:'elixir_storage',gx:c-4,gy:c,hp:500,maxHp:500});
   buildings.push({type:'barracks',gx:c+3,gy:c,hp:350,maxHp:350});
   for(let i=-4;i<=4;i++){
-    [{gx:c+i,gy:c-4},{gx:c+i,gy:c+4},{gx:c-4,gy:c+i},{gx:c+4,gy:c+i}].forEach(w=>{
+    // Yatay duvarlar (gy sabit, gx değişiyor) → rotasyon 0
+    [{gx:c+i,gy:c-4,wallRot:0},{gx:c+i,gy:c+4,wallRot:0}].forEach(w=>{
       if(!buildings.some(b=>{const d=BLDG_DEF[b.type];const s=d.isWall?1:Math.ceil(d.w);return w.gx>=b.gx&&w.gx<b.gx+s&&w.gy>=b.gy&&w.gy<b.gy+s;}))
         if(w.gx>=0&&w.gx<GRID&&w.gy>=0&&w.gy<GRID)
-          buildings.push({type:'wall',gx:w.gx,gy:w.gy,hp:250,maxHp:250});
+          buildings.push({type:'wall',gx:w.gx,gy:w.gy,hp:250,maxHp:250,wallRot:0});
+    });
+    // Dikey duvarlar (gx sabit, gy değişiyor) → rotasyon 90°
+    [{gx:c-4,gy:c+i,wallRot:Math.PI/2},{gx:c+4,gy:c+i,wallRot:Math.PI/2}].forEach(w=>{
+      if(!buildings.some(b=>{const d=BLDG_DEF[b.type];const s=d.isWall?1:Math.ceil(d.w);return w.gx>=b.gx&&w.gx<b.gx+s&&w.gy>=b.gy&&w.gy<b.gy+s;}))
+        if(w.gx>=0&&w.gx<GRID&&w.gy>=0&&w.gy<GRID)
+          buildings.push({type:'wall',gx:w.gx,gy:w.gy,hp:250,maxHp:250,wallRot:Math.PI/2});
     });
   }
   for(const b of buildings) await createBuildingMesh(b);
