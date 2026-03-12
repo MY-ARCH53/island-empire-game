@@ -204,6 +204,7 @@ const BLDG_MODELS = {
   elixir_storage: 'buildings/blue/building_church_blue.gltf',
   barracks:       'buildings/blue/building_barracks_blue.gltf',
   wall:           'buildings/neutral/wall_straight.gltf',
+  wall_corner:    'buildings/neutral/wall_corner_A_outside.gltf',
 };
 
 const DESTROYED_MODEL = 'buildings/neutral/building_destroyed.gltf';
@@ -299,7 +300,8 @@ const BLDG_DEF={
   mortar:{name:'Havan',hp:300,w:1,h:1,isDef:true,dmg:35,range:7,atkSpd:3,splash:2,minRange:3,modelScale:1.6},
   gold_storage:{name:'Altın Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:1.5},
   elixir_storage:{name:'İksir Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:1.5},
-  wall:{name:'Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:.6},
+  wall:{name:'Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:1.0},
+  wall_corner:{name:'Köşe Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:1.0},
   barracks:{name:'Kışla',hp:350,w:1,h:1,isDef:false,val:5,modelScale:1.5},
 };
 
@@ -532,7 +534,7 @@ async function createBuildingMesh(b){
   const s=d.modelScale||1.0;
   model.scale.set(s,s,s);
   model.position.set(pos.x,0,pos.z);
-  if(b.type==='wall'&&b.wallRot!==undefined) model.rotation.y=b.wallRot;
+  if(b.wallRot!==undefined) model.rotation.y=b.wallRot;
   model.userData={building:b};
   scene.add(model);
   buildingMeshes.set(b,model);
@@ -845,19 +847,17 @@ async function generateBase(){
   buildings.push({type:'elixir_storage',gx:c+2,gy:c+3,hp:500,maxHp:500});
   buildings.push({type:'elixir_storage',gx:c-4,gy:c,hp:500,maxHp:500});
   buildings.push({type:'barracks',gx:c+3,gy:c,hp:350,maxHp:350});
-  for(let i=-4;i<=4;i++){
-    // Yatay duvarlar (gy sabit, gx değişiyor) → rotasyon 0
-    [{gx:c+i,gy:c-4,wallRot:0},{gx:c+i,gy:c+4,wallRot:0}].forEach(w=>{
-      if(!buildings.some(b=>{const d=BLDG_DEF[b.type];const s=d.isWall?1:Math.ceil(d.w);return w.gx>=b.gx&&w.gx<b.gx+s&&w.gy>=b.gy&&w.gy<b.gy+s;}))
-        if(w.gx>=0&&w.gx<GRID&&w.gy>=0&&w.gy<GRID)
-          buildings.push({type:'wall',gx:w.gx,gy:w.gy,hp:250,maxHp:250,wallRot:0});
-    });
-    // Dikey duvarlar (gx sabit, gy değişiyor) → rotasyon 90°
-    [{gx:c-4,gy:c+i,wallRot:Math.PI/2},{gx:c+4,gy:c+i,wallRot:Math.PI/2}].forEach(w=>{
-      if(!buildings.some(b=>{const d=BLDG_DEF[b.type];const s=d.isWall?1:Math.ceil(d.w);return w.gx>=b.gx&&w.gx<b.gx+s&&w.gy>=b.gy&&w.gy<b.gy+s;}))
-        if(w.gx>=0&&w.gx<GRID&&w.gy>=0&&w.gy<GRID)
-          buildings.push({type:'wall',gx:w.gx,gy:w.gy,hp:250,maxHp:250,wallRot:Math.PI/2});
-    });
+  // 4 köşe parçası
+  buildings.push({type:'wall_corner',gx:c-4,gy:c-4,hp:250,maxHp:250,wallRot:Math.PI});
+  buildings.push({type:'wall_corner',gx:c+4,gy:c-4,hp:250,maxHp:250,wallRot:-Math.PI/2});
+  buildings.push({type:'wall_corner',gx:c+4,gy:c+4,hp:250,maxHp:250,wallRot:0});
+  buildings.push({type:'wall_corner',gx:c-4,gy:c+4,hp:250,maxHp:250,wallRot:Math.PI/2});
+  // Düz duvarlar — köşeler hariç (i: -3 to +3)
+  for(let i=-3;i<=3;i++){
+    buildings.push({type:'wall',gx:c+i,gy:c-4,hp:250,maxHp:250,wallRot:0});
+    buildings.push({type:'wall',gx:c+i,gy:c+4,hp:250,maxHp:250,wallRot:0});
+    buildings.push({type:'wall',gx:c-4,gy:c+i,hp:250,maxHp:250,wallRot:Math.PI/2});
+    buildings.push({type:'wall',gx:c+4,gy:c+i,hp:250,maxHp:250,wallRot:Math.PI/2});
   }
   for(const b of buildings) await createBuildingMesh(b);
 }
@@ -969,8 +969,8 @@ const ALL_MODELS={
   watermill:    {name:'💧 Su Değirmeni',    path:'buildings/blue/building_watermill_blue.gltf',       scale:1.2},
   well:         {name:'🪣 Kuyu',            path:'buildings/blue/building_well_blue.gltf',            scale:1.0},
   windmill:     {name:'🌀 Yel Değirmeni',   path:'buildings/blue/building_windmill_blue.gltf',        scale:1.2},
-  wall_str:     {name:'🧱 Duvar (düz)',     path:'buildings/neutral/wall_straight.gltf',              scale:0.6},
-  wall_corner:  {name:'🧱 Duvar (köşe)',   path:'buildings/neutral/wall_corner_A_outside.gltf',      scale:0.6},
+  wall_str:     {name:'🧱 Duvar (düz)',     path:'buildings/neutral/wall_straight.gltf',              scale:1.0},
+  wall_corner:  {name:'🧱 Duvar (köşe)',   path:'buildings/neutral/wall_corner_A_outside.gltf',      scale:1.0},
   fence_stone:  {name:'🪨 Taş Çit',        path:'buildings/neutral/fence_stone_straight.gltf',       scale:0.6},
   tree:         {name:'🌳 Ağaç',            path:'decoration/tree_single_A.gltf',                     scale:1.5},
   rock:         {name:'🪨 Kaya',            path:'decoration/rock_single_A.gltf',                     scale:1.0},
