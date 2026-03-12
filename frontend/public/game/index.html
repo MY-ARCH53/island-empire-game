@@ -842,22 +842,16 @@ async function generateBase(){
   const c=GRID/2;
   // --- Merkez Kale ---
   buildings.push({type:'townhall',    gx:c-1, gy:c-1, hp:1500,maxHp:1500});
-  // --- 8 Okçu Kulesi (dış halka) ---
-  buildings.push({type:'archer_tower',gx:c-3, gy:c-3, hp:350,maxHp:350,atkTimer:0}); // KK köşe
-  buildings.push({type:'archer_tower',gx:c,   gy:c-3, hp:350,maxHp:350,atkTimer:0}); // K orta
-  buildings.push({type:'archer_tower',gx:c+3, gy:c-3, hp:350,maxHp:350,atkTimer:0}); // KD köşe
-  buildings.push({type:'archer_tower',gx:c-3, gy:c,   hp:350,maxHp:350,atkTimer:0}); // B orta
-  buildings.push({type:'archer_tower',gx:c+3, gy:c,   hp:350,maxHp:350,atkTimer:0}); // D orta
-  buildings.push({type:'archer_tower',gx:c-3, gy:c+3, hp:350,maxHp:350,atkTimer:0}); // GK köşe
-  buildings.push({type:'archer_tower',gx:c,   gy:c+3, hp:350,maxHp:350,atkTimer:0}); // G orta
-  buildings.push({type:'archer_tower',gx:c+3, gy:c+3, hp:350,maxHp:350,atkTimer:0}); // GD köşe
+  // --- 4 Okçu Kulesi (köşeler) ---
+  buildings.push({type:'archer_tower',gx:c-3, gy:c-3, hp:350,maxHp:350,atkTimer:0});
+  buildings.push({type:'archer_tower',gx:c+3, gy:c-3, hp:350,maxHp:350,atkTimer:0});
+  buildings.push({type:'archer_tower',gx:c-3, gy:c+3, hp:350,maxHp:350,atkTimer:0});
+  buildings.push({type:'archer_tower',gx:c+3, gy:c+3, hp:350,maxHp:350,atkTimer:0});
   // --- 4 Top (iç çember) ---
   buildings.push({type:'cannon',gx:c-2,gy:c-2,hp:400,maxHp:400,atkTimer:0});
   buildings.push({type:'cannon',gx:c+2,gy:c-2,hp:400,maxHp:400,atkTimer:0});
   buildings.push({type:'cannon',gx:c-2,gy:c+2,hp:400,maxHp:400,atkTimer:0});
   buildings.push({type:'cannon',gx:c+2,gy:c+2,hp:400,maxHp:400,atkTimer:0});
-  // --- 1 Havan ---
-  buildings.push({type:'mortar',gx:c+1,gy:c+1,hp:300,maxHp:300,atkTimer:0});
   // --- 4 Köşe Duvar ---
   buildings.push({type:'wall_corner',gx:c-4,gy:c-4,hp:250,maxHp:250,wallRot:Math.PI});
   buildings.push({type:'wall_corner',gx:c+4,gy:c-4,hp:250,maxHp:250,wallRot:-Math.PI/2});
@@ -871,6 +865,19 @@ async function generateBase(){
     buildings.push({type:'wall',gx:c+4,gy:c+i,hp:250,maxHp:250,wallRot:Math.PI/2});
   }
   for(const b of buildings) await createBuildingMesh(b);
+  // --- 4 Tower B (orta kenarlar) ---
+  const tbM=ALL_MODELS['tower_b'];
+  for(const [dx,dy] of [[0,-3],[3,0],[0,3],[-3,0]]){
+    try{
+      const {scene:ms}=await loadModelData(tbM.path);
+      ms.scale.set(tbM.scale,tbM.scale,tbM.scale);
+      const wp=g2w(c+dx,c+dy);
+      ms.position.set(wp.x,0,wp.z);
+      ms.traverse(ch=>{if(ch.isMesh){ch.castShadow=true;ch.receiveShadow=true;}});
+      scene.add(ms);
+      editorMeshes.push({key:'tower_b',mesh:ms,id:editorPlacedId++});
+    }catch(e){console.warn('tower_b yüklenemedi:',e);}
+  }
 }
 
 async function spawnTroop(type,gx,gy){
