@@ -137,7 +137,8 @@
   <div id="editorHeader">
     <h3>🏗️ Asset Editörü</h3>
     <div style="display:flex;gap:5px">
-      <button class="ep-btn ep-copy" onclick="copyEditorConfig()">📋 Kopyala</button>
+      <button class="ep-btn ep-copy" onclick="copyEditorConfig()">📋 Scale</button>
+      <button class="ep-btn" style="background:#3b82f6;color:#fff" onclick="copyLayout()">📐 Layout</button>
       <button class="ep-btn ep-close" onclick="toggleEditorPanel()">✕</button>
     </div>
   </div>
@@ -1121,6 +1122,22 @@ async function placeEditorModel(gx,gy){
     SFX.play('place');
   }catch(e){console.warn('Model yüklenemedi:',m.path,e);}
 }
+window.copyLayout=()=>{
+  const c=GRID/2;
+  const list=buildings.map(b=>({
+    type:b.type,
+    gx:+(b.gx-c).toFixed(1),
+    gy:+(b.gy-c).toFixed(1),
+    ...(b.wallRot!==undefined?{wallRot:+b.wallRot.toFixed(4)}:{}),
+    hp:b.hp,maxHp:b.maxHp,
+    ...(b.atkTimer!==undefined?{atkTimer:0}:{})
+  }));
+  navigator.clipboard.writeText(JSON.stringify(list,null,2)).then(()=>{
+    const btn=document.querySelector('[onclick="copyLayout()"]');
+    btn.textContent='✅ Kopyalandı!';
+    setTimeout(()=>btn.textContent='📐 Layout',2000);
+  });
+};
 window.copyEditorConfig=()=>{
   const cfg={};Object.entries(ALL_MODELS).forEach(([k,m])=>{cfg[k]=m.scale;});
   const txt=JSON.stringify(cfg,null,2);
