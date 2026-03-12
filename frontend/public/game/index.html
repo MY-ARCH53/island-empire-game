@@ -355,7 +355,7 @@ function initThree(){
   scene.fog=new THREE.FogExp2(0x5a9e3a,.006);
 
   const aspect=window.innerWidth/window.innerHeight;
-  const frustum=28;
+  const frustum=16;
   camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,.1,200);
   camera.position.set(30,30,30);
   camera.lookAt(0,0,0);
@@ -389,9 +389,9 @@ function initThree(){
   gtCanvas.width=512;gtCanvas.height=512;
   const gtCtx=gtCanvas.getContext('2d');
   // Base grass
-  gtCtx.fillStyle='#3a7a1e';gtCtx.fillRect(0,0,512,512);
+  gtCtx.fillStyle='#4a8e28';gtCtx.fillRect(0,0,512,512);
   // Varied patches
-  const patchColors=['#4a9228','#2e6b18','#56a830','#3d8520','#266010'];
+  const patchColors=['#5aaa30','#3a7818','#62b838','#4d9225','#326b12'];
   for(let i=0;i<300;i++){
     gtCtx.fillStyle=patchColors[Math.floor(Math.random()*patchColors.length)];
     const px=Math.random()*512,py=Math.random()*512;
@@ -899,7 +899,7 @@ async function init(){
   renderer.domElement.addEventListener('touchstart',e=>{e.preventDefault();onClick({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY});});
 
   window.addEventListener('resize',()=>{
-    const a=window.innerWidth/window.innerHeight,f=28;
+    const a=window.innerWidth/window.innerHeight,f=16;
     camera.left=-f*a;camera.right=f*a;camera.top=f;camera.bottom=-f;
     camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);
   });
