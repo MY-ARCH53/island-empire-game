@@ -1119,7 +1119,7 @@ async function placeEditorModel(gx,gy){
 }
 window.copyLayout=()=>{
   const c=GRID/2;
-  const list=buildings.map(b=>({
+  const baseList=buildings.map(b=>({
     type:b.type,
     gx:+(b.gx-c).toFixed(1),
     gy:+(b.gy-c).toFixed(1),
@@ -1127,11 +1127,17 @@ window.copyLayout=()=>{
     hp:b.hp,maxHp:b.maxHp,
     ...(b.atkTimer!==undefined?{atkTimer:0}:{})
   }));
-  navigator.clipboard.writeText(JSON.stringify(list,null,2)).then(()=>{
+  const edList=editorMeshes.map(o=>{
+    const p=o.mesh.position;
+    const g=w2g(p.x,p.z);
+    return {type:'editor_'+o.key,gx:+(g.gx-c).toFixed(1),gy:+(g.gy-c).toFixed(1),rotY:+o.mesh.rotation.y.toFixed(4),scale:+o.mesh.scale.x.toFixed(3)};
+  });
+  const txt=JSON.stringify([...baseList,...edList],null,2);
+  navigator.clipboard.writeText(txt).then(()=>{
     const btn=document.querySelector('[onclick="copyLayout()"]');
     btn.textContent='✅ Kopyalandı!';
     setTimeout(()=>btn.textContent='📐 Layout',2000);
-  });
+  }).catch(()=>{ prompt('JSON (Ctrl+A → Ctrl+C):',txt); });
 };
 window.copyEditorConfig=()=>{
   const cfg={};Object.entries(ALL_MODELS).forEach(([k,m])=>{cfg[k]=m.scale;});
