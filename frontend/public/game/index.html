@@ -983,11 +983,15 @@ let editorDragging=false,editorDragObj=null;
 
 function _groundPt(e){_getRay(e);const h=raycaster.intersectObject(groundMesh);return h.length?h[0].point:null;}
 function _edHit(e){
-  if(!editorMeshes.length)return null;
   _getRay(e);
-  // tüm alt mesh'leri topla
   const flat=[];
+  // Editor'da yerleştirilen objeler
   editorMeshes.forEach(o=>o.mesh.traverse(c=>{if(c.isMesh||c.isSkinnedMesh)flat.push({mesh:c,obj:o});}));
+  // Mevcut base binalar ve duvarlar
+  buildingMeshes.forEach((mesh,b)=>{
+    if(mesh.userData.destroying)return;
+    mesh.traverse(c=>{if(c.isMesh||c.isSkinnedMesh)flat.push({mesh:c,obj:{mesh,key:b.type,isBase:true,buildingRef:b}});});
+  });
   if(!flat.length)return null;
   const hits=raycaster.intersectObjects(flat.map(f=>f.mesh),false);
   if(!hits.length)return null;
@@ -1006,7 +1010,8 @@ function selectEditorObject(obj){
     selectionRing.position.y=.04;
     scene.add(selectionRing);
     document.getElementById('edTransformPanel').style.display='block';
-    document.getElementById('editorStatus').innerHTML=`<span class="ed-active">✦ ${ALL_MODELS[obj.key]?.name||obj.key}</span> seçili`;
+    const displayName=ALL_MODELS[obj.key]?.name||BLDG_DEF[obj.key]?.name||obj.key;
+    document.getElementById('editorStatus').innerHTML=`<span class="ed-active">✦ ${displayName}</span> seçili`;
   }else{
     document.getElementById('edTransformPanel').style.display='none';
     if(!editorMode)document.getElementById('editorStatus').textContent='Bir model seç → Yerleştir\'e tıkla → Haritaya tıkla';
@@ -1019,8 +1024,15 @@ window.rotateSelected=deg=>{
 window.deleteSelected=()=>{
   if(!editorSelectedObj)return;
   scene.remove(editorSelectedObj.mesh);
-  const idx=editorMeshes.indexOf(editorSelectedObj);
-  if(idx>-1)editorMeshes.splice(idx,1);
+  if(editorSelectedObj.isBase){
+    // Base binayı buildings dizisinden ve buildingMeshes'den kaldır
+    buildingMeshes.delete(editorSelectedObj.buildingRef);
+    const bi=buildings.indexOf(editorSelectedObj.buildingRef);
+    if(bi>-1)buildings.splice(bi,1);
+  }else{
+    const idx=editorMeshes.indexOf(editorSelectedObj);
+    if(idx>-1)editorMeshes.splice(idx,1);
+  }
   if(selectionRing){scene.remove(selectionRing);selectionRing=null;}
   editorSelectedObj=null;
   document.getElementById('edTransformPanel').style.display='none';
