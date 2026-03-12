@@ -45,6 +45,9 @@
   #soundToggle{position:fixed;bottom:96px;right:14px;z-index:10;width:36px;height:36px;border-radius:50%;background:var(--panel);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
   #assetError{display:none;position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#991b1b;color:#fca5a5;padding:8px 16px;border-radius:8px;font-size:12px;z-index:20}
   #editorToggleBtn{position:fixed;left:14px;top:58px;z-index:30;padding:7px 14px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:700;box-shadow:0 4px 12px rgba(124,58,237,.4)}
+  /* DEBUG: editör açıkken altın kenarlık */
+  body[data-ed] canvas{outline:4px solid #ffd700 !important;}
+  body[data-ed] #editorToggleBtn{background:linear-gradient(135deg,#ffd700,#f59e0b)!important;color:#000!important;}
   #editorPanel{position:fixed;left:0;top:0;bottom:0;width:260px;background:rgba(8,12,22,.97);border-right:2px solid #1c2844;z-index:25;display:none;flex-direction:column;overflow:hidden}
   #editorPanel.open{display:flex}
   #editorHeader{padding:10px 12px;border-bottom:1px solid #1c2844;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -66,6 +69,13 @@
   #editorStatus{background:#0f1629;border-top:1px solid #1c2844;padding:7px 10px;font-size:11px;color:#64748b;flex-shrink:0}
   .ed-active{color:#ffd700;font-weight:700}
   #editorEscBtn{display:none;margin:6px 8px;padding:5px;background:#991b1b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;width:calc(100% - 16px)}
+  #edTransformPanel{display:none;padding:8px 10px;border-top:1px solid #1c2844;background:#0a0f1e;flex-shrink:0}
+  #edTransformPanel .edt-title{color:#ffd700;font-size:10px;font-weight:700;margin-bottom:6px;text-transform:uppercase}
+  #edTransformPanel .edt-row{display:flex;gap:5px;align-items:center;margin-bottom:5px}
+  .edt-btn{flex:1;padding:5px 4px;border-radius:5px;border:none;cursor:pointer;font-size:11px;font-weight:700}
+  .edt-rot{background:#1e3a5f;color:#60a5fa}
+  .edt-del{background:#7f1d1d;color:#fca5a5}
+  .edt-move-hint{color:#475569;font-size:9px;text-align:center}
 </style>
 </head>
 <body>
@@ -132,6 +142,15 @@
   <button id="editorEscBtn" onclick="cancelEditorPlace()">❌ Yerleştirmeyi İptal Et</button>
   <div id="editorList"></div>
   <div id="editorStatus">Bir model seç → Yerleştir'e tıkla → Haritaya tıkla</div>
+  <div id="edTransformPanel">
+    <div class="edt-title">✦ Seçili Nesne</div>
+    <div class="edt-row">
+      <button class="edt-btn edt-rot" onclick="rotateSelected(-45)">↺ -45°</button>
+      <button class="edt-btn edt-rot" onclick="rotateSelected(45)">↻ +45°</button>
+      <button class="edt-btn edt-del" onclick="deleteSelected()">🗑️ Sil</button>
+    </div>
+    <div class="edt-move-hint">Sürükle → Taşı &nbsp;|&nbsp; Esc → İptal</div>
+  </div>
 </div>
 
 <div id="resultOverlay">
@@ -890,17 +909,41 @@ window.resetGame=async()=>{
 // ================================================================
 const raycaster=new THREE.Raycaster();
 const mouse=new THREE.Vector2();
+// Editör açık mı? — body attribute ile en güvenilir kontrol
+function edActive(){return document.body.hasAttribute('data-ed');}
+
+let _mdPos=null,_mdDrag=false;
+
+function _getRay(e){
+  const r=renderer.domElement.getBoundingClientRect();
+  mouse.x=((e.clientX-r.left)/r.width)*2-1;
+  mouse.y=-((e.clientY-r.top)/r.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+}
+
 function onClick(e){
   SFX.init();
-  const rect=renderer.domElement.getBoundingClientRect();
-  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
-  mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
-  raycaster.setFromCamera(mouse,camera);
+  if(edActive()){
+    if(_mdDrag){_mdDrag=false;return;} // sürükleme bitti, click sayma
+    _getRay(e);
+    if(editorMode&&editorSelected){
+      // Yerleştirme modu
+      const gh=raycaster.intersectObject(groundMesh);
+      if(gh.length){const g=w2g(gh[0].point.x,gh[0].point.z);placeEditorModel(g.gx,g.gy);}
+      return;
+    }
+    // Seçim modu — editorMeshes içinde raycast
+    const hit=_edHit(e);
+    if(hit)selectEditorObject(hit);
+    else selectEditorObject(null);
+    return; // Editör açıkken ASLA asker yerleştirme
+  }
+  // Normal oyun modu
+  _getRay(e);
   const hits=raycaster.intersectObject(groundMesh);
-  if(hits.length>0){
-    const p=hits[0].point;const g=w2g(p.x,p.z);
-    if(editorMode&&editorSelected){placeEditorModel(g.gx,g.gy);}
-    else if(gameState==='setup'||gameState==='battle')spawnTroop(selectedTroop,g.gx,g.gy);
+  if(hits.length){
+    const g=w2g(hits[0].point.x,hits[0].point.z);
+    if(gameState==='setup'||gameState==='battle')spawnTroop(selectedTroop,g.gx,g.gy);
   }
 }
 
@@ -935,11 +978,77 @@ const ALL_MODELS={
 let editorOpen=false,editorSelected=null,editorMode=false;
 const editorMeshes=[];
 let editorPlacedId=0;
+let editorSelectedObj=null,selectionRing=null;
+let editorDragging=false,editorDragObj=null;
 
+function _groundPt(e){_getRay(e);const h=raycaster.intersectObject(groundMesh);return h.length?h[0].point:null;}
+function _edHit(e){
+  if(!editorMeshes.length)return null;
+  _getRay(e);
+  // tüm alt mesh'leri topla
+  const flat=[];
+  editorMeshes.forEach(o=>o.mesh.traverse(c=>{if(c.isMesh||c.isSkinnedMesh)flat.push({mesh:c,obj:o});}));
+  if(!flat.length)return null;
+  const hits=raycaster.intersectObjects(flat.map(f=>f.mesh),false);
+  if(!hits.length)return null;
+  const found=flat.find(f=>f.mesh===hits[0].object);
+  return found?found.obj:null;
+}
+function selectEditorObject(obj){
+  editorSelectedObj=obj;
+  if(selectionRing){scene.remove(selectionRing);selectionRing=null;}
+  if(obj){
+    const rg=new THREE.RingGeometry(.4,1.3,32);
+    const rm=new THREE.MeshBasicMaterial({color:0xffd700,transparent:true,opacity:.75,side:THREE.DoubleSide});
+    selectionRing=new THREE.Mesh(rg,rm);
+    selectionRing.rotation.x=-Math.PI/2;
+    selectionRing.position.copy(obj.mesh.position);
+    selectionRing.position.y=.04;
+    scene.add(selectionRing);
+    document.getElementById('edTransformPanel').style.display='block';
+    document.getElementById('editorStatus').innerHTML=`<span class="ed-active">✦ ${ALL_MODELS[obj.key]?.name||obj.key}</span> seçili`;
+  }else{
+    document.getElementById('edTransformPanel').style.display='none';
+    if(!editorMode)document.getElementById('editorStatus').textContent='Bir model seç → Yerleştir\'e tıkla → Haritaya tıkla';
+  }
+}
+window.rotateSelected=deg=>{
+  if(!editorSelectedObj)return;
+  editorSelectedObj.mesh.rotation.y+=deg*Math.PI/180;
+};
+window.deleteSelected=()=>{
+  if(!editorSelectedObj)return;
+  scene.remove(editorSelectedObj.mesh);
+  const idx=editorMeshes.indexOf(editorSelectedObj);
+  if(idx>-1)editorMeshes.splice(idx,1);
+  if(selectionRing){scene.remove(selectionRing);selectionRing=null;}
+  editorSelectedObj=null;
+  document.getElementById('edTransformPanel').style.display='none';
+  document.getElementById('editorStatus').textContent='Bir model seç → Yerleştir\'e tıkla → Haritaya tıkla';
+};
+function _edMouseDown(e){
+  if(!edActive()||editorMode)return;
+  _mdPos={x:e.clientX,y:e.clientY};_mdDrag=false;
+  const hit=_edHit(e);
+  if(hit){selectEditorObject(hit);editorDragging=true;editorDragObj=hit;}
+}
+function _edMouseMove(e){
+  if(!editorDragging||!editorDragObj)return;
+  const dx=e.clientX-_mdPos.x,dy=e.clientY-_mdPos.y;
+  if(!_mdDrag&&dx*dx+dy*dy<16)return;
+  _mdDrag=true;
+  const pt=_groundPt(e);
+  if(pt){editorDragObj.mesh.position.set(pt.x,0,pt.z);if(selectionRing)selectionRing.position.set(pt.x,.04,pt.z);}
+}
+function _edMouseUp(){editorDragging=false;editorDragObj=null;}
 window.toggleEditorPanel=()=>{
   editorOpen=!editorOpen;
   document.getElementById('editorPanel').classList.toggle('open',editorOpen);
+  // body attribute: editör açıkken onClick asker yerleştirmiyor
+  if(editorOpen)document.body.setAttribute('data-ed','1');
+  else document.body.removeAttribute('data-ed');
   if(editorOpen&&!document.getElementById('editorList').children.length)buildEditorList();
+  if(!editorOpen){cancelEditorPlace();selectEditorObject(null);}
 };
 function buildEditorList(filter=''){
   const list=document.getElementById('editorList');list.innerHTML='';
@@ -970,6 +1079,8 @@ window.changeEdScale=(key,delta)=>{
   if(bmap[key]){BLDG_DEF[bmap[key]].modelScale=m.scale;buildingMeshes.forEach((mesh,b)=>{if(b.type===bmap[key])mesh.scale.set(m.scale,m.scale,m.scale);});}
 };
 window.selectEditorModel=key=>{
+  // deselect any placed object first
+  selectEditorObject(null);
   editorSelected=key;editorMode=true;
   document.querySelectorAll('.ed-item').forEach(el=>el.classList.toggle('selected',el.id==='editem-'+key));
   document.querySelectorAll('.ed-pbtn').forEach(el=>el.classList.remove('active'));
@@ -1034,6 +1145,9 @@ async function init(){
   await generateBase();
 
   renderer.domElement.addEventListener('click',onClick);
+  renderer.domElement.addEventListener('mousedown',_edMouseDown);
+  renderer.domElement.addEventListener('mousemove',_edMouseMove);
+  renderer.domElement.addEventListener('mouseup',_edMouseUp);
   renderer.domElement.addEventListener('touchstart',e=>{e.preventDefault();onClick({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY});});
 
   window.addEventListener('resize',()=>{
@@ -1044,6 +1158,11 @@ async function init(){
 
   window.addEventListener('keydown',e=>{
     if(e.code==='Space'){e.preventDefault();const h=troops.find(t=>t.type==='hero'&&t.state!=='dead');if(h)activateAbility(h);}
+    if(e.code==='Escape'){
+      if(editorMode)cancelEditorPlace();
+      else selectEditorObject(null);
+    }
+    if(e.code==='Delete')deleteSelected();
   });
 
   setLoading(100,'Hazır!');
