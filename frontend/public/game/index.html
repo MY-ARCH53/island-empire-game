@@ -243,7 +243,7 @@ const BLDG_DEF={
   mortar:{name:'Havan',hp:300,w:1,h:1,isDef:true,dmg:35,range:7,atkSpd:3,splash:2,minRange:3,modelScale:1.0},
   gold_storage:{name:'Altın Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:1.0},
   elixir_storage:{name:'İksir Deposu',hp:500,w:1,h:1,isDef:false,val:10,modelScale:1.0},
-  wall:{name:'Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:.75},
+  wall:{name:'Duvar',hp:250,w:.5,h:.5,isDef:false,isWall:true,val:0,modelScale:.5},
   barracks:{name:'Kışla',hp:350,w:1,h:1,isDef:false,val:5,modelScale:1.0},
 };
 
@@ -351,8 +351,8 @@ function createFallbackTroop(type){
 // ================================================================
 function initThree(){
   scene=new THREE.Scene();
-  scene.background=new THREE.Color(0x87CEEB);
-  scene.fog=new THREE.FogExp2(0x87CEEB,.008);
+  scene.background=new THREE.Color(0x5a9e3a);
+  scene.fog=new THREE.FogExp2(0x5a9e3a,.006);
 
   const aspect=window.innerWidth/window.innerHeight;
   const frustum=28;
@@ -410,7 +410,7 @@ function initThree(){
   const gtTex=new THREE.CanvasTexture(gtCanvas);
   gtTex.wrapS=gtTex.wrapT=THREE.RepeatWrapping;gtTex.repeat.set(6,6);
   const gMat=new THREE.MeshStandardMaterial({map:gtTex,roughness:.95,metalness:0});
-  groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(GRID*CELL+10,GRID*CELL+10),gMat);
+  groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(GRID*CELL+40,GRID*CELL+40),gMat);
   groundMesh.rotation.x=-Math.PI/2;groundMesh.receiveShadow=true;
   scene.add(groundMesh);
 
