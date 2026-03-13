@@ -233,6 +233,13 @@ function RegisterPage() {
         ))}
       </div>
 
+      {/* Privacy Policy */}
+      <div style={{ marginTop: 16, position: 'relative', zIndex: 1, textAlign: 'center' }}>
+        <Link to="/privacy-policy" style={{ color: 'rgba(203,213,225,0.35)', fontSize: 12, textDecoration: 'none' }}>
+          Privacy Policy
+        </Link>
+      </div>
+
       {/* Alt şerit */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
         background: 'linear-gradient(90deg, transparent, #92400e 20%, #d97706 50%, #92400e 80%, transparent)' }} />
