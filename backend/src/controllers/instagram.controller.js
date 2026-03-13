@@ -55,9 +55,10 @@ class InstagramController {
         return res.status(400).json({ success: false, message: 'Boost zaten aktif!' });
       }
 
-      // Otomatik API kontrolü
+      // Otomatik API kontrolü (2 saniye bekle)
       if (process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_BUSINESS_ID) {
         try {
+          await new Promise(r => setTimeout(r, 2000));
           const isFollowing = await checkIfFollowing(cleanUsername);
 
           if (isFollowing) {

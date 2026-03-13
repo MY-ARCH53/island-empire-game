@@ -1067,7 +1067,7 @@ function HomePage() {
                             disabled={igVerifying || !igInput.trim()}
                             style={{ background: 'rgba(225,48,108,0.25)', border: '1px solid rgba(225,48,108,0.4)', borderRadius: 8, color: '#e1306c', fontWeight: 700, fontSize: 11, padding: '5px 10px', cursor: 'pointer', whiteSpace: 'nowrap', opacity: igVerifying || !igInput.trim() ? 0.5 : 1 }}
                           >
-                            {igVerifying ? '...' : 'Gönder'}
+                            {igVerifying ? '🔍 Kontrol ediliyor...' : 'Gönder'}
                           </button>
                         </div>
                       </div>
