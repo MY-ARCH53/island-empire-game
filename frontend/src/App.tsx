@@ -19,6 +19,7 @@ import Admin2Page from './pages/Admin2Page';
 import TLCoinPage from './pages/TLCoinPage';
 import ProfilePage from './pages/ProfilePage';
 import BattleDemoPage from './pages/BattleDemoPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 
 function App() {
   useEffect(() => {
@@ -53,6 +54,7 @@ function App() {
             <Route path="/tlcoin" element={<TLCoinPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/battle-demo" element={<BattleDemoPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           </Routes>
         </div>
       </Router>
