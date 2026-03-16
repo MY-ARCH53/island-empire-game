@@ -20,6 +20,8 @@ import TLCoinPage from './pages/TLCoinPage';
 import ProfilePage from './pages/ProfilePage';
 import BattleDemoPage from './pages/BattleDemoPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import AboutPage from './pages/AboutPage';
+import HowToPlayPage from './pages/HowToPlayPage';
 
 function App() {
   useEffect(() => {
@@ -55,6 +57,8 @@ function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/battle-demo" element={<BattleDemoPage />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/how-to-play" element={<HowToPlayPage />} />
           </Routes>
         </div>
       </Router>
