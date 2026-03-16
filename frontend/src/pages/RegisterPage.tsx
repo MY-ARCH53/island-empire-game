@@ -233,11 +233,11 @@ function RegisterPage() {
         ))}
       </div>
 
-      {/* Privacy Policy */}
-      <div style={{ marginTop: 16, position: 'relative', zIndex: 1, textAlign: 'center' }}>
-        <Link to="/privacy-policy" style={{ color: 'rgba(203,213,225,0.35)', fontSize: 12, textDecoration: 'none' }}>
-          Privacy Policy
-        </Link>
+      {/* Alt linkler */}
+      <div style={{ marginTop: 16, position: 'relative', zIndex: 1, textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 16 }}>
+        <Link to="/privacy-policy" style={{ color: 'rgba(203,213,225,0.35)', fontSize: 12, textDecoration: 'none' }}>Privacy Policy</Link>
+        <Link to="/about" style={{ color: 'rgba(203,213,225,0.35)', fontSize: 12, textDecoration: 'none' }}>Hakkında</Link>
+        <Link to="/how-to-play" style={{ color: 'rgba(203,213,225,0.35)', fontSize: 12, textDecoration: 'none' }}>Nasıl Oynanır?</Link>
       </div>
 
       {/* Alt şerit */}
