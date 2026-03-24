@@ -31,7 +31,7 @@ const NAV_ITEMS = [
   { key: 'trade',       emoji: '🔄', label: 'Ticaret'   },
   // { key: 'market',      emoji: '🏪', label: 'Pazar'     },  // geçici olarak gizlendi
   { key: 'leaderboard', emoji: '🏆', label: 'Liderlik'  },
-  { key: 'friends',     emoji: '👥', label: 'Arkadaş'   },
+  { key: 'chat',        emoji: '💬', label: 'Mesaj'     },
   { key: 'guild',       emoji: '🏰', label: 'Guild'     },
 ];
 
@@ -510,7 +510,7 @@ function HomePage() {
     } else if (key === 'market')       navigate('/marketplace');
     else if (key === 'leaderboard')    navigate('/leaderboard');
     else if (key === 'battle')         navigate('/battle');
-    else if (key === 'friends')        navigate('/friends');
+    else if (key === 'chat')           navigate('/chat');
     else if (key === 'guild')          navigate('/guilds');
   };
 
