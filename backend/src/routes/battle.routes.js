@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const BattleController = require('../controllers/battle.controller');
+const auth = require('../middleware/auth.middleware');
+
+router.use(auth);
 
 router.get('/army', BattleController.getArmy);
 router.post('/recruit', BattleController.recruitSoldiers);

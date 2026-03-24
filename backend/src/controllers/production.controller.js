@@ -9,7 +9,7 @@ class ProductionController {
       const { buildingId, userId } = req.body;
 
       // Bina bilgisini al
-      const buildingSql = 'SELECT * FROM buildings WHERE id = $1';
+      const buildingSql = 'SELECT b.*, i.user_id AS island_user_id FROM buildings b JOIN islands i ON i.id = b.island_id WHERE b.id = $1';
       const buildingResult = await query(buildingSql, [buildingId]);
       
       if (buildingResult.rows.length === 0) {
@@ -20,6 +20,11 @@ class ProductionController {
       }
 
       const building = buildingResult.rows[0];
+
+      // Binanın bu kullanıcıya ait olduğunu doğrula
+      if (parseInt(building.island_user_id) !== parseInt(userId)) {
+        return res.status(403).json({ success: false, message: 'Bu bina size ait değil' });
+      }
 
 // Bina yükseltiliyorsa üretim başlatma
 if (building.status === 'upgrading') {
@@ -100,8 +105,14 @@ if (building.status === 'upgrading') {
       const { productionId } = req.params;
       const { userId } = req.body;
 
-      // Üretim bilgisini al
-      const productionSql = 'SELECT * FROM productions WHERE id = $1';
+      // Üretim bilgisini al — bina sahibini de join et
+      const productionSql = `
+        SELECT p.*, i.user_id AS island_user_id
+        FROM productions p
+        JOIN buildings b ON b.id = p.building_id
+        JOIN islands i ON i.id = b.island_id
+        WHERE p.id = $1
+      `;
       const productionResult = await query(productionSql, [productionId]);
 
       if (productionResult.rows.length === 0) {
@@ -112,6 +123,11 @@ if (building.status === 'upgrading') {
       }
 
       const production = productionResult.rows[0];
+
+      // Üretimin bu kullanıcıya ait olduğunu doğrula
+      if (parseInt(production.island_user_id) !== parseInt(userId)) {
+        return res.status(403).json({ success: false, message: 'Bu üretim size ait değil' });
+      }
 
       // Zaten toplandı mı?
       if (production.collected) {
@@ -150,6 +166,14 @@ if (building.status === 'upgrading') {
       `;
 
       await query(updateResourceSql, [amount, userId, resourceType]);
+
+      // İşlem logu kaydet
+      await query(
+        `INSERT INTO resource_transactions (user_id, resource_type, amount, source, meta)
+         VALUES ($1, $2, $3, 'production', $4)
+         ON CONFLICT DO NOTHING`,
+        [userId, resourceType, amount, JSON.stringify({ production_id: productionId, building_id: production.building_id })]
+      ).catch(() => {}); // Tablo yoksa sessizce geç
 
       // Üretimi toplandı olarak işaretle
       await query(

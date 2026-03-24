@@ -49,7 +49,7 @@ class SpinController {
         }
       }
 
-      const baseGold = Math.max(500, level * 100);
+      const baseGold = Math.min(Math.max(500, level * 100), 3000);
 
       res.json({
         success: true,
@@ -82,7 +82,7 @@ class SpinController {
       }
 
       const prize = pickPrize();
-      const baseGold = Math.max(500, level * 100);
+      const baseGold = Math.min(Math.max(500, level * 100), 3000);
       const goldEarned = baseGold * prize.multiplier;
 
       // Altını ver

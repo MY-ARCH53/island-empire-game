@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const BuildingModel = require('../models/building.model');
 const BuildingController = require('../controllers/building.controller');
+const auth = require('../middleware/auth.middleware');
+
+router.use(auth);
 
 router.get('/:islandId', async (req, res) => {
   try {
