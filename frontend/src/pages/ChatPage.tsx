@@ -17,6 +17,7 @@ function ChatPage() {
   const [globalSending, setGlobalSending] = useState(false);
   const globalBottomRef = useRef<HTMLDivElement>(null);
   const lastGlobalTs = useRef<number>(0);
+  const seenGlobalIds = useRef<Set<number>>(new Set());
 
   // Özel mesajlar
   const [conversations, setConversations] = useState<any[]>([]);
@@ -66,9 +67,11 @@ function ChatPage() {
   const loadGlobal = async () => {
     try {
       const r = await chatAPI.getGlobal();
-      setGlobalMessages(r.data.data.messages);
-      if (r.data.data.messages.length > 0) {
-        lastGlobalTs.current = new Date(r.data.data.messages[r.data.data.messages.length - 1].created_at).getTime();
+      const msgs = r.data.data.messages;
+      msgs.forEach((m: any) => seenGlobalIds.current.add(m.id));
+      setGlobalMessages(msgs);
+      if (msgs.length > 0) {
+        lastGlobalTs.current = new Date(msgs[msgs.length - 1].created_at).getTime();
       }
     } catch { /* ignore */ }
   };
@@ -76,8 +79,9 @@ function ChatPage() {
   const pollGlobal = async () => {
     try {
       const r = await chatAPI.getGlobal(lastGlobalTs.current || undefined);
-      const newMsgs = r.data.data.messages;
+      const newMsgs = r.data.data.messages.filter((m: any) => !seenGlobalIds.current.has(m.id));
       if (newMsgs.length > 0) {
+        newMsgs.forEach((m: any) => seenGlobalIds.current.add(m.id));
         setGlobalMessages(prev => [...prev, ...newMsgs]);
         lastGlobalTs.current = new Date(newMsgs[newMsgs.length - 1].created_at).getTime();
       }
@@ -89,8 +93,10 @@ function ChatPage() {
     setGlobalSending(true);
     try {
       const r = await chatAPI.sendGlobal(globalInput.trim());
-      setGlobalMessages(prev => [...prev, r.data.data.message]);
-      lastGlobalTs.current = new Date(r.data.data.message.created_at).getTime();
+      const msg = r.data.data.message;
+      seenGlobalIds.current.add(msg.id);
+      setGlobalMessages(prev => [...prev, msg]);
+      lastGlobalTs.current = new Date(msg.created_at).getTime();
       setGlobalInput('');
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Mesaj gönderilemedi');
