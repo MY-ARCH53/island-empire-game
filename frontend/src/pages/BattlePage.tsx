@@ -369,7 +369,7 @@ function BattlePage() {
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
       }}>
-        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
+        <button onClick={() => navigate('/home')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}>
           <ArrowLeft size={22} />
         </button>
         <div>

@@ -217,7 +217,7 @@ function HomePage() {
     try {
       const token    = localStorage.getItem('token');
       const userData = localStorage.getItem('user');
-      if (!token || !userData) { navigate('/landing'); return; }
+      if (!token || !userData) { navigate('/'); return; }
 
       const u = JSON.parse(userData);
       setUser(u);

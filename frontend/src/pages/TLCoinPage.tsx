@@ -63,7 +63,7 @@ export default function TLCoinPage() {
   const token = localStorage.getItem('token');
   const userData = localStorage.getItem('user');
   if (!token || !userData) {
-    navigate('/landing');
+    navigate('/');
     return null;
   }
   const user = JSON.parse(userData);
@@ -153,7 +153,7 @@ export default function TLCoinPage() {
         display: 'flex', alignItems: 'center', gap: 12,
       }}>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '8px 10px', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
         >
           <ArrowLeft size={16} />

@@ -91,7 +91,7 @@ function ProfilePage() {
         display: 'flex', alignItems: 'center', gap: 12,
       }}>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           style={{ background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10, padding: 8, cursor: 'pointer', color: '#94a3b8', display: 'flex' }}
         >
           <ArrowLeft size={20} />

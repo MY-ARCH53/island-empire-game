@@ -87,7 +87,7 @@ function MarketplacePage() {
         {/* Header */}
         <div className="glass-card mb-4 animate-fadeIn">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-3 transition hover-lift"
           >
             <ArrowLeft className="w-4 h-4" />

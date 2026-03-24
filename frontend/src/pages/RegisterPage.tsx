@@ -23,7 +23,7 @@ function RegisterPage() {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       await authAPI.startGame(user.id);
-      navigate('/');
+      navigate('/home');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Kayıt başarısız');
     } finally {

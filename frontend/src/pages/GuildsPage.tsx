@@ -262,7 +262,7 @@ function GuildsPage() {
 
       {/* ── Top Header ──────────────────────────────────────────────────── */}
       <div style={S.header}>
-        <button style={S.backBtn} onClick={() => navigate('/')}>← Geri</button>
+        <button style={S.backBtn} onClick={() => navigate('/home')}>← Geri</button>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: 18 }}>⚔️ Guild</div>
           {myGuild && (

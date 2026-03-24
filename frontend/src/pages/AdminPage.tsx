@@ -99,7 +99,7 @@ function AdminPage() {
     const userData = localStorage.getItem('user');
     if (!userData) { navigate('/login'); return; }
     const u = JSON.parse(userData);
-    if (!u.is_admin) { navigate('/'); return; }
+    if (!u.is_admin) { navigate('/home'); return; }
     loadData();
   }, []);
 
@@ -471,7 +471,7 @@ function AdminPage() {
           </div>
         </div>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
         >
           ← Ana Sayfa
