@@ -24,6 +24,7 @@ import AboutPage from './pages/AboutPage';
 import HowToPlayPage from './pages/HowToPlayPage';
 import LandingPage from './pages/LandingPage';
 import ContactPage from './pages/ContactPage';
+import ChatPage from './pages/ChatPage';
 
 function App() {
   useEffect(() => {
@@ -64,6 +65,7 @@ function App() {
             <Route path="/how-to-play" element={<HowToPlayPage />} />
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/chat" element={<ChatPage />} />
           </Routes>
         </div>
       </Router>

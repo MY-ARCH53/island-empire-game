@@ -181,6 +181,16 @@ export const admin2API = {
   getActivityMetrics: ()       => api.get('/admin/admin2/activity'),
 };
 
+// Chat API
+export const chatAPI = {
+  getGlobal: (since) => api.get(`/chat/global${since ? `?since=${since}` : ''}`),
+  sendGlobal: (message) => api.post('/chat/global', { message }),
+  sendDm: (receiverId, message) => api.post('/chat/dm', { receiverId, message }),
+  getConversation: (otherId) => api.get(`/chat/dm/${otherId}`),
+  getConversations: () => api.get('/chat/conversations'),
+  getUnread: () => api.get('/chat/unread'),
+};
+
 // TLCoin API
 export const tlcoinAPI = {
   getBalance:    (userId) => api.get(`/tlcoin/balance?userId=${userId}`),

@@ -20,6 +20,7 @@ const spinRoutes   = require('./routes/spin.routes');
 const { startWorker } = require('./services/autoProductionWorker');
 const instagramRoutes = require('./routes/instagram.routes');
 const { startInstagramWorker } = require('./services/instagramWorker');
+const chatRoutes = require('./routes/chat.routes');
 const { startAutoAttackWorker } = require('./services/autoAttackWorker');
 const banCheck = require('./middleware/banCheck.middleware');
 
@@ -55,6 +56,7 @@ app.use('/api/tlcoin',          banCheck, tlcoinRoutes);
 app.use('/api/trade',           banCheck, tradeRoutes);
 app.use('/api/spin',            banCheck, spinRoutes);
 app.use('/api/instagram', instagramRoutes);
+app.use('/api/chat',           banCheck, chatRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route bulunamadi' });
