@@ -75,6 +75,7 @@ function HomePage() {
   const [activePanel, setActivePanel] = useState<string | null>(null); // 'tasks' | 'discover'
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [dailyRewardData, setDailyRewardData] = useState<any>(null);
+  const [bannerIndex, setBannerIndex]         = useState(0);
   const [streakAtRisk, setStreakAtRisk]       = useState(false);
   const [streakCount, setStreakCount]         = useState(0);
   const [dailyCanClaim, setDailyCanClaim]     = useState(false);
@@ -111,6 +112,12 @@ function HomePage() {
       );
     }, 1000);
     return () => clearInterval(ticker);
+  }, []);
+
+  // Duyuru banner döngüsü (4 saniyede bir)
+  useEffect(() => {
+    const iv = setInterval(() => setBannerIndex(i => (i + 1) % 3), 4000);
+    return () => clearInterval(iv);
   }, []);
 
   // Veri yükleme döngüsü
@@ -712,6 +719,36 @@ function HomePage() {
           })}
         </div>
       </header>
+
+      {/* ════════════ DUYURU BANNERI ════════════ */}
+      {(() => {
+        const banners = [
+          '💬 Sohbet özelliği eklendi! Alt menüden MESAJ bölümüne gir!',
+          '✉️ Oyuncularla DM at, Admin desteği al — MESAJ sekmesinde!',
+          '🎉 Genel sohbet, özel mesaj ve destek — hepsi MESAJ bölümünde! İyi eğlenceler!',
+        ];
+        return (
+          <div style={{ background: 'linear-gradient(90deg,#92400e,#f59e0b,#fbbf24,#f59e0b,#92400e)', backgroundSize: '200% 100%', padding: '0 16px', overflow: 'hidden', flexShrink: 0, position: 'relative', height: 38 }}>
+            {banners.map((text, i) => (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, height: 38,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 700, color: '#1c1917',
+                  padding: '0 16px', textAlign: 'center',
+                  transition: 'opacity 0.6s ease, transform 0.6s ease',
+                  opacity: bannerIndex === i ? 1 : 0,
+                  transform: bannerIndex === i ? 'translateY(0)' : 'translateY(8px)',
+                  pointerEvents: bannerIndex === i ? 'auto' : 'none',
+                }}
+              >
+                {text}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* ════════════ ANA İÇERİK ════════════ */}
       <main style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', paddingBottom: 100 }}>
