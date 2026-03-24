@@ -168,6 +168,9 @@ export const adminAPI = {
   getBannedUsers: () => api.get('/admin/banned'),
   banUser: (id, reason) => api.post(`/admin/users/${id}/ban`, { reason }),
   unbanUser: (id) => api.post(`/admin/users/${id}/unban`, {}),
+
+  getGuildChats: (guildId) => api.get(`/admin/guild-chats${guildId ? `?guildId=${guildId}` : ''}`),
+  deleteGuildMessage: (id) => api.delete(`/admin/guild-chats/${id}`),
 };
 
 // Admin2 API

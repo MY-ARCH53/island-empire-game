@@ -45,6 +45,10 @@ router.get('/banned',          AdminController.getBannedUsers);
 router.post('/users/:id/ban',  AdminController.banUser);
 router.post('/users/:id/unban', AdminController.unbanUser);
 
+// Guild sohbet takibi
+router.get('/guild-chats', AdminController.getGuildChats);
+router.delete('/guild-chats/:id', AdminController.deleteGuildMessage);
+
 // Admin2 - Detaylı raporlar
 router.get('/admin2/players',         AdminController.getDetailedPlayers);
 router.get('/admin2/players/:id',     AdminController.getPlayerDetail);

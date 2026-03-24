@@ -1246,6 +1246,70 @@ class AdminController {
       res.status(500).json({ success: false, message: 'Metrikler getirilemedi', error: error.message });
     }
   }
+
+  // Guild sohbet mesajlarını getir
+  static async getGuildChats(req, res) {
+    try {
+      const { guildId, limit = 100 } = req.query;
+
+      let sql, params;
+      if (guildId) {
+        sql = `
+          SELECT gc.id, gc.message, gc.created_at,
+                 u.username, u.id AS user_id,
+                 g.name AS guild_name, g.id AS guild_id
+          FROM guild_chat gc
+          JOIN users u ON u.id = gc.user_id
+          JOIN guilds g ON g.id = gc.guild_id
+          WHERE gc.guild_id = $1
+          ORDER BY gc.created_at DESC
+          LIMIT $2
+        `;
+        params = [guildId, limit];
+      } else {
+        sql = `
+          SELECT gc.id, gc.message, gc.created_at,
+                 u.username, u.id AS user_id,
+                 g.name AS guild_name, g.id AS guild_id
+          FROM guild_chat gc
+          JOIN users u ON u.id = gc.user_id
+          JOIN guilds g ON g.id = gc.guild_id
+          ORDER BY gc.created_at DESC
+          LIMIT $1
+        `;
+        params = [limit];
+      }
+
+      const messagesRes = await query(sql, params);
+
+      const guildsRes = await query(
+        'SELECT id, name FROM guilds ORDER BY name ASC'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          messages: messagesRes.rows,
+          guilds: guildsRes.rows,
+        }
+      });
+    } catch (error) {
+      console.error('Admin getGuildChats error:', error);
+      res.status(500).json({ success: false, message: 'Sohbet mesajlari getirilemedi', error: error.message });
+    }
+  }
+
+  // Guild mesajı sil
+  static async deleteGuildMessage(req, res) {
+    try {
+      const { id } = req.params;
+      await query('DELETE FROM guild_chat WHERE id = $1', [id]);
+      res.json({ success: true, message: 'Mesaj silindi' });
+    } catch (error) {
+      console.error('Admin deleteGuildMessage error:', error);
+      res.status(500).json({ success: false, message: 'Mesaj silinemedi', error: error.message });
+    }
+  }
 }
 
 module.exports = AdminController;

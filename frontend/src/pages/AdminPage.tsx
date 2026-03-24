@@ -4,7 +4,7 @@ import { adminAPI } from '../services/api';
 
 function AdminPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram' | 'banned'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram' | 'banned' | 'guildchat'>('users');
 
   // Kullanıcı tab state'leri
   const [stats, setStats]       = useState<any>(null);
@@ -85,6 +85,12 @@ function AdminPage() {
   const [bannedLoading, setBannedLoading]       = useState(false);
   const [banReason, setBanReason]               = useState('');
   const [banningId, setBanningId]               = useState<number | null>(null);
+
+  // Guild sohbet state'leri
+  const [guildChats, setGuildChats]             = useState<any[]>([]);
+  const [guildList, setGuildList]               = useState<any[]>([]);
+  const [chatLoading, setChatLoading]           = useState(false);
+  const [selectedGuildId, setSelectedGuildId]   = useState<string>('');
 
   // Sıralama state'leri
   const [sortBy, setSortBy] = useState<string>('id');
@@ -192,6 +198,22 @@ function AdminPage() {
     setBannedLoading(false);
   };
 
+  const loadGuildChats = async (guildId?: string) => {
+    setChatLoading(true);
+    try {
+      const r = await adminAPI.getGuildChats(guildId || undefined);
+      setGuildChats(r.data.data.messages);
+      setGuildList(r.data.data.guilds);
+    } catch { /* ignore */ }
+    setChatLoading(false);
+  };
+
+  const handleDeleteChatMessage = async (id: number) => {
+    if (!confirm('Bu mesajı silmek istediğine emin misin?')) return;
+    await adminAPI.deleteGuildMessage(id);
+    setGuildChats(prev => prev.filter((m: any) => m.id !== id));
+  };
+
   const handleBanUser = async (user: any) => {
     const reason = prompt(`"${user.username}" kullanıcısını banlamak istediğinize emin misiniz?\n\nBan sebebini yazın (zorunlu değil):`);
     if (reason === null) return; // iptal
@@ -220,12 +242,13 @@ function AdminPage() {
     setBanningId(null);
   };
 
-  const handleTabChange = (tab: 'users' | 'bots' | 'prizes' | 'instagram' | 'banned') => {
+  const handleTabChange = (tab: 'users' | 'bots' | 'prizes' | 'instagram' | 'banned' | 'guildchat') => {
     setActiveTab(tab);
     if (tab === 'bots') { if (bots.length === 0) loadBots(); loadAutoAttackRules(); }
     if (tab === 'prizes') loadPrizeRequests();
     if (tab === 'instagram') loadIgRequests();
     if (tab === 'banned') loadBannedUsers();
+    if (tab === 'guildchat') loadGuildChats();
   };
 
   const openEdit = (user: any) => {
@@ -505,6 +528,7 @@ function AdminPage() {
             { key: 'prizes',    label: '🎁 Ödül Talepleri' },
             { key: 'instagram', label: '📸 Instagram Boost' },
             { key: 'banned',    label: '🚫 Banlanan Oyuncular' },
+            { key: 'guildchat', label: '💬 Guild Sohbetleri' },
           ].map(t => (
             <button
               key={t.key}
@@ -1392,6 +1416,55 @@ function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+        {/* ── GUILD SOHBETLERİ SEKMESİ ─────────────────────────────────── */}
+        {activeTab === 'guildchat' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+              <select
+                value={selectedGuildId}
+                onChange={e => { setSelectedGuildId(e.target.value); loadGuildChats(e.target.value || undefined); }}
+                style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: '#e2e8f0', padding: '8px 14px', borderRadius: 8, fontSize: 14, cursor: 'pointer' }}
+              >
+                <option value="">Tüm Guildler</option>
+                {guildList.map((g: any) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              <button onClick={() => loadGuildChats(selectedGuildId || undefined)} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                Yenile
+              </button>
+              <span style={{ color: '#64748b', fontSize: 13 }}>Son 100 mesaj gösteriliyor</span>
+            </div>
+
+            {chatLoading ? (
+              <p style={{ color: '#64748b' }}>Yükleniyor...</p>
+            ) : guildChats.length === 0 ? (
+              <p style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Mesaj bulunamadı.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {guildChats.map((msg: any) => (
+                  <div key={msg.id} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                        <span style={{ color: '#3b82f6', fontWeight: 700, fontSize: 13 }}>{msg.username}</span>
+                        <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: 11, padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>🏰 {msg.guild_name}</span>
+                        <span style={{ color: '#475569', fontSize: 11 }}>{new Date(msg.created_at).toLocaleString('tr-TR')}</span>
+                      </div>
+                      <p style={{ color: '#e2e8f0', fontSize: 14, margin: 0, wordBreak: 'break-word' }}>{msg.message}</p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteChatMessage(msg.id)}
+                      title="Mesajı sil"
+                      style={{ background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ef4444', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+                    >
+                      🗑️ Sil
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
