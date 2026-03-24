@@ -78,9 +78,24 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 600, color: '#f1f5f9', marginBottom: 10 }}>11. Contact Us</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: '#f1f5f9', marginBottom: 10 }}>11. KVKK (Kişisel Verilerin Korunması)</h2>
+          <p>Türkiye'deki kullanıcılar için, 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında aşağıdaki haklara sahipsiniz:</p>
+          <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+            <li>Kişisel verilerinizin işlenip işlenmediğini öğrenme hakkı</li>
+            <li>Kişisel verilerinize erişim hakkı</li>
+            <li>Kişisel verilerinizin düzeltilmesini talep etme hakkı</li>
+            <li>Kişisel verilerinizin silinmesini talep etme hakkı</li>
+            <li>Kişisel verilerinizin işlenmesini kısıtlama hakkı</li>
+            <li>Kişisel verileriniz hakkında şikayet hakkı</li>
+          </ul>
+          <p style={{ marginTop: 10 }}>Bu haklarınızı kullanmak için bize <strong style={{ color: '#38bdf8' }}>info@islandsempire.com</strong> adresinden ulaşabilirsiniz.</p>
+        </section>
+
+        <section style={{ marginBottom: 32 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: '#f1f5f9', marginBottom: 10 }}>12. Contact Us</h2>
           <p>If you have any questions about this Privacy Policy, please contact us at:</p>
-          <p style={{ marginTop: 8, color: '#38bdf8' }}>islandsempire.com</p>
+          <p style={{ marginTop: 8 }}><strong style={{ color: '#38bdf8' }}>info@islandsempire.com</strong></p>
+          <p style={{ marginTop: 4 }}>Web: <a href="https://islandsempire.com/contact" style={{ color: '#38bdf8' }}>islandsempire.com/contact</a></p>
         </section>
 
         <div style={{ borderTop: '1px solid #1e293b', paddingTop: 20, color: '#64748b', fontSize: 14 }}>
