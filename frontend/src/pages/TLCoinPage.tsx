@@ -59,7 +59,14 @@ const statusLabel = (s: string) =>
 export default function TLCoinPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const token = localStorage.getItem('token');
+  const userData = localStorage.getItem('user');
+  if (!token || !userData) {
+    navigate('/landing');
+    return null;
+  }
+  const user = JSON.parse(userData);
 
   const [tlcoinBalance, setTlcoinBalance] = useState(0);
   const [lastConvertAt, setLastConvertAt] = useState<string | null>(null);
