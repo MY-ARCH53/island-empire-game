@@ -181,6 +181,25 @@ class ChatController {
     }
   }
 
+  // Kullanıcı arama (DM için)
+  static async searchUsers(req, res) {
+    try {
+      const { q } = req.query;
+      const userId = req.userId;
+      if (!q || q.trim().length < 2) return res.json({ success: true, data: { users: [] } });
+
+      const result = await query(
+        `SELECT id, username, level, league FROM users
+         WHERE username ILIKE $1 AND id != $2 AND is_active = TRUE AND (is_bot = FALSE OR is_bot IS NULL)
+         LIMIT 10`,
+        [`%${q.trim()}%`, userId]
+      );
+      res.json({ success: true, data: { users: result.rows } });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Arama başarısız' });
+    }
+  }
+
   // Toplam okunmamış mesaj sayısı
   static async getUnreadCount(req, res) {
     try {

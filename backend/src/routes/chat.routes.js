@@ -12,5 +12,6 @@ router.post('/dm', ChatController.sendPrivateMessage);
 router.get('/dm/:otherId', ChatController.getConversation);
 router.get('/conversations', ChatController.getConversationList);
 router.get('/unread', ChatController.getUnreadCount);
+router.get('/search', ChatController.searchUsers);
 
 module.exports = router;

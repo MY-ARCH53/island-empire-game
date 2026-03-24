@@ -189,6 +189,7 @@ export const chatAPI = {
   getConversation: (otherId) => api.get(`/chat/dm/${otherId}`),
   getConversations: () => api.get('/chat/conversations'),
   getUnread: () => api.get('/chat/unread'),
+  searchUsers: (q) => api.get(`/chat/search?q=${encodeURIComponent(q)}`),
 };
 
 // TLCoin API
