@@ -1247,6 +1247,66 @@ class AdminController {
     }
   }
 
+  // Destek konuşmalarını getir (admin)
+  static async getSupportConversations(req, res) {
+    try {
+      const sql = `
+        SELECT DISTINCT ON (sm.user_id)
+          sm.user_id, u.username,
+          sm.message AS last_message,
+          sm.created_at AS last_time,
+          (SELECT COUNT(*) FROM support_messages WHERE user_id = sm.user_id AND is_admin_reply = FALSE AND is_read = FALSE) AS unread_count
+        FROM support_messages sm
+        JOIN users u ON u.id = sm.user_id
+        ORDER BY sm.user_id, sm.created_at DESC
+      `;
+      const result = await query(sql);
+      res.json({ success: true, data: { conversations: result.rows } });
+    } catch (error) {
+      console.error('getSupportConversations error:', error);
+      res.status(500).json({ success: false, message: 'Getirilemedi', error: error.message });
+    }
+  }
+
+  // Belirli kullanıcının destek mesajlarını getir (admin)
+  static async getSupportThread(req, res) {
+    try {
+      const { userId } = req.params;
+      const result = await query(
+        `SELECT sm.*, u.username FROM support_messages sm
+         JOIN users u ON u.id = sm.user_id
+         WHERE sm.user_id = $1 ORDER BY sm.created_at ASC`,
+        [userId]
+      );
+      // Okunmamış kullanıcı mesajlarını okundu yap
+      await query(
+        `UPDATE support_messages SET is_read = TRUE WHERE user_id = $1 AND is_admin_reply = FALSE AND is_read = FALSE`,
+        [userId]
+      );
+      res.json({ success: true, data: { messages: result.rows } });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Getirilemedi', error: error.message });
+    }
+  }
+
+  // Admin cevap gönder
+  static async replySupportMessage(req, res) {
+    try {
+      const { userId } = req.params;
+      const { message } = req.body;
+      if (!message || message.trim().length === 0)
+        return res.status(400).json({ success: false, message: 'Mesaj boş olamaz' });
+
+      const result = await query(
+        `INSERT INTO support_messages (user_id, message, is_admin_reply) VALUES ($1, $2, TRUE) RETURNING *`,
+        [userId, message.trim()]
+      );
+      res.json({ success: true, data: { message: result.rows[0] } });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Cevap gönderilemedi', error: error.message });
+    }
+  }
+
   // Guild sohbet mesajlarını getir
   static async getGuildChats(req, res) {
     try {

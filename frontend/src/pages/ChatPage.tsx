@@ -9,7 +9,7 @@ function ChatPage() {
   if (!token || !userData) { navigate('/'); return null; }
   const me = JSON.parse(userData);
 
-  const [activeTab, setActiveTab] = useState<'global' | 'dm'>('global');
+  const [activeTab, setActiveTab] = useState<'global' | 'dm' | 'support'>('global');
 
   // Global sohbet
   const [globalMessages, setGlobalMessages] = useState<any[]>([]);
@@ -26,25 +26,38 @@ function ChatPage() {
   const [dmInput, setDmInput] = useState('');
   const [dmSending, setDmSending] = useState(false);
   const dmBottomRef = useRef<HTMLDivElement>(null);
-
-  // Kullanıcı arama (DM yeni konuşma)
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Destek
+  const [supportMessages, setSupportMessages] = useState<any[]>([]);
+  const [supportInput, setSupportInput] = useState('');
+  const [supportSending, setSupportSending] = useState(false);
+  const supportBottomRef = useRef<HTMLDivElement>(null);
 
   const [toast, setToast] = useState('');
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
+  // Global polling
   useEffect(() => {
     loadGlobal();
     const iv = setInterval(pollGlobal, 5000);
     return () => clearInterval(iv);
   }, []);
 
+  // DM tab
   useEffect(() => {
     if (activeTab === 'dm') loadConversations();
   }, [activeTab]);
 
+  // Support tab
+  useEffect(() => {
+    if (activeTab === 'support') loadSupport();
+  }, [activeTab]);
+
+  // DM seçilince
   useEffect(() => {
     if (!selectedConv) return;
     loadDmMessages();
@@ -52,15 +65,12 @@ function ChatPage() {
     return () => clearInterval(iv);
   }, [selectedConv]);
 
-  useEffect(() => {
-    globalBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [globalMessages]);
+  // Scroll
+  useEffect(() => { globalBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [globalMessages]);
+  useEffect(() => { dmBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [dmMessages]);
+  useEffect(() => { supportBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [supportMessages]);
 
-  useEffect(() => {
-    dmBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [dmMessages]);
-
-  // Kullanıcı arama debounce
+  // Arama debounce
   useEffect(() => {
     if (searchQuery.trim().length < 2) { setSearchResults([]); return; }
     const t = setTimeout(async () => {
@@ -80,8 +90,7 @@ function ChatPage() {
       const msgs = r.data.data.messages;
       msgs.forEach((m: any) => seenGlobalIds.current.add(m.id));
       setGlobalMessages(msgs);
-      if (msgs.length > 0)
-        lastGlobalTs.current = new Date(msgs[msgs.length - 1].created_at).getTime();
+      if (msgs.length > 0) lastGlobalTs.current = new Date(msgs[msgs.length - 1].created_at).getTime();
     } catch { /* ignore */ }
   };
 
@@ -148,11 +157,31 @@ function ChatPage() {
     setSelectedConv({ other_id: user.id, other_username: user.username, unread_count: 0 });
     setSearchQuery('');
     setSearchResults([]);
-    // Konuşma listesine ekle (yoksa)
+    setShowSearch(false);
     setConversations(prev => {
       if (prev.find((c: any) => c.other_id === user.id)) return prev;
       return [{ other_id: user.id, other_username: user.username, unread_count: 0, last_message: '' }, ...prev];
     });
+  };
+
+  const loadSupport = async () => {
+    try {
+      const r = await chatAPI.getSupportMessages();
+      setSupportMessages(r.data.data.messages);
+    } catch { /* ignore */ }
+  };
+
+  const sendSupport = async () => {
+    if (!supportInput.trim() || supportSending) return;
+    setSupportSending(true);
+    try {
+      const r = await chatAPI.sendSupportMessage(supportInput.trim());
+      setSupportMessages(prev => [...prev, r.data.data.message]);
+      setSupportInput('');
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Mesaj gönderilemedi');
+    }
+    setSupportSending(false);
   };
 
   const handleKey = (e: React.KeyboardEvent, fn: () => void) => {
@@ -164,17 +193,25 @@ function ChatPage() {
     return c[league] || '#64748b';
   };
 
-  const formatTime = (ts: string) =>
-    new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-
-  const formatDate = (ts: string) => {
+  const fmtTime = (ts: string) => new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const fmtDate = (ts: string) => {
     const d = new Date(ts);
     return d.toDateString() === new Date().toDateString()
-      ? formatTime(ts)
-      : d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+      ? fmtTime(ts)
+      : d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + ' ' + fmtTime(ts);
   };
 
   const totalUnread = conversations.reduce((s: number, c: any) => s + parseInt(c.unread_count || 0), 0);
+
+  const inputStyle: React.CSSProperties = {
+    flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 10, padding: '10px 14px', color: '#e2e8f0', fontSize: 14, outline: 'none',
+  };
+  const sendBtnStyle = (dis: boolean): React.CSSProperties => ({
+    background: dis ? 'rgba(59,130,246,0.3)' : 'linear-gradient(135deg,#3b82f6,#06b6d4)',
+    border: 'none', borderRadius: 10, color: '#fff', padding: '10px 20px',
+    cursor: dis ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14,
+  });
 
   return (
     <div style={{ height: '100vh', overflow: 'hidden', background: 'linear-gradient(135deg,#0f172a,#1e1b4b,#0f172a)', color: '#e2e8f0', fontFamily: "'Segoe UI',sans-serif", display: 'flex', flexDirection: 'column' }}>
@@ -192,17 +229,17 @@ function ChatPage() {
         </div>
       )}
 
-      {/* İçerik */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxWidth: 860, margin: '0 auto', width: '100%', padding: '0 16px' }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', maxWidth: 900, margin: '0 auto', width: '100%', padding: '0 16px' }}>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 8, padding: '14px 0 10px', flexShrink: 0 }}>
           {[
-            { key: 'global', label: '🌍 Genel Sohbet' },
-            { key: 'dm',     label: `✉️ Özel Mesajlar${totalUnread > 0 ? ` (${totalUnread})` : ''}` },
+            { key: 'global',  label: '🌍 Genel Sohbet' },
+            { key: 'dm',      label: totalUnread > 0 ? `✉️ Özel Mesajlar (${totalUnread})` : '✉️ Özel Mesajlar' },
+            { key: 'support', label: '🎧 Destek' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as any)} style={{
-              padding: '9px 22px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14,
+              padding: '9px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14,
               background: activeTab === t.key ? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : 'rgba(255,255,255,0.07)',
               color: activeTab === t.key ? '#fff' : '#64748b',
             }}>{t.label}</button>
@@ -234,7 +271,7 @@ function ChatPage() {
                         {msg.message}
                       </div>
                       <div style={{ fontSize: 11, color: '#475569', marginTop: 3, textAlign: isMe ? 'right' : 'left' }}>
-                        {formatTime(msg.created_at)}
+                        {fmtTime(msg.created_at)}
                       </div>
                     </div>
                   </div>
@@ -243,21 +280,8 @@ function ChatPage() {
               <div ref={globalBottomRef} />
             </div>
             <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8, flexShrink: 0 }}>
-              <input
-                style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', color: '#e2e8f0', fontSize: 14, outline: 'none' }}
-                placeholder="Mesaj yaz... (Enter ile gönder)"
-                value={globalInput}
-                onChange={e => setGlobalInput(e.target.value)}
-                onKeyDown={e => handleKey(e, sendGlobal)}
-                maxLength={200}
-              />
-              <button
-                onClick={sendGlobal}
-                disabled={globalSending || !globalInput.trim()}
-                style={{ background: globalSending || !globalInput.trim() ? 'rgba(59,130,246,0.3)' : 'linear-gradient(135deg,#3b82f6,#06b6d4)', border: 'none', borderRadius: 10, color: '#fff', padding: '10px 20px', cursor: globalSending || !globalInput.trim() ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14 }}
-              >
-                Gönder
-              </button>
+              <input style={inputStyle} placeholder="Mesaj yaz... (Enter ile gönder)" value={globalInput} onChange={e => setGlobalInput(e.target.value)} onKeyDown={e => handleKey(e, sendGlobal)} maxLength={200} />
+              <button style={sendBtnStyle(globalSending || !globalInput.trim())} onClick={sendGlobal} disabled={globalSending || !globalInput.trim()}>Gönder</button>
             </div>
           </div>
         )}
@@ -266,50 +290,63 @@ function ChatPage() {
         {activeTab === 'dm' && (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, marginBottom: 16 }}>
 
-            {/* Sol panel: arama + konuşma listesi */}
-            <div style={{ width: 230, borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-              {/* Kullanıcı arama */}
-              <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'relative' }}>
-                <input
-                  style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
-                  placeholder="Oyuncu ara..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
-                {(searchResults.length > 0 || searching) && (
-                  <div style={{ position: 'absolute', top: '100%', left: 12, right: 12, background: '#1e293b', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
-                    {searching && <div style={{ padding: '10px 14px', color: '#64748b', fontSize: 13 }}>Aranıyor...</div>}
-                    {searchResults.map((u: any) => (
-                      <div
-                        key={u.id}
-                        onClick={() => startConversation(u)}
-                        style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.15)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#8b5cf6,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
-                          {u.username?.[0]?.toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{u.username}</div>
-                          <div style={{ fontSize: 11, color: '#64748b' }}>Lv{u.level}</div>
-                        </div>
+            {/* Sol panel */}
+            <div style={{ width: 240, borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              {/* Yeni konuşma butonu */}
+              <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <button
+                  onClick={() => setShowSearch(s => !s)}
+                  style={{ width: '100%', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, color: '#93c5fd', padding: '8px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+                >
+                  + Yeni Mesaj
+                </button>
+                {showSearch && (
+                  <div style={{ marginTop: 8 }}>
+                    <input
+                      autoFocus
+                      style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 10px', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
+                      placeholder="Oyuncu adı ara..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                    />
+                    {(searching || searchResults.length > 0) && (
+                      <div style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, marginTop: 4 }}>
+                        {searching && <div style={{ padding: '8px 12px', color: '#64748b', fontSize: 13 }}>Aranıyor...</div>}
+                        {searchResults.map((u: any) => (
+                          <div
+                            key={u.id}
+                            onClick={() => startConversation(u)}
+                            style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.15)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#8b5cf6,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
+                              {u.username?.[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>{u.username}</div>
+                              <div style={{ fontSize: 11, color: '#64748b' }}>Lv{u.level}</div>
+                            </div>
+                          </div>
+                        ))}
+                        {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
+                          <div style={{ padding: '8px 12px', color: '#64748b', fontSize: 13 }}>Oyuncu bulunamadı</div>
+                        )}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Konuşmalar */}
+              {/* Konuşma listesi */}
               <div style={{ flex: 1, overflowY: 'auto' }}>
-                <div style={{ padding: '8px 14px 4px', fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Konuşmalar</div>
                 {conversations.length === 0 && (
-                  <p style={{ color: '#475569', fontSize: 12, textAlign: 'center', padding: '20px 14px' }}>Yukarıdan oyuncu ara ve mesaj gönder</p>
+                  <p style={{ color: '#475569', fontSize: 12, textAlign: 'center', padding: '20px 12px' }}>Henüz konuşma yok</p>
                 )}
                 {conversations.map((conv: any) => (
                   <div
                     key={conv.other_id}
-                    onClick={() => setSelectedConv(conv)}
+                    onClick={() => { setSelectedConv(conv); setShowSearch(false); }}
                     style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', background: selectedConv?.other_id === conv.other_id ? 'rgba(59,130,246,0.15)' : 'transparent', display: 'flex', alignItems: 'center', gap: 8 }}
                   >
                     <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#8b5cf6,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
@@ -331,11 +368,11 @@ function ChatPage() {
               </div>
             </div>
 
-            {/* Sağ panel: mesajlar */}
+            {/* Sağ panel */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
               {!selectedConv ? (
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: 14, textAlign: 'center', padding: 20 }}>
-                  Soldaki listeden bir konuşma seç<br />ya da oyuncu adı arayarak mesaj başlat
+                  "+ Yeni Mesaj" butonuna bas<br />veya soldaki listeden bir konuşma seç
                 </div>
               ) : (
                 <>
@@ -353,31 +390,73 @@ function ChatPage() {
                           <div style={{ background: isMe ? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : 'rgba(255,255,255,0.08)', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '8px 14px', fontSize: 14, maxWidth: '75%', wordBreak: 'break-word' }}>
                             {msg.message}
                           </div>
-                          <div style={{ fontSize: 11, color: '#475569', flexShrink: 0 }}>{formatDate(msg.created_at)}</div>
+                          <div style={{ fontSize: 11, color: '#475569', flexShrink: 0 }}>{fmtDate(msg.created_at)}</div>
                         </div>
                       );
                     })}
                     <div ref={dmBottomRef} />
                   </div>
                   <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8, flexShrink: 0 }}>
-                    <input
-                      style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', color: '#e2e8f0', fontSize: 14, outline: 'none' }}
-                      placeholder="Mesaj yaz..."
-                      value={dmInput}
-                      onChange={e => setDmInput(e.target.value)}
-                      onKeyDown={e => handleKey(e, sendDm)}
-                      maxLength={200}
-                    />
-                    <button
-                      onClick={sendDm}
-                      disabled={dmSending || !dmInput.trim()}
-                      style={{ background: dmSending || !dmInput.trim() ? 'rgba(59,130,246,0.3)' : 'linear-gradient(135deg,#3b82f6,#06b6d4)', border: 'none', borderRadius: 10, color: '#fff', padding: '10px 20px', cursor: dmSending || !dmInput.trim() ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14 }}
-                    >
-                      Gönder
-                    </button>
+                    <input style={inputStyle} placeholder="Mesaj yaz..." value={dmInput} onChange={e => setDmInput(e.target.value)} onKeyDown={e => handleKey(e, sendDm)} maxLength={200} />
+                    <button style={sendBtnStyle(dmSending || !dmInput.trim())} onClick={sendDm} disabled={dmSending || !dmInput.trim()}>Gönder</button>
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── DESTEK ── */}
+        {activeTab === 'support' && (
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, marginBottom: 16 }}>
+            {/* Başlık */}
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>Destek Merkezi</div>
+              <div style={{ color: '#64748b', fontSize: 12 }}>Sorun veya önerilerini buradan iletebilirsin. Admin ekibi en kısa sürede yanıt verir.</div>
+            </div>
+
+            {/* Mesajlar */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {supportMessages.length === 0 && (
+                <p style={{ color: '#475569', textAlign: 'center', marginTop: 40, fontSize: 14 }}>Henüz mesaj yok. Sorununu veya önerini yaz!</p>
+              )}
+              {supportMessages.map((msg: any) => {
+                const isAdmin = msg.is_admin_reply;
+                return (
+                  <div key={msg.id} style={{ display: 'flex', flexDirection: isAdmin ? 'row' : 'row-reverse', gap: 8, alignItems: 'flex-end' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: isAdmin ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                      {isAdmin ? '⚙️' : me.username?.[0]?.toUpperCase()}
+                    </div>
+                    <div style={{ maxWidth: '75%' }}>
+                      <div style={{ fontSize: 11, color: isAdmin ? '#f59e0b' : '#64748b', marginBottom: 3, textAlign: isAdmin ? 'left' : 'right', fontWeight: 600 }}>
+                        {isAdmin ? 'Destek Ekibi' : 'Sen'}
+                      </div>
+                      <div style={{ background: isAdmin ? 'rgba(245,158,11,0.12)' : 'linear-gradient(135deg,#3b82f6,#06b6d4)', border: isAdmin ? '1px solid rgba(245,158,11,0.2)' : 'none', borderRadius: isAdmin ? '14px 14px 14px 4px' : '14px 14px 4px 14px', padding: '10px 14px', fontSize: 14, wordBreak: 'break-word' }}>
+                        {msg.message}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#475569', marginTop: 3, textAlign: isAdmin ? 'left' : 'right' }}>
+                        {fmtDate(msg.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={supportBottomRef} />
+            </div>
+
+            {/* Input */}
+            <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8, flexShrink: 0 }}>
+              <input
+                style={{ ...inputStyle, flex: 1 }}
+                placeholder="Mesajını yaz... (Enter ile gönder)"
+                value={supportInput}
+                onChange={e => setSupportInput(e.target.value)}
+                onKeyDown={e => handleKey(e, sendSupport)}
+                maxLength={1000}
+              />
+              <button style={sendBtnStyle(supportSending || !supportInput.trim())} onClick={sendSupport} disabled={supportSending || !supportInput.trim()}>
+                Gönder
+              </button>
             </div>
           </div>
         )}

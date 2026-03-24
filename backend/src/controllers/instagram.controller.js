@@ -55,43 +55,13 @@ class InstagramController {
         return res.status(400).json({ success: false, message: 'Boost zaten aktif!' });
       }
 
-      // Otomatik API kontrolü (2 saniye bekle)
-      if (process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_BUSINESS_ID) {
-        try {
-          await new Promise(r => setTimeout(r, 2000));
-          const isFollowing = await checkIfFollowing(cleanUsername);
-
-          if (isFollowing) {
-            await query(
-              `UPDATE users SET instagram_username=$1, instagram_boost_active=TRUE,
-               instagram_request_status='approved', instagram_verified_at=NOW() WHERE id=$2`,
-              [cleanUsername, userId]
-            );
-            return res.json({ success: true, message: '✅ Takip doğrulandı! Boost aktif edildi.' });
-          } else {
-            await query(
-              `UPDATE users SET instagram_username=$1, instagram_request_status='not_following',
-               instagram_boost_active=FALSE WHERE id=$2`,
-              [cleanUsername, userId]
-            );
-            return res.status(400).json({
-              success: false,
-              message: `❌ @${process.env.INSTAGRAM_HANDLE || 'hesabımızı'} takip etmiyorsunuz. Önce takip edin, sonra tekrar deneyin.`
-            });
-          }
-        } catch (apiErr) {
-          console.warn('[Instagram] API kontrolü başarısız, manuel onaya düşüldü:', apiErr.message);
-          // API hatası → manuel onay sistemine düş
-        }
-      }
-
-      // Fallback: manuel onay
+      // Otomatik onay
       await query(
-        `UPDATE users SET instagram_username=$1, instagram_request_status='pending',
-         instagram_boost_active=FALSE, instagram_verified_at=NULL WHERE id=$2`,
+        `UPDATE users SET instagram_username=$1, instagram_boost_active=TRUE,
+         instagram_request_status='approved', instagram_verified_at=NOW() WHERE id=$2`,
         [cleanUsername, userId]
       );
-      res.json({ success: true, message: '📩 İsteğin alındı! Admin inceledikten sonra boost aktif edilecek.' });
+      res.json({ success: true, message: '✅ Boost aktif edildi! Teşekkürler.' });
 
     } catch (err) {
       console.error('[Instagram] requestBoost hatası:', err.message);

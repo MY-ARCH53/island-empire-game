@@ -13,5 +13,7 @@ router.get('/dm/:otherId', ChatController.getConversation);
 router.get('/conversations', ChatController.getConversationList);
 router.get('/unread', ChatController.getUnreadCount);
 router.get('/search', ChatController.searchUsers);
+router.get('/support', ChatController.getSupportMessages);
+router.post('/support', ChatController.sendSupportMessage);
 
 module.exports = router;

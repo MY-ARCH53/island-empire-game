@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../services/api';
 
 function AdminPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram' | 'banned' | 'guildchat'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram' | 'banned' | 'guildchat' | 'support'>('users');
 
   // Kullanıcı tab state'leri
   const [stats, setStats]       = useState<any>(null);
@@ -91,6 +91,14 @@ function AdminPage() {
   const [guildList, setGuildList]               = useState<any[]>([]);
   const [chatLoading, setChatLoading]           = useState(false);
   const [selectedGuildId, setSelectedGuildId]   = useState<string>('');
+
+  // Destek state'leri
+  const [supportConvs, setSupportConvs]         = useState<any[]>([]);
+  const [selectedSupportUser, setSelectedSupportUser] = useState<any>(null);
+  const [supportThread, setSupportThread]       = useState<any[]>([]);
+  const [supportReply, setSupportReply]         = useState('');
+  const [supportLoading, setSupportLoading]     = useState(false);
+  const supportBottomRef = useRef<HTMLDivElement>(null);
 
   // Sıralama state'leri
   const [sortBy, setSortBy] = useState<string>('id');
@@ -198,6 +206,32 @@ function AdminPage() {
     setBannedLoading(false);
   };
 
+  const loadSupportConvs = async () => {
+    setSupportLoading(true);
+    try {
+      const r = await adminAPI.getSupportConversations();
+      setSupportConvs(r.data.data.conversations);
+    } catch { /* ignore */ }
+    setSupportLoading(false);
+  };
+
+  const loadSupportThread = async (userId: number) => {
+    try {
+      const r = await adminAPI.getSupportThread(userId);
+      setSupportThread(r.data.data.messages);
+      setTimeout(() => supportBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    } catch { /* ignore */ }
+  };
+
+  const sendSupportReply = async () => {
+    if (!supportReply.trim() || !selectedSupportUser) return;
+    try {
+      await adminAPI.replySupportMessage(selectedSupportUser.user_id, supportReply.trim());
+      setSupportReply('');
+      await loadSupportThread(selectedSupportUser.user_id);
+    } catch { /* ignore */ }
+  };
+
   const loadGuildChats = async (guildId?: string) => {
     setChatLoading(true);
     try {
@@ -249,6 +283,7 @@ function AdminPage() {
     if (tab === 'instagram') loadIgRequests();
     if (tab === 'banned') loadBannedUsers();
     if (tab === 'guildchat') loadGuildChats();
+    if (tab === 'support') loadSupportConvs();
   };
 
   const openEdit = (user: any) => {
@@ -529,6 +564,7 @@ function AdminPage() {
             { key: 'instagram', label: '📸 Instagram Boost' },
             { key: 'banned',    label: '🚫 Banlanan Oyuncular' },
             { key: 'guildchat', label: '💬 Guild Sohbetleri' },
+            { key: 'support',   label: '🎧 Destek Mesajları' },
           ].map(t => (
             <button
               key={t.key}
@@ -1467,6 +1503,96 @@ function AdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+        {/* ── DESTEK MESAJLARI SEKMESİ ─────────────────────────────────── */}
+        {activeTab === 'support' && (
+          <div style={{ display: 'flex', gap: 16, height: 600 }}>
+            {/* Sol: konuşma listesi */}
+            <div style={{ width: 260, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>Kullanıcılar</span>
+                <button onClick={loadSupportConvs} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13 }}>↻</button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                {supportLoading && <p style={{ color: '#64748b', padding: 16, fontSize: 13 }}>Yükleniyor...</p>}
+                {!supportLoading && supportConvs.length === 0 && <p style={{ color: '#64748b', padding: 16, fontSize: 13, textAlign: 'center' }}>Henüz destek mesajı yok</p>}
+                {supportConvs.map((conv: any) => (
+                  <div
+                    key={conv.user_id}
+                    onClick={() => { setSelectedSupportUser(conv); loadSupportThread(conv.user_id); }}
+                    style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', background: selectedSupportUser?.user_id === conv.user_id ? 'rgba(59,130,246,0.15)' : 'transparent', display: 'flex', alignItems: 'center', gap: 10 }}
+                  >
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                      {conv.username?.[0]?.toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{conv.username}</span>
+                        {parseInt(conv.unread_count) > 0 && (
+                          <span style={{ background: '#ef4444', color: '#fff', borderRadius: 10, minWidth: 18, height: 18, fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                            {conv.unread_count}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.last_message}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Sağ: mesaj alanı */}
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {!selectedSupportUser ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: 14 }}>
+                  Soldaki listeden bir kullanıcı seç
+                </div>
+              ) : (
+                <>
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontWeight: 700, fontSize: 14 }}>
+                    {selectedSupportUser.username}
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {supportThread.map((msg: any) => {
+                      const isAdmin = msg.is_admin_reply;
+                      return (
+                        <div key={msg.id} style={{ display: 'flex', flexDirection: isAdmin ? 'row-reverse' : 'row', gap: 8, alignItems: 'flex-end' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', background: isAdmin ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                            {isAdmin ? '⚙' : msg.username?.[0]?.toUpperCase()}
+                          </div>
+                          <div style={{ maxWidth: '75%' }}>
+                            <div style={{ background: isAdmin ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'rgba(255,255,255,0.08)', borderRadius: isAdmin ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '8px 14px', fontSize: 13, wordBreak: 'break-word' }}>
+                              {msg.message}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#475569', marginTop: 2, textAlign: isAdmin ? 'right' : 'left' }}>
+                              {new Date(msg.created_at).toLocaleString('tr-TR')}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={supportBottomRef} />
+                  </div>
+                  <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8 }}>
+                    <input
+                      style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', color: '#e2e8f0', fontSize: 14, outline: 'none' }}
+                      placeholder="Cevap yaz... (Enter ile gönder)"
+                      value={supportReply}
+                      onChange={e => setSupportReply(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSupportReply(); } }}
+                    />
+                    <button
+                      onClick={sendSupportReply}
+                      disabled={!supportReply.trim()}
+                      style={{ background: !supportReply.trim() ? 'rgba(245,158,11,0.3)' : 'linear-gradient(135deg,#f59e0b,#ef4444)', border: 'none', borderRadius: 10, color: '#fff', padding: '10px 20px', cursor: !supportReply.trim() ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14 }}
+                    >
+                      Cevapla
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
     </div>

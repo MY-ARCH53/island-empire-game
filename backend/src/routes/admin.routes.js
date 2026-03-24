@@ -45,6 +45,11 @@ router.get('/banned',          AdminController.getBannedUsers);
 router.post('/users/:id/ban',  AdminController.banUser);
 router.post('/users/:id/unban', AdminController.unbanUser);
 
+// Destek mesajları
+router.get('/support', AdminController.getSupportConversations);
+router.get('/support/:userId', AdminController.getSupportThread);
+router.post('/support/:userId/reply', AdminController.replySupportMessage);
+
 // Guild sohbet takibi
 router.get('/guild-chats', AdminController.getGuildChats);
 router.delete('/guild-chats/:id', AdminController.deleteGuildMessage);

@@ -13,7 +13,33 @@
       "Bash(python3 -c \":*)",
       "Bash(xargs grep -l \"league\\\\|seed\\\\|Bronz\")",
       "Bash(xargs grep -l \"listen\\\\|PORT\")",
-      "Read(//c/Users/musta/OneDrive/Desktop/assets/**)"
+      "Read(//c/Users/musta/OneDrive/Desktop/assets/**)",
+      "Read(//c/Users/musta/OneDrive/Desktop/karakterler/Assets/obj/**)",
+      "Bash(powershell -Command \"Compress-Archive -Path sword_1handed.obj,shield_badge.obj,bow_withString.obj,axe_2handed.obj,staff.obj,dagger.obj -DestinationPath C:\\\\Users\\\\musta\\\\OneDrive\\\\Desktop\\\\weapons.zip -Force\")",
+      "Read(//c/Users/musta/OneDrive/Desktop/karakterler/**)",
+      "Bash(powershell Compress-Archive -Path * -DestinationPath \"C:/Users/musta/Desktop/island-empire.zip\" -Force)",
+      "Bash(powershell -Command \"Compress-Archive -Path ''c:/Users/musta/OneDrive/Desktop/island-empire-game/frontend/dist/*'' -DestinationPath ''C:/Users/musta/Desktop/island-empire.zip'' -Force\")",
+      "Bash(powershell -Command \"Compress-Archive -Path ''c:/Users/musta/OneDrive/Desktop/island-empire-game/frontend/dist/*'' -DestinationPath ''C:/Users/musta/OneDrive/Desktop/island-empire.zip'' -Force\")",
+      "Bash(powershell -Command \"Add-Type -Assembly ''System.IO.Compression.FileSystem''; [System.IO.Compression.ZipFile]::OpenRead\\(''C:/Users/musta/OneDrive/Desktop/island-empire.zip''\\).Entries | Select-Object -First 10 FullName\")",
+      "Bash(powershell -Command \":*)",
+      "Bash(powershell -Command \"Remove-Item ''C:/Users/musta/OneDrive/Desktop/island-empire.zip'' -ErrorAction SilentlyContinue; cd ''c:/Users/musta/OneDrive/Desktop/island-empire-game/frontend/dist''; Compress-Archive -Path index.html,assets -DestinationPath ''C:/Users/musta/OneDrive/Desktop/island-empire.zip'' -Force; Write-Host ''ZIP olusturuldu''\")",
+      "Bash(powershell -Command \"Add-Type -Assembly ''System.IO.Compression.FileSystem''; [System.IO.Compression.ZipFile]::OpenRead\\(''C:/Users/musta/OneDrive/Desktop/island-empire.zip''\\).Entries | Select-Object FullName\")",
+      "Bash(powershell -Command \"Remove-Item ''C:/Users/musta/OneDrive/Desktop/island-empire.zip'' -ErrorAction SilentlyContinue; Compress-Archive -Path ''c:/Users/musta/OneDrive/Desktop/island-empire-game/frontend/dist/index.html'',''c:/Users/musta/OneDrive/Desktop/island-empire-game/frontend/dist/assets'' -DestinationPath ''C:/Users/musta/OneDrive/Desktop/island-empire.zip'' -Force; Write-Host ''ZIP hazir''\")",
+      "Bash(powershell -Command \"Remove-Item ''C:/Users/musta/OneDrive/Desktop/island-empire.zip'' -ErrorAction SilentlyContinue; Compress-Archive -Path ''C:/Users/musta/OneDrive/Desktop/gd-test/index.html'' -DestinationPath ''C:/Users/musta/OneDrive/Desktop/island-empire.zip'' -Force; Write-Host ''ZIP hazir''\")",
+      "Bash(powershell Compress-Archive -Path index.html -DestinationPath gd-upload.zip -Force)",
+      "Bash(grep -rn \"export.*const\\\\|export.*let\\\\|export.*var\" c:UsersmustaOneDriveDesktopisland-empire-gamefrontendsrc --include=*.ts --include=*.tsx --include=*.js)",
+      "Bash(sudo -u postgres psql -d island_empire -c '\\\\d users')",
+      "Bash(find C:/Users/musta/OneDrive/Desktop/island-empire-game/frontend/public/game/assets -name *.gltf -o -name *.glb)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\musta\\\\OneDrive\\\\Desktop\\\\island-empire-game\\\\frontend\\\\public\\\\game\\\\assets\")",
+      "Read(//mnt/c/Users/musta/OneDrive/Desktop/**)",
+      "Read(//etc/nginx/sites-available/**)",
+      "Read(//etc/nginx/sites-enabled/**)",
+      "Read(//etc/nginx/**)",
+      "Bash(ssh root@islandsempire.com \"pm2 logs island-empire-backend --lines 30 --nostream\")",
+      "Bash(grep -n \"direct_messages\\\\|private_messages\\\\|dm\\\\|chat\" c:/Users/musta/OneDrive/Desktop/island-empire-game/backend/src/controllers/*.js)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\musta\\OneDrive\\Desktop\\gd-test"
     ]
   }
 }

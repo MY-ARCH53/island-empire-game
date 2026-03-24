@@ -171,6 +171,10 @@ export const adminAPI = {
 
   getGuildChats: (guildId) => api.get(`/admin/guild-chats${guildId ? `?guildId=${guildId}` : ''}`),
   deleteGuildMessage: (id) => api.delete(`/admin/guild-chats/${id}`),
+
+  getSupportConversations: () => api.get('/admin/support'),
+  getSupportThread: (userId) => api.get(`/admin/support/${userId}`),
+  replySupportMessage: (userId, message) => api.post(`/admin/support/${userId}/reply`, { message }),
 };
 
 // Admin2 API
@@ -190,6 +194,8 @@ export const chatAPI = {
   getConversations: () => api.get('/chat/conversations'),
   getUnread: () => api.get('/chat/unread'),
   searchUsers: (q) => api.get(`/chat/search?q=${encodeURIComponent(q)}`),
+  getSupportMessages: () => api.get('/chat/support'),
+  sendSupportMessage: (message) => api.post('/chat/support', { message }),
 };
 
 // TLCoin API

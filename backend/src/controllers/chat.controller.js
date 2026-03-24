@@ -213,6 +213,47 @@ class ChatController {
       res.status(500).json({ success: false, message: 'Hata' });
     }
   }
+
+  // Destek mesajı gönder (kullanıcı → admin)
+  static async sendSupportMessage(req, res) {
+    try {
+      const { message } = req.body;
+      const userId = req.userId;
+      if (!message || message.trim().length === 0)
+        return res.status(400).json({ success: false, message: 'Mesaj boş olamaz' });
+      if (message.length > 1000)
+        return res.status(400).json({ success: false, message: 'Mesaj en fazla 1000 karakter olabilir' });
+
+      const result = await query(
+        `INSERT INTO support_messages (user_id, message, is_admin_reply) VALUES ($1, $2, FALSE) RETURNING *`,
+        [userId, message.trim()]
+      );
+      res.json({ success: true, data: { message: result.rows[0] } });
+    } catch (error) {
+      console.error('sendSupportMessage error:', error);
+      res.status(500).json({ success: false, message: 'Mesaj gönderilemedi' });
+    }
+  }
+
+  // Destek mesajlarını getir (kullanıcı kendi konuşmasını görür)
+  static async getSupportMessages(req, res) {
+    try {
+      const userId = req.userId;
+      const result = await query(
+        `SELECT * FROM support_messages WHERE user_id = $1 ORDER BY created_at ASC`,
+        [userId]
+      );
+      // Okunmamış admin cevaplarını okundu yap
+      await query(
+        `UPDATE support_messages SET is_read = TRUE WHERE user_id = $1 AND is_admin_reply = TRUE AND is_read = FALSE`,
+        [userId]
+      );
+      res.json({ success: true, data: { messages: result.rows } });
+    } catch (error) {
+      console.error('getSupportMessages error:', error);
+      res.status(500).json({ success: false, message: 'Mesajlar getirilemedi' });
+    }
+  }
 }
 
 module.exports = ChatController;
