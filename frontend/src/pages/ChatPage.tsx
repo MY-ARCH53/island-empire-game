@@ -65,10 +65,20 @@ function ChatPage() {
     return () => clearInterval(iv);
   }, [selectedConv]);
 
-  // Scroll
+  // Scroll — yeni mesaj gelince
   useEffect(() => { globalBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [globalMessages]);
   useEffect(() => { dmBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [dmMessages]);
   useEffect(() => { supportBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [supportMessages]);
+
+  // Scroll — sekme değişince
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (activeTab === 'global') globalBottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      if (activeTab === 'dm') dmBottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      if (activeTab === 'support') supportBottomRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [activeTab]);
 
   // Arama debounce
   useEffect(() => {
