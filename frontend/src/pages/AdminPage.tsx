@@ -86,6 +86,15 @@ function AdminPage() {
   const [banReason, setBanReason]               = useState('');
   const [banningId, setBanningId]               = useState<number | null>(null);
 
+  // Sıralama state'leri
+  const [sortBy, setSortBy] = useState<string>('id');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (col: string) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('asc'); }
+  };
+
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (!userData) { navigate('/login'); return; }
@@ -416,10 +425,29 @@ function AdminPage() {
     }
   };
 
-  const filtered = users.filter(u =>
-    u.username.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const getSortValue = (u: any) => {
+    switch (sortBy) {
+      case 'id':         return u.id;
+      case 'level':      return u.level;
+      case 'gold':       return u.resources?.gold || 0;
+      case 'wood':       return u.resources?.wood || 0;
+      case 'food':       return u.resources?.food || 0;
+      case 'tlcoin':     return u.tlcoin_balance || 0;
+      case 'power':      return u.army_power || 0;
+      case 'created_at': return new Date(u.created_at).getTime();
+      default:           return u.id;
+    }
+  };
+
+  const filtered = users
+    .filter(u =>
+      u.username.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const av = getSortValue(a), bv = getSortValue(b);
+      return sortDir === 'asc' ? av - bv : bv - av;
+    });
 
   const leagueColor: any = { 'Ticaret': '#3b82f6', 'Üretim': '#22c55e', 'Korsan': '#ef4444' };
 
@@ -511,8 +539,34 @@ function AdminPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      {['ID', 'Kullanıcı', 'E-posta', 'Seviye', 'Lig', 'Altın', 'Odun', 'Yiyecek', 'TLCoin', 'Ada', '⚔️ Güç', 'Durum', 'Kayıt', 'İşlem'].map(h => (
-                        <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      {[
+                        { label: 'ID',       col: 'id' },
+                        { label: 'Kullanıcı', col: null },
+                        { label: 'E-posta',  col: null },
+                        { label: 'Seviye',   col: 'level' },
+                        { label: 'Lig',      col: null },
+                        { label: 'Altın',    col: 'gold' },
+                        { label: 'Odun',     col: 'wood' },
+                        { label: 'Yiyecek',  col: 'food' },
+                        { label: 'TLCoin',   col: 'tlcoin' },
+                        { label: 'Ada',      col: null },
+                        { label: '⚔️ Güç',   col: 'power' },
+                        { label: 'Durum',    col: null },
+                        { label: 'Kayıt',    col: 'created_at' },
+                        { label: 'İşlem',    col: null },
+                      ].map(({ label, col }) => (
+                        <th
+                          key={label}
+                          onClick={col ? () => handleSort(col) : undefined}
+                          style={{
+                            padding: '12px 14px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap',
+                            color: col && sortBy === col ? '#f1f5f9' : '#64748b',
+                            cursor: col ? 'pointer' : 'default',
+                            userSelect: 'none',
+                          }}
+                        >
+                          {label}{col && sortBy === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : col ? ' ⇅' : ''}
+                        </th>
                       ))}
                     </tr>
                   </thead>
