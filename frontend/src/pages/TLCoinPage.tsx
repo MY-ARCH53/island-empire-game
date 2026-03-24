@@ -12,14 +12,9 @@ const PRIZES = [
     emoji: '📱',
     image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'Apple iPhone 17 256GB',
-  },
-  {
-    id: 'giftcard',
-    name: 'Hediye Çeki 10.000₺',
-    cost: 10000,
-    emoji: '🎁',
-    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=400&h=300&q=80',
-    description: 'İstediğin markette kullanabileceğin hediye çeki',
+    stock: 3,
+    color: '#3b82f6',
+    badge: '🏆 Büyük Ödül',
   },
   {
     id: 'laptop',
@@ -28,6 +23,9 @@ const PRIZES = [
     emoji: '💻',
     image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'i5 işlemci, 16GB RAM, 512GB SSD',
+    stock: 5,
+    color: '#8b5cf6',
+    badge: '⭐ Popüler',
   },
   {
     id: 'desktop',
@@ -36,6 +34,20 @@ const PRIZES = [
     emoji: '🖥️',
     image: 'https://images.unsplash.com/photo-1587202372634-32705e3bf49c?auto=format&fit=crop&w=400&h=300&q=80',
     description: 'Gaming PC, RTX 3060, 32GB RAM',
+    stock: 4,
+    color: '#f59e0b',
+    badge: '🎮 Gaming',
+  },
+  {
+    id: 'giftcard',
+    name: 'Hediye Çeki 10.000₺',
+    cost: 10000,
+    emoji: '🎁',
+    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=400&h=300&q=80',
+    description: 'İstediğin markette kullanabileceğin hediye çeki',
+    stock: 1,
+    color: '#22c55e',
+    badge: '🔥 Son 1 Adet',
   },
 ];
 
@@ -227,26 +239,43 @@ export default function TLCoinPage() {
           );
         })()}
 
-        {/* Ödüller */}
+        {/* Sezon 1 Ödül Kataloğu */}
         <div>
-          <p style={{ color: '#fff', fontWeight: 700, fontSize: 17, marginBottom: 14 }}>🎁 Ödül Kataloğu</p>
+          {/* Sezon Başlık Banner */}
+          <div style={{
+            background: 'linear-gradient(135deg,#92400e,#d97706,#92400e)',
+            borderRadius: 16, padding: '16px 20px', marginBottom: 16,
+            border: '1px solid rgba(251,191,36,0.4)',
+            boxShadow: '0 4px 24px rgba(217,119,6,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <p style={{ color: '#fef3c7', fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>🏅 Sezon 1</p>
+              <p style={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>Ödül Kataloğu</p>
+              <p style={{ color: '#fcd34d', fontSize: 11, marginTop: 2 }}>Sınırlı stok — Hemen talep et!</p>
+            </div>
+            <div style={{ fontSize: 48 }}>🏆</div>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
             {PRIZES.map(prize => {
               const canAfford = tlcoinBalance >= prize.cost;
               const hasImgError = imgErrors[prize.id];
+              const outOfStock = prize.stock <= 0;
               return (
                 <div key={prize.id} style={{
-                  background: 'linear-gradient(145deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))',
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))',
+                  border: `1px solid ${prize.color}44`,
                   borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+                  boxShadow: `0 4px 24px rgba(0,0,0,0.35), 0 0 0 0px ${prize.color}33`,
+                  transition: 'transform 0.15s',
                 }}>
                   {/* Görsel */}
                   <div style={{ position: 'relative', aspectRatio: '4/3', flexShrink: 0 }}>
                     {hasImgError ? (
                       <div style={{
                         width: '100%', height: '100%',
-                        background: 'linear-gradient(135deg,rgba(225,29,72,0.22),rgba(15,23,42,0.85))',
+                        background: `linear-gradient(135deg,${prize.color}33,rgba(15,23,42,0.85))`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 54,
                       }}>
@@ -262,19 +291,38 @@ export default function TLCoinPage() {
                         />
                         <div style={{
                           position: 'absolute', inset: 0,
-                          background: 'linear-gradient(to bottom,transparent 35%,rgba(10,18,35,0.75) 100%)',
+                          background: 'linear-gradient(to bottom,transparent 30%,rgba(10,18,35,0.85) 100%)',
                         }} />
                       </>
                     )}
+                    {/* Fiyat etiketi */}
                     <div style={{
                       position: 'absolute', top: 8, right: 8,
-                      background: 'rgba(225,29,72,0.95)',
+                      background: `${prize.color}ee`,
                       backdropFilter: 'blur(6px)',
                       borderRadius: 99,
                       padding: '4px 10px', fontSize: 11, fontWeight: 800, color: '#fff',
-                      boxShadow: '0 2px 10px rgba(225,29,72,0.55)',
+                      boxShadow: `0 2px 10px ${prize.color}66`,
                     }}>
-                      🪙 {prize.cost}
+                      🪙 {prize.cost.toLocaleString()}
+                    </div>
+                    {/* Badge */}
+                    <div style={{
+                      position: 'absolute', top: 8, left: 8,
+                      background: 'rgba(0,0,0,0.7)',
+                      backdropFilter: 'blur(6px)',
+                      borderRadius: 99,
+                      padding: '3px 8px', fontSize: 10, fontWeight: 700, color: '#fff',
+                    }}>
+                      {prize.badge}
+                    </div>
+                    {/* Stok göstergesi */}
+                    <div style={{
+                      position: 'absolute', bottom: 8, left: 8,
+                      background: outOfStock ? 'rgba(239,68,68,0.9)' : prize.stock <= 2 ? 'rgba(245,158,11,0.9)' : 'rgba(34,197,94,0.9)',
+                      borderRadius: 99, padding: '3px 8px', fontSize: 10, fontWeight: 700, color: '#fff',
+                    }}>
+                      {outOfStock ? '❌ Stok Tükendi' : `📦 Stok: ${prize.stock}`}
                     </div>
                   </div>
 
@@ -286,25 +334,47 @@ export default function TLCoinPage() {
                     <p style={{ color: '#64748b', fontSize: 10, lineHeight: 1.45, flex: 1 }}>
                       {prize.description}
                     </p>
+                    {/* İlerleme çubuğu */}
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: '#475569', fontSize: 9 }}>Bakiyen</span>
+                        <span style={{ color: canAfford ? '#22c55e' : '#ef4444', fontSize: 9, fontWeight: 700 }}>
+                          {canAfford ? '✓ Yeterli' : `${(prize.cost - tlcoinBalance).toLocaleString()} eksik`}
+                        </span>
+                      </div>
+                      <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.min(100, (tlcoinBalance / prize.cost) * 100)}%`,
+                          background: canAfford ? '#22c55e' : prize.color,
+                          borderRadius: 99, transition: 'width 0.5s',
+                        }} />
+                      </div>
+                    </div>
                     <button
                       onClick={() => handleRequestPrize(prize)}
-                      disabled={requesting === prize.id || !canAfford}
+                      disabled={requesting === prize.id || !canAfford || outOfStock}
                       style={{
-                        marginTop: 6,
-                        background: !canAfford
+                        marginTop: 8,
+                        background: outOfStock
+                          ? 'rgba(239,68,68,0.15)'
+                          : !canAfford
                           ? 'rgba(255,255,255,0.05)'
-                          : 'linear-gradient(135deg,#e11d48,#be123c)',
-                        border: !canAfford ? '1px solid rgba(255,255,255,0.10)' : 'none',
-                        borderRadius: 10, color: !canAfford ? '#475569' : '#fff',
+                          : `linear-gradient(135deg,${prize.color},${prize.color}cc)`,
+                        border: (!canAfford || outOfStock) ? `1px solid rgba(255,255,255,0.10)` : 'none',
+                        borderRadius: 10,
+                        color: outOfStock ? '#ef4444' : !canAfford ? '#475569' : '#fff',
                         fontWeight: 700, fontSize: 11, padding: '9px 0',
-                        cursor: !canAfford ? 'not-allowed' : 'pointer',
-                        boxShadow: !canAfford ? 'none' : '0 2px 12px rgba(225,29,72,0.40)',
+                        cursor: (!canAfford || outOfStock) ? 'not-allowed' : 'pointer',
+                        boxShadow: (!canAfford || outOfStock) ? 'none' : `0 2px 12px ${prize.color}55`,
                       }}
                     >
                       {requesting === prize.id
                         ? 'Gönderiliyor...'
+                        : outOfStock
+                        ? 'Stok Tükendi'
                         : !canAfford
-                        ? `🪙 ${prize.cost} gerekli`
+                        ? `🪙 ${prize.cost.toLocaleString()} gerekli`
                         : 'Talep Et →'}
                     </button>
                   </div>
