@@ -26,6 +26,7 @@ import HowToPlayPage from './pages/HowToPlayPage';
 import LandingPage from './pages/LandingPage';
 import ContactPage from './pages/ContactPage';
 import ChatPage from './pages/ChatPage';
+import KlanSavasPage from './pages/KlanSavasPage';
 
 function App() {
   useEffect(() => {
@@ -54,6 +55,7 @@ function App() {
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/guilds" element={<GuildsPage />} />
             <Route path="/klan" element={<KlanPage />} />
+            <Route path="/klan-savas" element={<KlanSavasPage />} />
             <Route path="/battle" element={<BattlePage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />

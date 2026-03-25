@@ -564,6 +564,7 @@ export default function KlanPage() {
             {myTab === 'war' && (
               <>
                 {activeWar ? (
+                  <>
                   <div style={{ ...S.card, background: 'linear-gradient(135deg,rgba(239,68,68,0.15),rgba(185,28,28,0.1))', border: '1px solid rgba(239,68,68,0.3)' }}>
                     <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 16, color: '#ef4444' }}>⚔️ Aktif Savaş</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 16, alignItems: 'center', marginBottom: 16 }}>
@@ -579,12 +580,37 @@ export default function KlanPage() {
                         <div style={{ fontSize: 28, fontWeight: 900, color: '#fbbf24', marginTop: 4 }}>⭐{activeWar.defender_stars}</div>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                    <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>
                       Durum: <span style={{ color: activeWar.status === 'active' ? '#10b981' : '#f59e0b', fontWeight: 700 }}>
-                        {activeWar.status === 'preparation' ? '⏳ Hazırlık' : activeWar.status === 'active' ? '⚔️ Savaş Devam Ediyor' : '✅ Bitti'}
+                        {activeWar.status === 'preparation' ? '⏳ Hazırlık (24 saat)' : activeWar.status === 'active' ? '⚔️ Savaş Devam Ediyor' : '✅ Bitti'}
                       </span>
                     </div>
+
+                    {/* Savaş aktifse saldır butonu */}
+                    {activeWar.status === 'active' && (
+                      <div style={{ textAlign: 'center' }}>
+                        <button
+                          style={{ ...S.btn('#ef4444'), fontSize: 16, padding: '12px 32px' }}
+                          onClick={() => {
+                            const defGuildId = myGuild.id === activeWar.attacker_guild_id
+                              ? activeWar.defender_guild_id
+                              : activeWar.attacker_guild_id;
+                            const defCastle = myGuild.id === activeWar.attacker_guild_id
+                              ? activeWar.defender_castle
+                              : activeWar.attacker_castle;
+                            const defName = myGuild.id === activeWar.attacker_guild_id
+                              ? activeWar.defender_name
+                              : activeWar.attacker_name;
+                            navigate(`/klan-savas?warId=${activeWar.id}&defenderId=${defGuildId}&defName=${encodeURIComponent(defName)}&castleLevel=${defCastle || 1}`);
+                          }}
+                        >
+                          ⚔️ Saldırıya Geç!
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  </>
+
                 ) : (
                   <div style={S.card}>
                     <div style={{ fontWeight: 700, marginBottom: 12 }}>🔥 Savaş Başlat</div>
