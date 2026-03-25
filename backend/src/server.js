@@ -22,6 +22,7 @@ const instagramRoutes = require('./routes/instagram.routes');
 const { startInstagramWorker } = require('./services/instagramWorker');
 const chatRoutes = require('./routes/chat.routes');
 const { startAutoAttackWorker } = require('./services/autoAttackWorker');
+const { startWorker: startWeeklyGuildWorker } = require('./services/weeklyGuildWorker');
 const banCheck = require('./middleware/banCheck.middleware');
 
 const app = express();
@@ -67,4 +68,5 @@ app.listen(PORT, () => {
   startWorker();
   startInstagramWorker();
   startAutoAttackWorker();
+  startWeeklyGuildWorker();
 });

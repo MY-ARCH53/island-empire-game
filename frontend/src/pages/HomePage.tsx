@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   // { key: 'market',      emoji: '🏪', label: 'Pazar'     },  // geçici olarak gizlendi
   { key: 'leaderboard', emoji: '🏆', label: 'Liderlik'  },
   { key: 'chat',        emoji: '💬', label: 'Mesaj'     },
-  { key: 'guild',       emoji: '🏰', label: 'Guild'     },
+  { key: 'klan',        emoji: '⚔️', label: 'Klan'      },
 ];
 
 const TRADE_RATES = [
@@ -518,7 +518,7 @@ function HomePage() {
     else if (key === 'leaderboard')    navigate('/leaderboard');
     else if (key === 'battle')         navigate('/battle');
     else if (key === 'chat')           navigate('/chat');
-    else if (key === 'guild')          navigate('/guilds');
+    else if (key === 'klan')           navigate('/klan');
   };
 
   const handleSpin = async () => {

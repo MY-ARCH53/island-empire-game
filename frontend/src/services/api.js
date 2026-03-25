@@ -89,24 +89,36 @@ export const friendAPI = {
 
 // Guild API'leri
 export const guildAPI = {
-  create: (name, description, leaderId) => 
-    api.post('/guilds/create', { name, description, leaderId }),
+  create: (name, description) => api.post('/guilds/create', { name, description }),
   list: () => api.get('/guilds/list'),
   getDetails: (guildId) => api.get(`/guilds/details?guildId=${guildId}`),
-  getUserGuild: (userId) => api.get(`/guilds/user-guild?userId=${userId}`),
-  apply: (guildId, userId, message) => 
-    api.post('/guilds/apply', { guildId, userId, message }),
+  getUserGuild: () => api.get('/guilds/user-guild'),
+  // Lider yetkileri
+  rename: (guildId, newName) => api.post('/guilds/rename', { guildId, newName }),
+  disband: (guildId) => api.post('/guilds/disband', { guildId }),
+  updateBulletin: (guildId, bulletin) => api.post('/guilds/bulletin', { guildId, bulletin }),
+  changeRole: (guildId, targetUserId, newRole) => api.post('/guilds/change-role', { guildId, targetUserId, newRole }),
+  kick: (guildId, targetUserId) => api.post('/guilds/kick', { guildId, targetUserId }),
+  // Başvuru
+  apply: (guildId, message) => api.post('/guilds/apply', { guildId, message }),
   getApplications: (guildId) => api.get(`/guilds/applications?guildId=${guildId}`),
-  acceptApplication: (applicationId, guildId) => 
-    api.post('/guilds/accept', { applicationId, guildId }),
-  rejectApplication: (applicationId) => 
-    api.post('/guilds/reject', { applicationId }),
-  leave: (userId, guildId) => api.post('/guilds/leave', { userId, guildId }),
-  donate: (userId, guildId, resourceType, amount) => 
-    api.post('/guilds/donate', { userId, guildId, resourceType, amount }),
+  acceptApplication: (applicationId, guildId) => api.post('/guilds/accept', { applicationId, guildId }),
+  rejectApplication: (applicationId) => api.post('/guilds/reject', { applicationId }),
+  leave: (guildId) => api.post('/guilds/leave', { guildId }),
+  // Bağış & Kale
+  donate: (guildId, resourceType, amount) => api.post('/guilds/donate', { guildId, resourceType, amount }),
+  getCastle: (guildId) => api.get(`/guilds/castle?guildId=${guildId}`),
+  // Asker
+  recruitTroops: (guildId, troopType, count) => api.post('/guilds/recruit', { guildId, troopType, count }),
+  getTroops: (guildId) => api.get(`/guilds/troops?guildId=${guildId}`),
+  // Savaş
+  startWar: (attackerGuildId, defenderGuildId) => api.post('/guilds/war/start', { attackerGuildId, defenderGuildId }),
+  getActiveWar: (guildId) => api.get(`/guilds/war/active?guildId=${guildId}`),
+  getWarHistory: (guildId) => api.get(`/guilds/war/history?guildId=${guildId}`),
+  recordWarAttack: (warId, defenderId, stars, damagePercent) => api.post('/guilds/war/attack', { warId, defenderId, stars, damagePercent }),
+  // Sohbet
   getChatMessages: (guildId) => api.get(`/guilds/chat?guildId=${guildId}`),
-  sendMessage: (guildId, userId, message) => 
-    api.post('/guilds/chat', { guildId, userId, message }),
+  sendMessage: (guildId, message) => api.post('/guilds/chat', { guildId, message }),
 };
 
 // Battle API'leri

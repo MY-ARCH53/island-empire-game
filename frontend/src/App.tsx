@@ -11,6 +11,7 @@ import MarketplacePage from './pages/MarketplacePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import FriendsPage from './pages/FriendsPage';
 import GuildsPage from './pages/GuildsPage';
+import KlanPage from './pages/KlanPage';
 import BattlePage from './pages/BattlePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -52,6 +53,7 @@ function App() {
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/guilds" element={<GuildsPage />} />
+            <Route path="/klan" element={<KlanPage />} />
             <Route path="/battle" element={<BattlePage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
