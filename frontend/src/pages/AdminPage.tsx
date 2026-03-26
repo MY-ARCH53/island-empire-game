@@ -4,7 +4,7 @@ import { adminAPI } from '../services/api';
 
 function AdminPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram' | 'banned' | 'guildchat' | 'support'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'bots' | 'prizes' | 'instagram' | 'banned' | 'guildchat' | 'support' | 'tlcoin'>('users');
 
   // Kullanıcı tab state'leri
   const [stats, setStats]       = useState<any>(null);
@@ -93,6 +93,16 @@ function AdminPage() {
   const [selectedGuildId, setSelectedGuildId]   = useState<string>('');
 
   // Destek state'leri
+  // TLCoin tab state'leri
+  const [tlcoinTxs, setTlcoinTxs]           = useState<any[]>([]);
+  const [tlcoinStats, setTlcoinStats]       = useState<any>(null);
+  const [tlcoinUserStats, setTlcoinUserStats] = useState<any[]>([]);
+  const [tlcoinFilter, setTlcoinFilter]     = useState({ type: '', source: '', userId: '' });
+  const [tlcoinPage, setTlcoinPage]         = useState(1);
+  const [tlcoinTotal, setTlcoinTotal]       = useState(0);
+  const [tlcoinLoading, setTlcoinLoading]   = useState(false);
+  const [tlcoinView, setTlcoinView]         = useState<'txs' | 'users'>('txs');
+
   const [supportConvs, setSupportConvs]         = useState<any[]>([]);
   const [selectedSupportUser, setSelectedSupportUser] = useState<any>(null);
   const [supportThread, setSupportThread]       = useState<any[]>([]);
@@ -206,6 +216,25 @@ function AdminPage() {
     setBannedLoading(false);
   };
 
+  const loadTLCoinTxs = async (page = 1, filter = tlcoinFilter) => {
+    setTlcoinLoading(true);
+    try {
+      const r = await adminAPI.getTLCoinTransactions({ ...filter, page, limit: 50 });
+      setTlcoinTxs(r.data.data.transactions);
+      setTlcoinTotal(r.data.data.total);
+      setTlcoinStats(r.data.data.stats);
+      setTlcoinPage(page);
+    } catch { /* ignore */ }
+    setTlcoinLoading(false);
+  };
+
+  const loadTLCoinUserStats = async () => {
+    try {
+      const r = await adminAPI.getTLCoinUserStats();
+      setTlcoinUserStats(r.data.data.users);
+    } catch { /* ignore */ }
+  };
+
   const loadSupportConvs = async () => {
     setSupportLoading(true);
     try {
@@ -284,6 +313,7 @@ function AdminPage() {
     if (tab === 'banned') loadBannedUsers();
     if (tab === 'guildchat') loadGuildChats();
     if (tab === 'support') loadSupportConvs();
+    if (tab === 'tlcoin') { loadTLCoinTxs(1); loadTLCoinUserStats(); }
   };
 
   const openEdit = (user: any) => {
@@ -565,6 +595,7 @@ function AdminPage() {
             { key: 'banned',    label: '🚫 Banlanan Oyuncular' },
             { key: 'guildchat', label: '💬 Guild Sohbetleri' },
             { key: 'support',   label: '🎧 Destek Mesajları' },
+            { key: 'tlcoin',    label: '🪙 TLCoin İşlemleri' },
           ].map(t => (
             <button
               key={t.key}
@@ -1593,6 +1624,197 @@ function AdminPage() {
                 </>
               )}
             </div>
+          </div>
+        )}
+        {/* ── TLCOİN İŞLEMLERİ ──────────────────────────────────────────── */}
+        {activeTab === 'tlcoin' && (
+          <div>
+            {/* Alt görünüm seçici */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              <button onClick={() => setTlcoinView('txs')} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, background: tlcoinView === 'txs' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)' : 'rgba(255,255,255,0.07)', color: tlcoinView === 'txs' ? '#fff' : '#64748b' }}>
+                📋 İşlem Geçmişi
+              </button>
+              <button onClick={() => setTlcoinView('users')} style={{ padding: '8px 20px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, background: tlcoinView === 'users' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)' : 'rgba(255,255,255,0.07)', color: tlcoinView === 'users' ? '#fff' : '#64748b' }}>
+                👥 Kullanıcı Bazlı
+              </button>
+            </div>
+
+            {/* İstatistik kartları */}
+            {tlcoinStats && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: 'Toplam Kazanılan', value: parseFloat(tlcoinStats.total_earned).toFixed(1), icon: '📈', color: '#10b981' },
+                  { label: 'Toplam Harcanan',  value: parseFloat(tlcoinStats.total_spent).toFixed(1),  icon: '📉', color: '#ef4444' },
+                  { label: 'Toplam İade',       value: parseFloat(tlcoinStats.total_refunded).toFixed(1), icon: '🔄', color: '#f59e0b' },
+                  { label: 'Kazanma İşlemi',   value: tlcoinStats.earn_count,   icon: '⬆️', color: '#3b82f6' },
+                  { label: 'Harcama İşlemi',   value: tlcoinStats.spend_count,  icon: '⬇️', color: '#8b5cf6' },
+                  { label: 'Aktif Kullanıcı',  value: tlcoinStats.unique_users, icon: '👤', color: '#06b6d4' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 24 }}>{s.icon}</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: s.color, marginTop: 4 }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* İşlem Geçmişi */}
+            {tlcoinView === 'txs' && (
+              <>
+                {/* Filtreler */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' as const }}>
+                  <select
+                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: 13 }}
+                    value={tlcoinFilter.type}
+                    onChange={e => { const f = { ...tlcoinFilter, type: e.target.value }; setTlcoinFilter(f); loadTLCoinTxs(1, f); }}
+                  >
+                    <option value="">Tüm Tipler</option>
+                    <option value="earn">📈 Kazanma</option>
+                    <option value="spend">📉 Harcama</option>
+                    <option value="refund">🔄 İade</option>
+                  </select>
+                  <select
+                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: 13 }}
+                    value={tlcoinFilter.source}
+                    onChange={e => { const f = { ...tlcoinFilter, source: e.target.value }; setTlcoinFilter(f); loadTLCoinTxs(1, f); }}
+                  >
+                    <option value="">Tüm Kaynaklar</option>
+                    <option value="convert">💱 Altın Çevirme</option>
+                    <option value="prize_request">🎁 Ödül Talebi</option>
+                    <option value="refund">🔄 İade</option>
+                    <option value="admin">👑 Admin</option>
+                  </select>
+                  <input
+                    type="number"
+                    placeholder="Kullanıcı ID filtrele"
+                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', color: '#e2e8f0', fontSize: 13, width: 180 }}
+                    value={tlcoinFilter.userId}
+                    onChange={e => { const f = { ...tlcoinFilter, userId: e.target.value }; setTlcoinFilter(f); loadTLCoinTxs(1, f); }}
+                  />
+                  <button onClick={() => loadTLCoinTxs(1)} style={{ background: 'linear-gradient(135deg,#3b82f6,#06b6d4)', border: 'none', borderRadius: 8, color: '#fff', padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                    🔄 Yenile
+                  </button>
+                </div>
+
+                {tlcoinLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>Yükleniyor...</div>
+                ) : (
+                  <div style={{ overflowX: 'auto' as const }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#64748b', textAlign: 'left' as const }}>
+                          <th style={{ padding: '10px 12px' }}>ID</th>
+                          <th style={{ padding: '10px 12px' }}>Kullanıcı</th>
+                          <th style={{ padding: '10px 12px' }}>Tip</th>
+                          <th style={{ padding: '10px 12px' }}>Miktar</th>
+                          <th style={{ padding: '10px 12px' }}>Kaynak</th>
+                          <th style={{ padding: '10px 12px' }}>Bakiye Sonrası</th>
+                          <th style={{ padding: '10px 12px' }}>Detay</th>
+                          <th style={{ padding: '10px 12px' }}>Tarih</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tlcoinTxs.map(tx => {
+                          const typeColor = tx.type === 'earn' ? '#10b981' : tx.type === 'spend' ? '#ef4444' : '#f59e0b';
+                          const typeIcon  = tx.type === 'earn' ? '📈' : tx.type === 'spend' ? '📉' : '🔄';
+                          const sourceLabel: Record<string, string> = { convert: '💱 Altın Çevirme', prize_request: '🎁 Ödül Talebi', refund: '🔄 İade', admin: '👑 Admin' };
+                          return (
+                            <tr key={tx.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                              <td style={{ padding: '10px 12px', color: '#475569' }}>#{tx.id}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <span style={{ fontWeight: 600 }}>{tx.username}</span>
+                                <span style={{ color: '#475569', fontSize: 11, marginLeft: 6 }}>#{tx.user_id}</span>
+                              </td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <span style={{ color: typeColor, fontWeight: 700 }}>{typeIcon} {tx.type === 'earn' ? 'Kazanma' : tx.type === 'spend' ? 'Harcama' : 'İade'}</span>
+                              </td>
+                              <td style={{ padding: '10px 12px', fontWeight: 700, color: typeColor }}>
+                                {tx.type === 'earn' ? '+' : '-'}{parseFloat(tx.amount).toFixed(2)} 🪙
+                              </td>
+                              <td style={{ padding: '10px 12px', color: '#94a3b8' }}>
+                                {sourceLabel[tx.source] || tx.source}
+                              </td>
+                              <td style={{ padding: '10px 12px', color: '#fbbf24' }}>
+                                {parseFloat(tx.balance_after ?? 0).toFixed(2)} 🪙
+                              </td>
+                              <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12, maxWidth: 200 }}>
+                                {tx.meta ? (
+                                  <span title={JSON.stringify(tx.meta, null, 2)}>
+                                    {tx.meta.gold_spent ? `${(tx.meta.gold_spent).toLocaleString()} altın` : ''}
+                                    {tx.meta.prize_name ? `${tx.meta.prize_name}` : ''}
+                                  </span>
+                                ) : '—'}
+                              </td>
+                              <td style={{ padding: '10px 12px', color: '#475569', fontSize: 12, whiteSpace: 'nowrap' as const }}>
+                                {new Date(tx.created_at).toLocaleString('tr-TR')}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {tlcoinTxs.length === 0 && (
+                          <tr><td colSpan={8} style={{ padding: 30, textAlign: 'center', color: '#475569' }}>Kayıt bulunamadı</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Sayfalama */}
+                {tlcoinTotal > 50 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
+                    <button disabled={tlcoinPage === 1} onClick={() => loadTLCoinTxs(tlcoinPage - 1)} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.07)', color: '#e2e8f0' }}>← Önceki</button>
+                    <span style={{ padding: '6px 12px', color: '#94a3b8', fontSize: 13 }}>{tlcoinPage} / {Math.ceil(tlcoinTotal / 50)}</span>
+                    <button disabled={tlcoinPage >= Math.ceil(tlcoinTotal / 50)} onClick={() => loadTLCoinTxs(tlcoinPage + 1)} style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.07)', color: '#e2e8f0' }}>Sonraki →</button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Kullanıcı Bazlı */}
+            {tlcoinView === 'users' && (
+              <div style={{ overflowX: 'auto' as const }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#64748b', textAlign: 'left' as const }}>
+                      <th style={{ padding: '10px 12px' }}>Kullanıcı</th>
+                      <th style={{ padding: '10px 12px' }}>Mevcut Bakiye</th>
+                      <th style={{ padding: '10px 12px' }}>Toplam Kazandı</th>
+                      <th style={{ padding: '10px 12px' }}>Toplam Harcadı</th>
+                      <th style={{ padding: '10px 12px' }}>İşlem Sayısı</th>
+                      <th style={{ padding: '10px 12px' }}>Son İşlem</th>
+                      <th style={{ padding: '10px 12px' }}>İşlemler</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tlcoinUserStats.map(u => (
+                      <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{ fontWeight: 600 }}>{u.username}</span>
+                          <span style={{ color: '#475569', fontSize: 11, marginLeft: 6 }}>#{u.id}</span>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#fbbf24' }}>{parseFloat(u.tlcoin_balance).toFixed(2)} 🪙</td>
+                        <td style={{ padding: '10px 12px', color: '#10b981' }}>+{parseFloat(u.total_earned).toFixed(2)}</td>
+                        <td style={{ padding: '10px 12px', color: '#ef4444' }}>-{parseFloat(u.total_spent).toFixed(2)}</td>
+                        <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{u.tx_count}</td>
+                        <td style={{ padding: '10px 12px', color: '#475569', fontSize: 12 }}>{u.last_tx_at ? new Date(u.last_tx_at).toLocaleString('tr-TR') : '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <button
+                            onClick={() => { setTlcoinFilter(f => ({ ...f, userId: String(u.id) })); setTlcoinView('txs'); loadTLCoinTxs(1, { ...tlcoinFilter, userId: String(u.id) }); }}
+                            style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 6, color: '#a78bfa', padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
+                          >
+                            İşlemleri Gör
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {tlcoinUserStats.length === 0 && (
+                      <tr><td colSpan={7} style={{ padding: 30, textAlign: 'center', color: '#475569' }}>Henüz TLCoin işlemi yok</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
     </div>

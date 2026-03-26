@@ -75,6 +75,13 @@ class TLCoinController {
         [userId]
       );
 
+      // İşlem logu
+      await query(
+        `INSERT INTO tlcoin_transactions (user_id, type, amount, source, meta, balance_after)
+         VALUES ($1, 'earn', $2, 'convert', $3, $4)`,
+        [userId, tlcoin, JSON.stringify({ gold_spent: amount }), updated.rows[0].tlcoin_balance]
+      ).catch(() => {});
+
       res.json({
         success: true,
         data: {
@@ -116,6 +123,14 @@ class TLCoinController {
          VALUES ($1, $2, $3, $4) RETURNING id`,
         [userId, prizeId, prizeName, cost]
       );
+
+      // İşlem logu
+      const balAfter = await query('SELECT tlcoin_balance FROM users WHERE id = $1', [userId]);
+      await query(
+        `INSERT INTO tlcoin_transactions (user_id, type, amount, source, meta, balance_after)
+         VALUES ($1, 'spend', $2, 'prize_request', $3, $4)`,
+        [userId, cost, JSON.stringify({ prize_id: prizeId, prize_name: prizeName, request_id: insertRes.rows[0].id }), balAfter.rows[0]?.tlcoin_balance ?? 0]
+      ).catch(() => {});
 
       res.json({
         success: true,

@@ -183,6 +183,9 @@ export const adminAPI = {
 
   getGuildChats: (guildId) => api.get(`/admin/guild-chats${guildId ? `?guildId=${guildId}` : ''}`),
   deleteGuildMessage: (id) => api.delete(`/admin/guild-chats/${id}`),
+  // TLCoin işlem takibi
+  getTLCoinTransactions: (params = {}) => api.get('/admin/tlcoin-transactions', { params }),
+  getTLCoinUserStats: () => api.get('/admin/tlcoin-user-stats'),
 
   getSupportConversations: () => api.get('/admin/support'),
   getSupportThread: (userId) => api.get(`/admin/support/${userId}`),

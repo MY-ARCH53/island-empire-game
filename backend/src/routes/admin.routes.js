@@ -54,6 +54,10 @@ router.post('/support/:userId/reply', AdminController.replySupportMessage);
 router.get('/guild-chats', AdminController.getGuildChats);
 router.delete('/guild-chats/:id', AdminController.deleteGuildMessage);
 
+// TLCoin işlem takibi
+router.get('/tlcoin-transactions', AdminController.getTLCoinTransactions);
+router.get('/tlcoin-user-stats', AdminController.getTLCoinUserStats);
+
 // Admin2 - Detaylı raporlar
 router.get('/admin2/players',         AdminController.getDetailedPlayers);
 router.get('/admin2/players/:id',     AdminController.getPlayerDetail);

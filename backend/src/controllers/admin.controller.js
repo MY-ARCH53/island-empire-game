@@ -1370,6 +1370,92 @@ class AdminController {
       res.status(500).json({ success: false, message: 'Mesaj silinemedi', error: error.message });
     }
   }
+
+  // ── TLCoin İşlem Geçmişi ──────────────────────────────────────────────────
+
+  // GET /api/admin/tlcoin-transactions?userId=&type=&source=&page=1&limit=50
+  static async getTLCoinTransactions(req, res) {
+    try {
+      const { userId, type, source, page = 1, limit = 50 } = req.query;
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const conditions = [];
+      const values = [];
+      let idx = 1;
+
+      if (userId) { conditions.push(`t.user_id = $${idx++}`); values.push(userId); }
+      if (type)   { conditions.push(`t.type = $${idx++}`);    values.push(type); }
+      if (source) { conditions.push(`t.source = $${idx++}`);  values.push(source); }
+
+      const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
+      const sql = `
+        SELECT t.id, t.user_id, u.username, t.type, t.amount, t.source,
+               t.meta, t.balance_after, t.created_at
+        FROM tlcoin_transactions t
+        JOIN users u ON u.id = t.user_id
+        ${where}
+        ORDER BY t.created_at DESC
+        LIMIT $${idx++} OFFSET $${idx++}
+      `;
+      values.push(parseInt(limit), offset);
+      const result = await query(sql, values);
+
+      const countSql = `SELECT COUNT(*) FROM tlcoin_transactions t ${where}`;
+      const countResult = await query(countSql, values.slice(0, -2));
+
+      // İstatistikler
+      const statsSql = `
+        SELECT
+          COUNT(*) FILTER (WHERE type = 'earn')  AS earn_count,
+          COUNT(*) FILTER (WHERE type = 'spend') AS spend_count,
+          COUNT(*) FILTER (WHERE type = 'refund') AS refund_count,
+          COALESCE(SUM(amount) FILTER (WHERE type = 'earn'),   0) AS total_earned,
+          COALESCE(SUM(amount) FILTER (WHERE type = 'spend'),  0) AS total_spent,
+          COALESCE(SUM(amount) FILTER (WHERE type = 'refund'), 0) AS total_refunded,
+          COUNT(DISTINCT user_id) AS unique_users
+        FROM tlcoin_transactions
+      `;
+      const stats = await query(statsSql);
+
+      res.json({
+        success: true,
+        data: {
+          transactions: result.rows,
+          total: parseInt(countResult.rows[0].count),
+          page: parseInt(page),
+          limit: parseInt(limit),
+          stats: stats.rows[0],
+        }
+      });
+    } catch (error) {
+      console.error('Admin getTLCoinTransactions error:', error);
+      res.status(500).json({ success: false, message: 'İşlemler alınamadı' });
+    }
+  }
+
+  // GET /api/admin/tlcoin-stats — Kullanıcı bazlı özet
+  static async getTLCoinUserStats(req, res) {
+    try {
+      const sql = `
+        SELECT
+          u.id, u.username, u.tlcoin_balance,
+          COUNT(t.id) AS tx_count,
+          COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'earn'),  0) AS total_earned,
+          COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'spend'), 0) AS total_spent,
+          MAX(t.created_at) AS last_tx_at
+        FROM users u
+        LEFT JOIN tlcoin_transactions t ON t.user_id = u.id
+        WHERE u.is_bot = false AND (u.tlcoin_balance > 0 OR t.id IS NOT NULL)
+        GROUP BY u.id, u.username, u.tlcoin_balance
+        ORDER BY u.tlcoin_balance DESC
+        LIMIT 100
+      `;
+      const result = await query(sql);
+      res.json({ success: true, data: { users: result.rows } });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Kullanıcı istatistikleri alınamadı' });
+    }
+  }
 }
 
 module.exports = AdminController;
