@@ -1062,16 +1062,34 @@ class AdminController {
           COALESCE(a.archer_count, 0)   AS archer_count,
           COALESCE(a.infantry_count, 0) AS infantry_count,
           COALESCE(a.cavalry_count, 0)  AS cavalry_count,
-          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'gold'  LIMIT 1), 0) AS gold,
-          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'food'  LIMIT 1), 0) AS food,
-          COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'wood'  LIMIT 1), 0) AS wood,
-          (SELECT COUNT(*) FROM battles WHERE attacker_id = u.id OR defender_id = u.id)::int AS total_battles,
-          (SELECT COUNT(*) FROM battles
-           WHERE (attacker_id = u.id AND winner = 'attacker')
-              OR (defender_id = u.id AND winner = 'defender'))::int AS battle_wins,
-          (SELECT COUNT(*) FROM islands WHERE user_id = u.id)::int  AS island_count
+          COALESCE(r_gold.amount, 0)    AS gold,
+          COALESCE(r_food.amount, 0)    AS food,
+          COALESCE(r_wood.amount, 0)    AS wood,
+          COALESCE(bt.total_battles, 0) AS total_battles,
+          COALESCE(bw.wins, 0)          AS battle_wins,
+          COALESCE(ic.island_count, 0)  AS island_count
         FROM users u
         LEFT JOIN armies a ON a.user_id = u.id
+        LEFT JOIN resources r_gold ON r_gold.user_id = u.id AND r_gold.resource_type = 'gold'
+        LEFT JOIN resources r_food ON r_food.user_id = u.id AND r_food.resource_type = 'food'
+        LEFT JOIN resources r_wood ON r_wood.user_id = u.id AND r_wood.resource_type = 'wood'
+        LEFT JOIN (
+          SELECT user_id, SUM(cnt) AS total_battles FROM (
+            SELECT attacker_id AS user_id, COUNT(*) AS cnt FROM battles GROUP BY attacker_id
+            UNION ALL
+            SELECT defender_id AS user_id, COUNT(*) AS cnt FROM battles WHERE defender_id IS NOT NULL GROUP BY defender_id
+          ) t GROUP BY user_id
+        ) bt ON bt.user_id = u.id
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) AS wins FROM (
+            SELECT attacker_id AS user_id FROM battles WHERE winner = 'attacker'
+            UNION ALL
+            SELECT defender_id AS user_id FROM battles WHERE winner = 'defender' AND defender_id IS NOT NULL
+          ) w GROUP BY user_id
+        ) bw ON bw.user_id = u.id
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) AS island_count FROM islands GROUP BY user_id
+        ) ic ON ic.user_id = u.id
         WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
         ORDER BY u.created_at DESC
       `;
@@ -1219,11 +1237,11 @@ class AdminController {
           LIMIT 10
         `),
         query(`
-          SELECT u.id, u.username,
-                 COALESCE((SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'gold' LIMIT 1), 0) AS gold
+          SELECT u.id, u.username, COALESCE(r.amount, 0) AS gold
           FROM users u
+          LEFT JOIN resources r ON r.user_id = u.id AND r.resource_type = 'gold'
           WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
-          ORDER BY gold DESC
+          ORDER BY r.amount DESC NULLS LAST
           LIMIT 10
         `),
       ]);
