@@ -79,6 +79,10 @@
   .edt-rot{background:#1e3a5f;color:#60a5fa}
   .edt-del{background:#7f1d1d;color:#fca5a5}
   .edt-move-hint{color:#475569;font-size:9px;text-align:center}
+  #speedBtns{position:fixed;bottom:136px;right:14px;z-index:10;display:flex;flex-direction:column;gap:3px;}
+  .speed-btn{width:36px;height:20px;border-radius:5px;background:var(--panel);border:1px solid var(--border);color:#94a3b8;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;}
+  .speed-btn:hover{border-color:#475569;}
+  .speed-btn.active{background:linear-gradient(135deg,#e94560,#c2185b);border-color:#e94560;color:#fff;}
 </style>
 </head>
 <body>
@@ -130,6 +134,11 @@
 </div>
 
 <div id="soundToggle" onclick="toggleSound()">🔊</div>
+<div id="speedBtns">
+  <button class="speed-btn active" id="spd1" onclick="setSpeed(1)">1×</button>
+  <button class="speed-btn" id="spd2" onclick="setSpeed(2)">2×</button>
+  <button class="speed-btn" id="spd3" onclick="setSpeed(3)">3×</button>
+</div>
 <div id="assetError"></div>
 
 <button id="editorToggleBtn" onclick="toggleEditorPanel()">🏗️ Editör</button>
@@ -281,6 +290,14 @@ const modelCache = new Map();
 let mode='battle', gameState='setup', selectedTroop='infantry';
 let troops=[], buildings=[], projectiles=[];
 let battleTimer=180, stars=0, destructionPct=0, townHallDead=false, animT=0;
+let gameSpeed=1;
+let camFrustum=16, camPanX=0, camPanZ=0;
+let terrainMeshList=[], enemyTroops=[];
+const ENEMY_TYPES=[
+  {id:'grunt',hp:80,maxHp:80,dmg:15,spd:1.3,range:1.5,atkSpd:0.9,color:'#ef4444'},
+  {id:'brute',hp:200,maxHp:200,dmg:28,spd:0.8,range:1.5,atkSpd:1.4,color:'#dc2626'},
+  {id:'scout',hp:50,maxHp:50,dmg:12,spd:2.0,range:1.5,atkSpd:0.7,color:'#f97316'},
+];
 
 // Ordu sayıları URL'den okunuyor
 let troopCounts = {infantry:_infantry, archer:_archer, cavalry:_cavalry, healer:_healer, hero:1};
@@ -422,8 +439,7 @@ function initThree(){
   scene.fog=new THREE.FogExp2(0x5a9e3a,.006);
 
   const aspect=window.innerWidth/window.innerHeight;
-  const frustum=16;
-  camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,.1,200);
+  camera=new THREE.OrthographicCamera(-camFrustum*aspect,camFrustum*aspect,camFrustum,-camFrustum,.1,200);
   camera.position.set(30,30,30);
   camera.lookAt(0,0,0);
 
@@ -624,8 +640,14 @@ function updateHpBar(sprite,pct){
 // ================================================================
 function findTarget(tr){
   const d=TROOP_DEF[tr.type];const alive=buildings.filter(b=>b.hp>0);
-  if(!alive.length)return null;
   if(d.priority==='heal'){let best=null,bestHp=1;troops.forEach(t=>{if(t!==tr&&t.state!=='dead'&&t.type!=='healer'){const r=t.hp/t.maxHp;if(r<bestHp){bestHp=r;best=t;}}});return best;}
+  // Non-healer troops: fight nearby enemy troops first
+  if(enemyTroops.length>0){
+    let nearEnemy=null,nearEnemyD=Infinity;
+    enemyTroops.forEach(e=>{if(e.state!=='dead'){const dd=gDist(tr,e);if(dd<9&&dd<nearEnemyD){nearEnemyD=dd;nearEnemy=e;}}});
+    if(nearEnemy)return nearEnemy;
+  }
+  if(!alive.length)return null;
   if(d.priority==='defense'){const defs=alive.filter(b=>BLDG_DEF[b.type].isDef);const pool=defs.length?defs:alive;let best=null,bestD=Infinity;pool.forEach(b=>{const dd=gDist(tr,b);if(dd<bestD){bestD=dd;best=b;}});return best;}
   let best=null,bestD=Infinity;alive.forEach(b=>{const dd=gDist(tr,b);if(dd<bestD){bestD=dd;best=b;}});return best;
 }
@@ -671,7 +693,7 @@ function activateAbility(hero){
   SFX.play('star');
 }
 
-function dealDamage(b,dmg){b.hp-=dmg;if(b.hp<=0){b.hp=0;onDestroyed(b);}}
+function dealDamage(b,dmg){b.hp-=dmg;if(b.hp<=0){b.hp=0;if(b._isEnemy){b.state='dead';b.deadTimer=0;SFX.play('destroy');}else onDestroyed(b);}}
 
 async function onDestroyed(b){
   const mesh=buildingMeshes.get(b);
@@ -838,6 +860,134 @@ const SFX={
   }
 };
 window.toggleSound=()=>{SFX.enabled=!SFX.enabled;document.getElementById('soundToggle').textContent=SFX.enabled?'🔊':'🔇';};
+window.setSpeed=v=>{gameSpeed=v;[1,2,3].forEach(n=>{const b=document.getElementById('spd'+n);if(b)b.classList.toggle('active',n===v);});};
+
+// ================================================================
+//  ENEMY TROOPS
+// ================================================================
+function createEnemyMesh(e){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(e.color),roughness:.8});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.22,.28,.65,8),mat);
+  body.position.y=.33;body.castShadow=true;g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),new THREE.MeshStandardMaterial({color:0xcc1111}));
+  head.position.y=.82;g.add(head);
+  // Red flag indicator
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.5,4),new THREE.MeshBasicMaterial({color:0x888888}));
+  pole.position.set(.12,1.15,0);g.add(pole);
+  const flag=new THREE.Mesh(new THREE.BoxGeometry(.18,.12,.02),new THREE.MeshBasicMaterial({color:0xff0000}));
+  flag.position.set(.21,1.33,0);g.add(flag);
+  const pos=g2w(e.gx,e.gy);
+  g.position.set(pos.x,0,pos.z);
+  scene.add(g);
+  e._mesh=g;
+}
+
+function spawnEnemyWave(){
+  const total=_infantry+_archer+_cavalry;
+  const count=Math.max(4,Math.min(10,Math.floor(total*0.25)+4));
+  const spawnPoints=[];
+  for(let i=0;i<8;i++){
+    spawnPoints.push({gx:.5+Math.random()*3.5, gy:.5+Math.random()*3.5});          // top-left
+    spawnPoints.push({gx:GRID-4+Math.random()*3.5, gy:GRID-4+Math.random()*3.5}); // bottom-right
+  }
+  for(let i=0;i<count;i++){
+    const sp=spawnPoints[i%spawnPoints.length];
+    const def=ENEMY_TYPES[i%3===0?1:i%5===0?2:0];
+    const e={
+      _isEnemy:true, id:def.id,
+      hp:def.hp,maxHp:def.hp, dmg:def.dmg,spd:def.spd,range:def.range,atkSpd:def.atkSpd,
+      color:def.color, gx:sp.gx+Math.random()*.4-.2, gy:sp.gy+Math.random()*.4-.2,
+      state:'idle',target:null,atkTimer:0,deadTimer:0, _mesh:null,
+    };
+    enemyTroops.push(e);
+    createEnemyMesh(e);
+  }
+}
+
+function updateEnemyTroops(dt){
+  enemyTroops.forEach(e=>{
+    if(e.state==='dead'){
+      e.deadTimer+=dt;
+      if(e._mesh&&e.deadTimer<1.2){e._mesh.scale.y=Math.max(.01,1-e.deadTimer*.8);}
+      else if(e._mesh&&e.deadTimer>=1.2){scene.remove(e._mesh);e._mesh=null;}
+      return;
+    }
+    // Sync mesh position
+    if(e._mesh){const pos=g2w(e.gx,e.gy);e._mesh.position.set(pos.x,0,pos.z);}
+    // Find target: nearest player troop, else nearest building
+    if(!e.target||((e.target.state&&e.target.state==='dead')||(e.target.hp!==undefined&&e.target.hp<=0))){
+      let best=null,bestD=Infinity;
+      troops.forEach(t=>{if(t.state!=='dead'){const dd=gDist(e,t);if(dd<bestD){bestD=dd;best=t;}}});
+      if(!best){buildings.forEach(b=>{if(b.hp>0){const dd=gDist(e,b);if(dd<bestD){bestD=dd;best=b;}}});}
+      e.target=best;
+    }
+    if(!e.target){e.state='idle';return;}
+    const dist=gDist(e,e.target);
+    if(dist<=e.range){
+      e.state='attacking';e.atkTimer+=dt;
+      if(e.atkTimer>=e.atkSpd){
+        e.atkTimer=0;
+        if(e.target._isEnemy===undefined&&e.target.state!==undefined){
+          // Player troop
+          e.target.hp-=e.dmg;
+          if(e.target.hp<=0){e.target.hp=0;e.target.state='dead';e.target.deadTimer=0;}
+        }else{
+          dealDamage(e.target,e.dmg);
+        }
+        SFX.play('hit');
+      }
+    }else{
+      e.state='moving';e.atkTimer=0;
+      const dx=e.target.gx-e.gx,dy=e.target.gy-e.gy,dd=Math.sqrt(dx*dx+dy*dy);
+      if(dd>.1){const mv=e.spd*dt;e.gx+=(dx/dd)*Math.min(mv,dd);e.gy+=(dy/dd)*Math.min(mv,dd);}
+      if(e._mesh&&e.target){
+        const tp=g2w(e.target.gx,e.target.gy),p=g2w(e.gx,e.gy);
+        e._mesh.rotation.y=Math.atan2(tp.x-p.x,tp.z-p.z);
+      }
+    }
+  });
+  enemyTroops=enemyTroops.filter(e=>e.state!=='dead'||e.deadTimer<1.5);
+}
+
+// ================================================================
+//  TERRAIN
+// ================================================================
+async function spawnTerrain(){
+  const c=GRID/2, meshes=[];
+  const treeDef=ALL_MODELS['tree'], rockDef=ALL_MODELS['rock'];
+  // Trees
+  let placed=0;
+  for(let i=0;i<300&&placed<14;i++){
+    const gx=.5+Math.random()*(GRID-1), gy=.5+Math.random()*(GRID-1);
+    if(Math.abs(gx-c)<6.5&&Math.abs(gy-c)<6.5)continue;
+    try{
+      const {scene:ms}=await loadModelData(treeDef.path);
+      const sc=treeDef.scale*(.75+Math.random()*.5);
+      ms.scale.set(sc,sc,sc);
+      const pos=g2w(gx,gy);ms.position.set(pos.x,0,pos.z);
+      ms.rotation.y=Math.random()*Math.PI*2;
+      ms.traverse(ch=>{if(ch.isMesh){ch.castShadow=true;ch.receiveShadow=true;}});
+      scene.add(ms);meshes.push(ms);placed++;
+    }catch(e){}
+  }
+  // Rocks
+  placed=0;
+  for(let i=0;i<200&&placed<8;i++){
+    const gx=.5+Math.random()*(GRID-1), gy=.5+Math.random()*(GRID-1);
+    if(Math.abs(gx-c)<5.5&&Math.abs(gy-c)<5.5)continue;
+    try{
+      const {scene:ms}=await loadModelData(rockDef.path);
+      const sc=rockDef.scale*(.5+Math.random()*.6);
+      ms.scale.set(sc,sc,sc);
+      const pos=g2w(gx,gy);ms.position.set(pos.x,0,pos.z);
+      ms.rotation.y=Math.random()*Math.PI*2;
+      ms.traverse(ch=>{if(ch.isMesh){ch.castShadow=true;ch.receiveShadow=true;}});
+      scene.add(ms);meshes.push(ms);placed++;
+    }catch(e){}
+  }
+  return meshes;
+}
 
 // ================================================================
 //  BASE & SPAWNING
@@ -902,13 +1052,14 @@ async function spawnTroop(type,gx,gy){
 //  UI
 // ================================================================
 window.selectTroop=t=>{selectedTroop=t;document.querySelectorAll('.troop-slot').forEach(el=>el.classList.toggle('selected',el.dataset.troop===t));};
-window.startBattle=()=>{if(!troops.length)return;SFX.init();gameState='battle';document.getElementById('battleBtn').style.display='none';document.getElementById('instructions').style.opacity='0';};
+window.startBattle=()=>{if(!troops.length)return;SFX.init();gameState='battle';document.getElementById('battleBtn').style.display='none';document.getElementById('instructions').style.opacity='0';spawnEnemyWave();};
 window.endBattle=()=>{
   gameState='ended';document.getElementById('resultOverlay').classList.add('show');
   document.getElementById('resultTitle').textContent=stars>=1?'ZAFER!':'YENİLGİ!';
   document.getElementById('resultTitle').style.color=stars>=1?'var(--gold)':'var(--red)';
   document.getElementById('resultStats').innerHTML=`Yıkım: ${destructionPct}%<br>Yıldız: ${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}`;
-  // Klan savaşı modunda sonucu parent'a gönder
+  // Her modda sonucu parent frame'e gönder
+  window.parent.postMessage({type:'battle_result',stars,damage:destructionPct,won:stars>=1},'*');
   if(_clanWarMode){
     const btn=document.querySelector('.result-btn');
     if(btn){btn.textContent='✅ Sonucu Kaydet';btn.style.background='linear-gradient(135deg,#7c3aed,#4f46e5)';}
@@ -921,7 +1072,11 @@ window.resetGame=async()=>{
   troopMeshes.forEach(m=>scene.remove(m));troopMeshes.clear();
   buildingMeshes.forEach(m=>scene.remove(m));buildingMeshes.clear();
   projectiles.forEach(p=>{if(p.mesh)scene.remove(p.mesh);});
+  enemyTroops.forEach(e=>{if(e._mesh)scene.remove(e._mesh);});
+  enemyTroops=[];
+  terrainMeshList.forEach(m=>scene.remove(m));terrainMeshList=[];
   troops=[];projectiles=[];battleTimer=180;stars=0;destructionPct=0;townHallDead=false;
+  gameSpeed=1;window.setSpeed(1);
   // URL'den tekrar oku (reset sonrası ordu yenilenir)
   troopCounts={infantry:_infantry,archer:_archer,cavalry:_cavalry,healer:_healer,hero:1};
   Object.keys(troopCounts).forEach(k=>{const el=document.getElementById(`cnt-${k}`);if(el)el.textContent=troopCounts[k];});
@@ -930,7 +1085,9 @@ window.resetGame=async()=>{
   const m=Math.floor(battleTimer/60),s=Math.floor(battleTimer%60);
   document.getElementById('timerText').textContent=`${m}:${s.toString().padStart(2,'0')}`;
   document.getElementById('battleBtn').style.display='';document.getElementById('instructions').style.opacity='1';
-  await generateBase();selectTroop('infantry');
+  await generateBase();
+  terrainMeshList=await spawnTerrain();
+  selectTroop('infantry');
 };
 
 // ================================================================
@@ -1183,18 +1340,21 @@ window.copyEditorConfig=()=>{
 // ================================================================
 function gameLoop(){
   requestAnimationFrame(gameLoop);
-  const dt=Math.min(clock.getDelta(),.05);animT+=dt;
+  const dt=Math.min(clock.getDelta(),.05);
+  const sdt=dt*gameSpeed;
+  animT+=sdt;
   if(gameState==='battle'){
-    battleTimer-=dt;
+    battleTimer-=sdt;
     const m=Math.floor(Math.max(0,battleTimer)/60),s=Math.floor(Math.max(0,battleTimer)%60);
     document.getElementById('timerText').textContent=`${m}:${s.toString().padStart(2,'0')}`;
-    updateTroops(dt);updateDefenses(dt);updateProjectiles(dt);
-    troops.forEach(t=>{if(t.mixer)t.mixer.update(dt);});
+    updateTroops(sdt);updateDefenses(sdt);updateProjectiles(sdt);
+    troops.forEach(t=>{if(t.mixer)t.mixer.update(sdt);});
+    updateEnemyTroops(sdt);
     const allDead=troops.length>0&&troops.every(t=>t.state==='dead');
     const noMore=Object.values(troopCounts).every(c=>c===0);
     if(battleTimer<=0||destructionPct>=100||(allDead&&noMore))endBattle();
   }
-  updateMeshes(dt);
+  updateMeshes(sdt);
   renderer.render(scene,camera);
 }
 
@@ -1206,6 +1366,8 @@ async function init(){
   initThree();
   await preloadAssets();
   await generateBase();
+  setLoading(92,'Arazi oluşturuluyor...');
+  terrainMeshList=await spawnTerrain();
 
   renderer.domElement.addEventListener('click',onClick);
   renderer.domElement.addEventListener('mousedown',_edMouseDown);
@@ -1213,9 +1375,34 @@ async function init(){
   renderer.domElement.addEventListener('mouseup',_edMouseUp);
   renderer.domElement.addEventListener('touchstart',e=>{e.preventDefault();onClick({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY});});
 
+  // Camera zoom via wheel
+  renderer.domElement.addEventListener('wheel',e=>{
+    e.preventDefault();
+    camFrustum=Math.max(6,Math.min(32,camFrustum+e.deltaY*.025));
+    const a=window.innerWidth/window.innerHeight;
+    camera.left=-camFrustum*a;camera.right=camFrustum*a;camera.top=camFrustum;camera.bottom=-camFrustum;
+    camera.updateProjectionMatrix();
+  },{passive:false});
+
+  // Camera pan via right-click drag
+  let _rpDown=false,_rpLast={x:0,y:0};
+  renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+  renderer.domElement.addEventListener('mousedown',e=>{if(e.button===2){_rpDown=true;_rpLast={x:e.clientX,y:e.clientY};}});
+  renderer.domElement.addEventListener('mousemove',e=>{
+    if(!_rpDown)return;
+    const dx=e.clientX-_rpLast.x,dy=e.clientY-_rpLast.y;
+    _rpLast={x:e.clientX,y:e.clientY};
+    const f=camFrustum*0.022;
+    camPanX=Math.max(-20,Math.min(20,camPanX+(dy-dx)*f*.5));
+    camPanZ=Math.max(-20,Math.min(20,camPanZ+(dy+dx)*f*.5));
+    camera.position.set(30+camPanX,30,30+camPanZ);
+    camera.lookAt(camPanX,0,camPanZ);
+  });
+  renderer.domElement.addEventListener('mouseup',e=>{if(e.button===2)_rpDown=false;});
+
   window.addEventListener('resize',()=>{
-    const a=window.innerWidth/window.innerHeight,f=16;
-    camera.left=-f*a;camera.right=f*a;camera.top=f;camera.bottom=-f;
+    const a=window.innerWidth/window.innerHeight;
+    camera.left=-camFrustum*a;camera.right=camFrustum*a;camera.top=camFrustum;camera.bottom=-camFrustum;
     camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);
   });
 

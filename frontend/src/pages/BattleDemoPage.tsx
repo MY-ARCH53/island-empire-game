@@ -6,11 +6,13 @@ export default function BattleDemoPage() {
   const navigate = useNavigate();
   const [army, setArmy] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [battleResult, setBattleResult] = useState<{stars:number,damage:number,won:boolean}|null>(null);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (!userData) { navigate('/login'); return; }
     const user = JSON.parse(userData);
+    if (!user.is_admin) { navigate('/home'); return; }
 
     battleAPI.getArmy(user.id)
       .then((res: any) => {
@@ -24,6 +26,22 @@ export default function BattleDemoPage() {
         setLoading(false);
       });
   }, [navigate]);
+
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== 'battle_result') return;
+      const { stars, damage, won } = e.data;
+      setBattleResult({ stars, damage, won });
+      // Save result via API (fire-and-forget)
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        battleAPI.saveDemoResult?.(user.id, { stars, damage, won }).catch(() => {});
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
 
   const inf = army?.infantry_count ?? 20;
   const arc = army?.archer_count ?? 15;
@@ -98,6 +116,22 @@ export default function BattleDemoPage() {
           </a>
         </div>
       </div>
+
+      {/* Savaş sonucu banner */}
+      {battleResult && (
+        <div style={{
+          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
+          background: battleResult.won ? 'linear-gradient(135deg,#166534,#15803d)' : 'linear-gradient(135deg,#7f1d1d,#991b1b)',
+          border: `2px solid ${battleResult.won ? '#4ade80' : '#f87171'}`,
+          color: '#fff', padding: '10px 24px', borderRadius: 12,
+          fontWeight: 700, fontSize: 15, zIndex: 10, textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        }}>
+          {battleResult.won ? '🏆 ZAFER!' : '💀 YENİLGİ'} &nbsp;|&nbsp;
+          {'⭐'.repeat(battleResult.stars)}{'☆'.repeat(3 - battleResult.stars)} &nbsp;|&nbsp;
+          Yıkım: {battleResult.damage}%
+        </div>
+      )}
 
       {/* Oyun iframe */}
       <iframe
