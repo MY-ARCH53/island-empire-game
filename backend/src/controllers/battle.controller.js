@@ -156,7 +156,7 @@ class BattleController {
         [userId]
       );
       const lastSeen = presenceRes.rows[0]?.last_seen;
-      if (!lastSeen || (Date.now() - new Date(lastSeen).getTime()) > 60000) {
+      if (!lastSeen || (Date.now() - new Date(lastSeen).getTime()) > 120000) {
         return res.status(403).json({
           success: false,
           message: 'Korsan saldırısı için oyunun tarayıcıda açık olması gerekiyor'
