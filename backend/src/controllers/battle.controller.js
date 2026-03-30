@@ -146,7 +146,17 @@ class BattleController {
   // Korsana saldır
   static async attackPirate(req, res) {
     try {
-      const { userId, pirateId } = req.body;
+      const userId = req.userId; // JWT'den al
+      const { pirateId } = req.body;
+
+      // Hız kontrolü: son 3 saniyede saldırı yaptı mı?
+      const rateCheck = await query(
+        `SELECT id FROM pirate_attacks WHERE attacker_id = $1 AND created_at > NOW() - INTERVAL '3 seconds'`,
+        [userId]
+      );
+      if (rateCheck.rows.length > 0) {
+        return res.status(429).json({ success: false, message: 'Çok hızlı saldırıyorsun, biraz bekle' });
+      }
 
       // Günlük limit kontrolü
       const limitRes = await query(
