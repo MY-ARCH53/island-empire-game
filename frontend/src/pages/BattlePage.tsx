@@ -929,7 +929,14 @@ function BattlePage() {
 }
 
 // ── Reklam Sayaç Modalı ───────────────────────────────────────────────────────
+const ADSTERRA_SMARTLINK = 'https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70';
+
 function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick: () => void; onComplete: () => void }) {
+  useEffect(() => {
+    // Modal açılınca Adsterra reklamını yeni sekmede aç
+    window.open(ADSTERRA_SMARTLINK, '_blank');
+  }, []);
+
   useEffect(() => {
     if (countdown <= 0) { onComplete(); return; }
     const timer = setTimeout(onTick, 1000);
