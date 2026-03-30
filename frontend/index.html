@@ -112,5 +112,16 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
+      const BUILD_VERSION = '20260330-3';
+      const stored = localStorage.getItem('app_version');
+      if (stored && stored !== BUILD_VERSION) {
+        localStorage.setItem('app_version', BUILD_VERSION);
+        window.location.reload(true);
+      } else if (!stored) {
+        localStorage.setItem('app_version', BUILD_VERSION);
+      }
+    </script>
   </body>
 </html>
