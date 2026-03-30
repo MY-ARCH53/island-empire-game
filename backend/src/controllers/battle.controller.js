@@ -697,10 +697,10 @@ class BattleController {
         [token]
       );
 
-      res.redirect('https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70');
+      res.redirect('https://www.profitablecpmratenetwork.com/thaawfn7?key=caf68e0ca91e1901d37e7a32fa07cffe');
     } catch (error) {
       console.error('adRedirect error:', error);
-      res.redirect('https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70');
+      res.redirect('https://www.profitablecpmratenetwork.com/thaawfn7?key=caf68e0ca91e1901d37e7a32fa07cffe');
     }
   }
 
