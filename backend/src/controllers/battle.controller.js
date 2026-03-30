@@ -650,28 +650,9 @@ class BattleController {
         return res.status(400).json({ success: false, message: 'Henüz limite ulaşmadın' });
       }
 
-      // Günlük maksimum 5 reklam izleme hakkı (users tablosunda last_ad_reward_date + ad_reward_count)
-      const userRes = await query(
-        `SELECT ad_reward_count, ad_reward_date FROM users WHERE id = $1`,
-        [userId]
-      );
-      const user = userRes.rows[0];
-      const today = new Date().toISOString().slice(0, 10);
-      const adDate = user.ad_reward_date ? new Date(user.ad_reward_date).toISOString().slice(0, 10) : null;
-      const todayCount = adDate === today ? (user.ad_reward_count || 0) : 0;
-
-      if (todayCount >= 5) {
-        return res.status(400).json({ success: false, message: 'Günlük maksimum reklam hakkını kullandın (5/5)' });
-      }
-
       await query(
         `DELETE FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
         [userId]
-      );
-
-      await query(
-        `UPDATE users SET ad_reward_count = $1, ad_reward_date = CURRENT_DATE WHERE id = $2`,
-        [todayCount + 1, userId]
       );
 
       res.json({ success: true, message: 'Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.' });
