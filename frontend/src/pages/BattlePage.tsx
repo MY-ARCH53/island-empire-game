@@ -943,8 +943,11 @@ function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick:
   }, [countdown, adOpened]);
 
   const handleOpenAd = () => {
-    // Direkt kullanıcı tıklamasıyla aç — popup engelleyici geçilir
-    window.open(ADSTERRA_SMARTLINK, '_blank');
+    const popup = window.open(ADSTERRA_SMARTLINK, '_blank');
+    if (!popup) {
+      alert('Tarayıcın açılır pencereyi engelledi. Lütfen bu site için açılır pencere iznini aç ve tekrar dene.');
+      return;
+    }
     setAdOpened(true);
   };
 
