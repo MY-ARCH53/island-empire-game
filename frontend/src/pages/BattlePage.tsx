@@ -948,7 +948,14 @@ function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick:
       alert('Tarayıcın açılır pencereyi engelledi. Lütfen bu site için açılır pencere iznini aç ve tekrar dene.');
       return;
     }
-    setAdOpened(true);
+    // 1.5 saniye sonra AdBlock tarafından kapatılıp kapatılmadığını kontrol et
+    setTimeout(() => {
+      if (popup.closed) {
+        alert('Reklam engelleyici tespit edildi. Lütfen reklam engelleyicini kapat ve tekrar dene.');
+        return;
+      }
+      setAdOpened(true);
+    }, 1500);
   };
 
   const pct = Math.round(((5 - countdown) / 5) * 100);
