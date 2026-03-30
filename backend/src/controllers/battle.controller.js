@@ -1,4 +1,5 @@
 const { query } = require('../config/database');
+const crypto = require('crypto');
 
 class BattleController {
   // Ordu bilgisini getir veya oluştur
@@ -149,9 +150,22 @@ class BattleController {
       const userId = req.userId; // JWT'den al
       const { pirateId } = req.body;
 
-      // Hız kontrolü: son 3 saniyede saldırı yaptı mı?
+      // Tarayıcı varlık kontrolü: son 60 saniyede heartbeat geldi mi?
+      const presenceRes = await query(
+        `SELECT last_seen FROM users WHERE id = $1`,
+        [userId]
+      );
+      const lastSeen = presenceRes.rows[0]?.last_seen;
+      if (!lastSeen || (Date.now() - new Date(lastSeen).getTime()) > 60000) {
+        return res.status(403).json({
+          success: false,
+          message: 'Korsan saldırısı için oyunun tarayıcıda açık olması gerekiyor'
+        });
+      }
+
+      // Hız kontrolü: son 2 saniyede saldırı yaptı mı?
       const rateCheck = await query(
-        `SELECT id FROM pirate_attacks WHERE attacker_id = $1 AND created_at > NOW() - INTERVAL '3 seconds'`,
+        `SELECT id FROM pirate_attacks WHERE attacker_id = $1 AND created_at > NOW() - INTERVAL '2 seconds'`,
         [userId]
       );
       if (rateCheck.rows.length > 0) {
@@ -646,12 +660,11 @@ class BattleController {
     }
   }
 
-  // Reklam izleme ödülü — korsan saldırı sayacını sıfırla
-  static async watchAdReward(req, res) {
+  // Reklam oturumu başlat — token üret
+  static async adStart(req, res) {
     try {
-      const userId = req.userId; // JWT'den al, body'den değil
+      const userId = req.userId;
 
-      // Gerçekten limite ulaşmış mı kontrol et
       const limitRes = await query(
         `SELECT COUNT(*) FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
         [userId]
@@ -660,6 +673,49 @@ class BattleController {
         return res.status(400).json({ success: false, message: 'Henüz limite ulaşmadın' });
       }
 
+      const token = crypto.randomBytes(32).toString('hex');
+      await query(
+        `UPDATE users SET ad_session_token = $1, ad_session_started_at = NOW() WHERE id = $2`,
+        [token, userId]
+      );
+
+      res.json({ success: true, data: { token } });
+    } catch (error) {
+      console.error('adStart error:', error);
+      res.status(500).json({ success: false, message: 'Hata oluştu' });
+    }
+  }
+
+  // Reklam izleme ödülü — token + 5 saniye doğrula
+  static async watchAdReward(req, res) {
+    try {
+      const userId = req.userId;
+      const { token } = req.body;
+
+      if (!token) return res.status(400).json({ success: false, message: 'Token gerekli' });
+
+      const userRes = await query(
+        `SELECT ad_session_token, ad_session_started_at FROM users WHERE id = $1`,
+        [userId]
+      );
+      const user = userRes.rows[0];
+
+      if (!user.ad_session_token || user.ad_session_token !== token) {
+        return res.status(403).json({ success: false, message: 'Geçersiz token' });
+      }
+
+      const elapsed = (Date.now() - new Date(user.ad_session_started_at).getTime()) / 1000;
+      if (elapsed < 5) {
+        return res.status(400).json({ success: false, message: 'Reklam henüz tamamlanmadı' });
+      }
+      if (elapsed > 120) {
+        return res.status(400).json({ success: false, message: 'Reklam süresi doldu, tekrar dene' });
+      }
+
+      await query(
+        `UPDATE users SET ad_session_token = NULL, ad_session_started_at = NULL WHERE id = $1`,
+        [userId]
+      );
       await query(
         `DELETE FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
         [userId]
