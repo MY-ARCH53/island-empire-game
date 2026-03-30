@@ -64,22 +64,8 @@
 
     <!-- Adsterra Social Bar -->
     <script src="https://pl29016161.profitablecpmratenetwork.com/c8/bf/15/c8bf150b3138ac3bed27b58d1c2fb819.js"></script>
-    <!-- Adsterra Popunder — 5 dakikada bir -->
+    <!-- Adsterra Popunder -->
     <script src="https://pl29016159.profitablecpmratenetwork.com/f4/63/f5/f463f596dcdffc98b2a7cb780a02b3a7.js"></script>
-    <script>
-      (function() {
-        var INTERVAL = 5 * 60 * 1000;
-        var _origOpen = window.open;
-        window.open = function() {
-          var last = localStorage.getItem('last_popunder');
-          if (last && (Date.now() - parseInt(last)) < INTERVAL) {
-            return null;
-          }
-          localStorage.setItem('last_popunder', Date.now().toString());
-          return _origOpen.apply(window, arguments);
-        };
-      })();
-    </script>
     <!-- Adsterra Native Banner -->
     <script async="async" data-cfasync="false" src="https://pl29016160.profitablecpmratenetwork.com/d27fa9a24250b0a1a29da0c21d2d0649/invoke.js"></script>
 
@@ -128,7 +114,7 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
-      const BUILD_VERSION = '20260330-5';
+      const BUILD_VERSION = '20260330-6';
       const stored = localStorage.getItem('app_version');
       if (stored && stored !== BUILD_VERSION) {
         localStorage.setItem('app_version', BUILD_VERSION);
