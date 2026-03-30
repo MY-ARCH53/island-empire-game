@@ -751,7 +751,7 @@ function HomePage() {
       })()}
 
       {/* ════════════ ANA İÇERİK ════════════ */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', paddingBottom: 100 }}>
+      <main style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', paddingBottom: 160 }}>
 
         {/* Streak tehlikede banner */}
         {streakAtRisk && (
@@ -1016,6 +1016,10 @@ function HomePage() {
             <p style={{ color: '#475569', fontSize: 13, marginTop: 8 }}>Oyunu yeniden başlat.</p>
           </div>
         )}
+
+        {/* ════════════ ADSTERRA NATIVE BANNER ════════════ */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }} id="container-d27fa9a24250b0a1a29da0c21d2d0649"></div>
+
       </main>
 
       {/* ════════════ PANEL: GÖREVLER ════════════ */}
@@ -1308,11 +1312,6 @@ function HomePage() {
           </div>
         </BottomPanel>
       )}
-
-      {/* ════════════ ADSTERRA NATIVE BANNER ════════════ */}
-      <div style={{ position: 'fixed', bottom: 62, left: 0, right: 0, zIndex: 49, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-        <div style={{ pointerEvents: 'auto' }} id="container-d27fa9a24250b0a1a29da0c21d2d0649"></div>
-      </div>
 
       {/* ════════════ ALT NAVİGASYON ════════════ */}
       <nav style={{
