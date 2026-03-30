@@ -932,16 +932,21 @@ function BattlePage() {
 const ADSTERRA_SMARTLINK = 'https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70';
 
 function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick: () => void; onComplete: () => void }) {
-  useEffect(() => {
-    // Modal açılınca Adsterra reklamını yeni sekmede aç
-    window.open(ADSTERRA_SMARTLINK, '_blank');
-  }, []);
+  const [adOpened, setAdOpened] = useState(false);
 
+  // Sayaç sadece reklam açıldıktan sonra başlar
   useEffect(() => {
+    if (!adOpened) return;
     if (countdown <= 0) { onComplete(); return; }
     const timer = setTimeout(onTick, 1000);
     return () => clearTimeout(timer);
-  }, [countdown]);
+  }, [countdown, adOpened]);
+
+  const handleOpenAd = () => {
+    // Direkt kullanıcı tıklamasıyla aç — popup engelleyici geçilir
+    window.open(ADSTERRA_SMARTLINK, '_blank');
+    setAdOpened(true);
+  };
 
   const pct = Math.round(((5 - countdown) / 5) * 100);
 
@@ -951,28 +956,46 @@ function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick:
         background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
         borderRadius: 24, padding: '40px 32px', textAlign: 'center', minWidth: 280, maxWidth: 340,
       }}>
-        <div style={{ fontSize: 56, marginBottom: 8 }}>📺</div>
-        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Reklam İzleniyor</div>
-        <div style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>
-          Reklam bitince 10 saldırı hakkın yenilenir
-        </div>
-
-        {/* Büyük sayaç */}
-        <div style={{ fontSize: 56, fontWeight: 900, color: '#fbbf24', lineHeight: 1, marginBottom: 20 }}>
-          {countdown}
-        </div>
-
-        {/* Progress bar */}
-        <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', width: `${pct}%`,
-            background: 'linear-gradient(90deg,#f59e0b,#fbbf24)',
-            borderRadius: 99, transition: 'width 0.9s linear',
-          }} />
-        </div>
-        <div style={{ color: '#475569', fontSize: 12, marginTop: 12 }}>
-          Lütfen bekleyin...
-        </div>
+        {!adOpened ? (
+          <>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>📺</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Reklam İzle</div>
+            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 28 }}>
+              Reklamı izleyerek 10 saldırı hakkını yenile
+            </div>
+            <button
+              onClick={handleOpenAd}
+              style={{
+                background: 'linear-gradient(135deg,#f59e0b,#ef4444)',
+                border: 'none', borderRadius: 14, color: '#fff',
+                fontWeight: 800, fontSize: 16, padding: '14px 36px',
+                cursor: 'pointer', boxShadow: '0 0 20px rgba(245,158,11,0.4)',
+                width: '100%',
+              }}
+            >
+              ▶ Reklamı Aç
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 56, marginBottom: 8 }}>⏳</div>
+            <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Reklam İzleniyor</div>
+            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 24 }}>
+              Reklam bitince 10 saldırı hakkın yenilenir
+            </div>
+            <div style={{ fontSize: 56, fontWeight: 900, color: '#fbbf24', lineHeight: 1, marginBottom: 20 }}>
+              {countdown}
+            </div>
+            <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${pct}%`,
+                background: 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+                borderRadius: 99, transition: 'width 0.9s linear',
+              }} />
+            </div>
+            <div style={{ color: '#475569', fontSize: 12, marginTop: 12 }}>Lütfen bekleyin...</div>
+          </>
+        )}
       </div>
     </div>
   );
