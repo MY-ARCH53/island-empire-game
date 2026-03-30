@@ -64,6 +64,27 @@
 
     <!-- Adsterra Social Bar -->
     <script src="https://pl29016161.profitablecpmratenetwork.com/c8/bf/15/c8bf150b3138ac3bed27b58d1c2fb819.js"></script>
+    <!-- Popunder frekans: 5 dakikada bir — Adsterra scriptinden ÖNCE olmalı -->
+    <script>
+      (function() {
+        var INTERVAL = 5 * 60 * 1000;
+        var _orig = window.open;
+        window.open = function(url, target, features) {
+          var u = url ? String(url) : '';
+          // Kendi domainimizi serbest bırak (korsan reklam sistemi vs.)
+          if (!u || u.indexOf('islandsempire.com') !== -1 || u.indexOf('localhost') !== -1 || u.charAt(0) === '/') {
+            return _orig.apply(window, arguments);
+          }
+          // Dış URL (popunder reklamı): frekans kontrolü
+          var last = localStorage.getItem('pu_last');
+          if (last && (Date.now() - parseInt(last)) < INTERVAL) {
+            return null;
+          }
+          localStorage.setItem('pu_last', Date.now().toString());
+          return _orig.apply(window, arguments);
+        };
+      })();
+    </script>
     <!-- Adsterra Popunder -->
     <script src="https://pl29016159.profitablecpmratenetwork.com/f4/63/f5/f463f596dcdffc98b2a7cb780a02b3a7.js"></script>
     <!-- Adsterra Native Banner -->
@@ -114,7 +135,7 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
-      const BUILD_VERSION = '20260330-7';
+      const BUILD_VERSION = '20260330-8';
       const stored = localStorage.getItem('app_version');
       if (stored && stored !== BUILD_VERSION) {
         localStorage.setItem('app_version', BUILD_VERSION);
