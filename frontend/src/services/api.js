@@ -204,6 +204,8 @@ export const admin2API = {
 export const chatAPI = {
   getGlobal: (since) => api.get(`/chat/global${since ? `?since=${since}` : ''}`),
   sendGlobal: (message) => api.post('/chat/global', { message }),
+  deleteGlobalMessage: (id) => api.delete(`/chat/global/${id}`),
+  editGlobalMessage: (id, message) => api.put(`/chat/global/${id}`, { message }),
   sendDm: (receiverId, message) => api.post('/chat/dm', { receiverId, message }),
   getConversation: (otherId) => api.get(`/chat/dm/${otherId}`),
   getConversations: () => api.get('/chat/conversations'),

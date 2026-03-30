@@ -11,7 +11,7 @@ class ChatController {
 
       if (since) {
         sql = `
-          SELECT gc.id, gc.message, gc.created_at, u.username, u.level, u.league
+          SELECT gc.id, gc.user_id, gc.message, gc.created_at, u.username, u.level, u.league, u.is_admin
           FROM global_chat gc
           JOIN users u ON u.id = gc.user_id
           WHERE gc.created_at > $1
@@ -20,7 +20,7 @@ class ChatController {
         params = [new Date(parseInt(since))];
       } else {
         sql = `
-          SELECT gc.id, gc.message, gc.created_at, u.username, u.level, u.league
+          SELECT gc.id, gc.user_id, gc.message, gc.created_at, u.username, u.level, u.league, u.is_admin
           FROM global_chat gc
           JOIN users u ON u.id = gc.user_id
           ORDER BY gc.created_at DESC
@@ -66,13 +66,44 @@ class ChatController {
         [userId, message.trim()]
       );
 
-      const userRes = await query('SELECT username, level, league FROM users WHERE id = $1', [userId]);
-      const msg = { ...result.rows[0], ...userRes.rows[0] };
+      const userRes = await query('SELECT username, level, league, is_admin FROM users WHERE id = $1', [userId]);
+      const msg = { ...result.rows[0], user_id: userId, ...userRes.rows[0] };
 
       res.json({ success: true, data: { message: msg } });
     } catch (error) {
       console.error('sendGlobalMessage error:', error);
       res.status(500).json({ success: false, message: 'Mesaj gönderilemedi' });
+    }
+  }
+
+  // Global mesaj sil (sadece admin)
+  static async deleteGlobalMessage(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.userId;
+      const adminCheck = await query('SELECT is_admin FROM users WHERE id = $1', [userId]);
+      if (!adminCheck.rows[0]?.is_admin) return res.status(403).json({ success: false, message: 'Yetkisiz' });
+      await query('DELETE FROM global_chat WHERE id = $1', [id]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Silinemedi' });
+    }
+  }
+
+  // Global mesaj düzenle (sadece admin)
+  static async editGlobalMessage(req, res) {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      const userId = req.userId;
+      const adminCheck = await query('SELECT is_admin FROM users WHERE id = $1', [userId]);
+      if (!adminCheck.rows[0]?.is_admin) return res.status(403).json({ success: false, message: 'Yetkisiz' });
+      if (!message || message.trim().length === 0) return res.status(400).json({ success: false, message: 'Mesaj boş olamaz' });
+      const result = await query('UPDATE global_chat SET message = $1 WHERE id = $2 RETURNING id', [message.trim(), id]);
+      if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Mesaj bulunamadı' });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Düzenlenemedi' });
     }
   }
 

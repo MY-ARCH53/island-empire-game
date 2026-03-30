@@ -40,6 +40,11 @@ function ChatPage() {
   const [toast, setToast] = useState('');
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
+  // Admin mesaj düzenleme
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
+  const [hoveredMsgId, setHoveredMsgId] = useState<number | null>(null);
+
   // Global polling
   useEffect(() => {
     loadGlobal();
@@ -194,6 +199,24 @@ function ChatPage() {
     setSupportSending(false);
   };
 
+  const deleteGlobalMessage = async (id: number) => {
+    try {
+      await chatAPI.deleteGlobalMessage(id);
+      setGlobalMessages(prev => prev.filter((m: any) => m.id !== id));
+    } catch { showToast('Silinemedi'); }
+  };
+
+  const startEdit = (msg: any) => { setEditingId(msg.id); setEditText(msg.message); };
+
+  const saveEdit = async () => {
+    if (!editingId || !editText.trim()) return;
+    try {
+      await chatAPI.editGlobalMessage(editingId, editText.trim());
+      setGlobalMessages(prev => prev.map((m: any) => m.id === editingId ? { ...m, message: editText.trim() } : m));
+      setEditingId(null); setEditText('');
+    } catch { showToast('Düzenlenemedi'); }
+  };
+
   const handleKey = (e: React.KeyboardEvent, fn: () => void) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); fn(); }
   };
@@ -265,25 +288,97 @@ function ChatPage() {
               )}
               {globalMessages.map((msg: any) => {
                 const isMe = msg.user_id === me.id || msg.username === me.username;
+                const isAdmin = msg.is_admin;
+                const isHovered = hoveredMsgId === msg.id;
                 return (
-                  <div key={msg.id} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: 8, alignItems: 'flex-end' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                      {msg.username?.[0]?.toUpperCase()}
+                  <div key={msg.id}
+                    style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: 8, alignItems: 'flex-end', position: 'relative' }}
+                    onMouseEnter={() => setHoveredMsgId(msg.id)}
+                    onMouseLeave={() => setHoveredMsgId(null)}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                      background: isAdmin ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : 'linear-gradient(135deg,#3b82f6,#8b5cf6)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
+                      boxShadow: isAdmin ? '0 0 10px rgba(245,158,11,0.5)' : 'none',
+                    }}>
+                      {isAdmin ? '👑' : msg.username?.[0]?.toUpperCase()}
                     </div>
+
                     <div style={{ maxWidth: '70%' }}>
+                      {/* İsim satırı */}
                       {!isMe && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: leagueColor(msg.league) }}>{msg.username}</span>
-                          <span style={{ fontSize: 10, color: '#475569' }}>Lv{msg.level}</span>
+                          {isAdmin ? (
+                            <>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', textShadow: '0 0 8px rgba(245,158,11,0.6)', letterSpacing: '0.02em' }}>
+                                {msg.username}
+                              </span>
+                              <span style={{ fontSize: 10, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>
+                                ADMIN
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: leagueColor(msg.league) }}>{msg.username}</span>
+                              <span style={{ fontSize: 10, color: '#475569' }}>Lv{msg.level}</span>
+                            </>
+                          )}
                         </div>
                       )}
-                      <div style={{ background: isMe ? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : 'rgba(255,255,255,0.08)', borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '8px 14px', fontSize: 14 }}>
-                        {msg.message}
-                      </div>
+
+                      {/* Mesaj balonu */}
+                      {editingId === msg.id ? (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input
+                            value={editText}
+                            onChange={e => setEditText(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') { setEditingId(null); } }}
+                            autoFocus
+                            style={{ flex: 1, background: 'rgba(245,158,11,0.1)', border: '1px solid #f59e0b', borderRadius: 8, padding: '6px 10px', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
+                          />
+                          <button onClick={saveEdit} style={{ background: '#f59e0b', border: 'none', borderRadius: 8, color: '#000', padding: '4px 10px', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>✓</button>
+                          <button onClick={() => setEditingId(null)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#94a3b8', padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                        </div>
+                      ) : (
+                        <div style={{
+                          background: isAdmin
+                            ? 'linear-gradient(135deg,rgba(245,158,11,0.18),rgba(239,68,68,0.12))'
+                            : isMe ? 'linear-gradient(135deg,#3b82f6,#06b6d4)' : 'rgba(255,255,255,0.08)',
+                          border: isAdmin ? '1px solid rgba(245,158,11,0.35)' : 'none',
+                          borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                          padding: '8px 14px', fontSize: 14,
+                          fontWeight: isAdmin ? 600 : 400,
+                          color: isAdmin ? '#fde68a' : '#e2e8f0',
+                        }}>
+                          {msg.message}
+                        </div>
+                      )}
+
                       <div style={{ fontSize: 11, color: '#475569', marginTop: 3, textAlign: isMe ? 'right' : 'left' }}>
                         {fmtTime(msg.created_at)}
                       </div>
                     </div>
+
+                    {/* Admin sil/düzenle butonları */}
+                    {me.is_admin && isHovered && editingId !== msg.id && (
+                      <div style={{
+                        display: 'flex', gap: 4, alignSelf: 'center',
+                        order: isMe ? 1 : -1,
+                      }}>
+                        <button
+                          onClick={() => startEdit(msg)}
+                          title="Düzenle"
+                          style={{ background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.4)', borderRadius: 6, color: '#93c5fd', padding: '3px 7px', cursor: 'pointer', fontSize: 12 }}
+                        >✏️</button>
+                        <button
+                          onClick={() => deleteGlobalMessage(msg.id)}
+                          title="Sil"
+                          style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 6, color: '#fca5a5', padding: '3px 7px', cursor: 'pointer', fontSize: 12 }}
+                        >🗑️</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

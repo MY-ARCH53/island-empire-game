@@ -7,6 +7,8 @@ router.use(auth);
 
 router.get('/global', ChatController.getGlobalMessages);
 router.post('/global', ChatController.sendGlobalMessage);
+router.delete('/global/:id', ChatController.deleteGlobalMessage);
+router.put('/global/:id', ChatController.editGlobalMessage);
 
 router.post('/dm', ChatController.sendPrivateMessage);
 router.get('/dm/:otherId', ChatController.getConversation);
