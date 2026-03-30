@@ -1309,6 +1309,11 @@ function HomePage() {
         </BottomPanel>
       )}
 
+      {/* ════════════ ADSTERRA NATIVE BANNER ════════════ */}
+      <div style={{ position: 'fixed', bottom: 62, left: 0, right: 0, zIndex: 49, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+        <div style={{ pointerEvents: 'auto' }} id="container-d27fa9a24250b0a1a29da0c21d2d0649"></div>
+      </div>
+
       {/* ════════════ ALT NAVİGASYON ════════════ */}
       <nav style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
