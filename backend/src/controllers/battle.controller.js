@@ -639,15 +639,42 @@ class BattleController {
   // Reklam izleme ödülü — korsan saldırı sayacını sıfırla
   static async watchAdReward(req, res) {
     try {
-      const { userId } = req.body;
+      const userId = req.userId; // JWT'den al, body'den değil
+
+      // Gerçekten limite ulaşmış mı kontrol et
+      const limitRes = await query(
+        `SELECT COUNT(*) FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
+        [userId]
+      );
+      if (parseInt(limitRes.rows[0].count) < 10) {
+        return res.status(400).json({ success: false, message: 'Henüz limite ulaşmadın' });
+      }
+
+      // Günlük maksimum 5 reklam izleme hakkı (users tablosunda last_ad_reward_date + ad_reward_count)
+      const userRes = await query(
+        `SELECT ad_reward_count, ad_reward_date FROM users WHERE id = $1`,
+        [userId]
+      );
+      const user = userRes.rows[0];
+      const today = new Date().toISOString().slice(0, 10);
+      const adDate = user.ad_reward_date ? new Date(user.ad_reward_date).toISOString().slice(0, 10) : null;
+      const todayCount = adDate === today ? (user.ad_reward_count || 0) : 0;
+
+      if (todayCount >= 5) {
+        return res.status(400).json({ success: false, message: 'Günlük maksimum reklam hakkını kullandın (5/5)' });
+      }
+
       await query(
         `DELETE FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
         [userId]
       );
-      res.json({
-        success: true,
-        message: 'Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.'
-      });
+
+      await query(
+        `UPDATE users SET ad_reward_count = $1, ad_reward_date = CURRENT_DATE WHERE id = $2`,
+        [todayCount + 1, userId]
+      );
+
+      res.json({ success: true, message: 'Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.' });
     } catch (error) {
       console.error('Watch ad reward error:', error);
       res.status(500).json({ success: false, message: 'Hata oluştu' });
