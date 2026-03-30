@@ -930,7 +930,7 @@ function BattlePage() {
 }
 
 // ── Reklam Sayaç Modalı ───────────────────────────────────────────────────────
-const ADSTERRA_SMARTLINK = 'https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick: () => void; onComplete: (token: string) => void }) {
   const [adOpened, setAdOpened] = useState(false);
@@ -959,7 +959,7 @@ function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick:
     }
     setAdLoading(false);
 
-    const popup = window.open(ADSTERRA_SMARTLINK, '_blank');
+    const popup = window.open(`${API_BASE}/battles/ad-redirect?token=${token}`, '_blank');
     if (!popup) {
       alert('Tarayıcın açılır pencereyi engelledi. Lütfen bu site için açılır pencere iznini aç ve tekrar dene.');
       return;

@@ -675,7 +675,7 @@ class BattleController {
 
       const token = crypto.randomBytes(32).toString('hex');
       await query(
-        `UPDATE users SET ad_session_token = $1, ad_session_started_at = NOW() WHERE id = $2`,
+        `UPDATE users SET ad_session_token = $1, ad_session_started_at = NOW(), ad_redirect_used = FALSE WHERE id = $2`,
         [token, userId]
       );
 
@@ -683,6 +683,24 @@ class BattleController {
     } catch (error) {
       console.error('adStart error:', error);
       res.status(500).json({ success: false, message: 'Hata oluştu' });
+    }
+  }
+
+  // Reklam redirect — token'ı "açıldı" işaretle, Adsterra'ya yönlendir
+  static async adRedirect(req, res) {
+    try {
+      const { token } = req.query;
+      if (!token) return res.status(400).send('Token gerekli');
+
+      await query(
+        `UPDATE users SET ad_redirect_used = TRUE WHERE ad_session_token = $1`,
+        [token]
+      );
+
+      res.redirect('https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70');
+    } catch (error) {
+      console.error('adRedirect error:', error);
+      res.redirect('https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70');
     }
   }
 
@@ -695,13 +713,17 @@ class BattleController {
       if (!token) return res.status(400).json({ success: false, message: 'Token gerekli' });
 
       const userRes = await query(
-        `SELECT ad_session_token, ad_session_started_at FROM users WHERE id = $1`,
+        `SELECT ad_session_token, ad_session_started_at, ad_redirect_used FROM users WHERE id = $1`,
         [userId]
       );
       const user = userRes.rows[0];
 
       if (!user.ad_session_token || user.ad_session_token !== token) {
         return res.status(403).json({ success: false, message: 'Geçersiz token' });
+      }
+
+      if (!user.ad_redirect_used) {
+        return res.status(403).json({ success: false, message: 'Reklam linki açılmadan ödül alınamaz' });
       }
 
       const elapsed = (Date.now() - new Date(user.ad_session_started_at).getTime()) / 1000;
