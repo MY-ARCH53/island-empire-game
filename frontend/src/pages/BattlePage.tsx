@@ -178,13 +178,14 @@ function BattlePage() {
     } catch {}
   };
 
-  const handleAdComplete = useCallback(async () => {
+  const handleAdComplete = useCallback(async (token: string) => {
     try {
-      const uid = userIdRef.current;
-      if (uid) await battleAPI.watchAdReward(uid);
+      await battleAPI.watchAdReward(token);
       setPirateAttacksToday(0);
       showToast('Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.', 'success');
-    } catch {}
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Reklam doğrulanamadı', 'error');
+    }
     setShowAdModal(false);
     setAdCountdown(5);
   }, []);
@@ -194,7 +195,7 @@ function BattlePage() {
     (window as any).gdEventHandler = (event: any) => {
       switch (event.name) {
         case 'SDK_REWARDED_WATCH_COMPLETE':
-          handleAdComplete();
+          handleAdComplete('');
           break;
         case 'SDK_REWARDED_WATCH_INCOMPLETE':
         case 'SDK_ERROR':
@@ -921,7 +922,7 @@ function BattlePage() {
         <AdModal
           countdown={adCountdown}
           onTick={() => setAdCountdown(p => p - 1)}
-          onComplete={handleAdComplete}
+          onComplete={(token) => handleAdComplete(token)}
         />
       )}
     </div>
@@ -931,18 +932,33 @@ function BattlePage() {
 // ── Reklam Sayaç Modalı ───────────────────────────────────────────────────────
 const ADSTERRA_SMARTLINK = 'https://www.profitablecpmratenetwork.com/yn94ymuan?key=29ee2d4dd4e6f84642d00180b7705c70';
 
-function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick: () => void; onComplete: () => void }) {
+function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick: () => void; onComplete: (token: string) => void }) {
   const [adOpened, setAdOpened] = useState(false);
+  const [adToken, setAdToken] = useState('');
+  const [adLoading, setAdLoading] = useState(false);
 
   // Sayaç sadece reklam açıldıktan sonra başlar
   useEffect(() => {
     if (!adOpened) return;
-    if (countdown <= 0) { onComplete(); return; }
+    if (countdown <= 0) { onComplete(adToken); return; }
     const timer = setTimeout(onTick, 1000);
     return () => clearTimeout(timer);
   }, [countdown, adOpened]);
 
-  const handleOpenAd = () => {
+  const handleOpenAd = async () => {
+    setAdLoading(true);
+    let token = '';
+    try {
+      const res = await battleAPI.adStart();
+      token = res.data.data.token;
+      setAdToken(token);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Reklam başlatılamadı. Tekrar dene.');
+      setAdLoading(false);
+      return;
+    }
+    setAdLoading(false);
+
     const popup = window.open(ADSTERRA_SMARTLINK, '_blank');
     if (!popup) {
       alert('Tarayıcın açılır pencereyi engelledi. Lütfen bu site için açılır pencere iznini aç ve tekrar dene.');
@@ -975,15 +991,17 @@ function AdModal({ countdown, onTick, onComplete }: { countdown: number; onTick:
             </div>
             <button
               onClick={handleOpenAd}
+              disabled={adLoading}
               style={{
-                background: 'linear-gradient(135deg,#f59e0b,#ef4444)',
+                background: adLoading ? '#374151' : 'linear-gradient(135deg,#f59e0b,#ef4444)',
                 border: 'none', borderRadius: 14, color: '#fff',
                 fontWeight: 800, fontSize: 16, padding: '14px 36px',
-                cursor: 'pointer', boxShadow: '0 0 20px rgba(245,158,11,0.4)',
+                cursor: adLoading ? 'not-allowed' : 'pointer',
+                boxShadow: adLoading ? 'none' : '0 0 20px rgba(245,158,11,0.4)',
                 width: '100%',
               }}
             >
-              ▶ Reklamı Aç
+              {adLoading ? '⏳ Hazırlanıyor...' : '▶ Reklamı Aç'}
             </button>
           </>
         ) : (
