@@ -69,13 +69,17 @@
       (function() {
         var INTERVAL = 5 * 60 * 1000;
         var last = localStorage.getItem('last_popunder');
-        if (!last || (Date.now() - parseInt(last)) > INTERVAL) {
+        if (last && (Date.now() - parseInt(last)) < INTERVAL) {
+          window.__blockPopunder = true;
+        } else {
           localStorage.setItem('last_popunder', Date.now().toString());
-          var s = document.createElement('script');
-          s.src = 'https://pl29016159.profitablecpmratenetwork.com/f4/63/f5/f463f596dcdffc98b2a7cb780a02b3a7.js';
-          document.head.appendChild(s);
         }
       })();
+    </script>
+    <script>
+      if (!window.__blockPopunder) {
+        document.write('<scr' + 'ipt src="https://pl29016159.profitablecpmratenetwork.com/f4/63/f5/f463f596dcdffc98b2a7cb780a02b3a7.js"></scr' + 'ipt>');
+      }
     </script>
     <!-- Adsterra Native Banner -->
     <script async="async" data-cfasync="false" src="https://pl29016160.profitablecpmratenetwork.com/d27fa9a24250b0a1a29da0c21d2d0649/invoke.js"></script>
@@ -125,7 +129,7 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
-      const BUILD_VERSION = '20260330-3';
+      const BUILD_VERSION = '20260330-4';
       const stored = localStorage.getItem('app_version');
       if (stored && stored !== BUILD_VERSION) {
         localStorage.setItem('app_version', BUILD_VERSION);
