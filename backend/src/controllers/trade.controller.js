@@ -18,7 +18,8 @@ class TradeController {
   // Body: { userId, resourceType, amount }
   static async convert(req, res) {
     try {
-      const { userId, resourceType, amount } = req.body;
+      const userId = req.userId;
+      const { resourceType, amount } = req.body;
       const qty = parseInt(amount, 10);
 
       const rate = TRADE_RATES[resourceType];
@@ -32,16 +33,25 @@ class TradeController {
         });
       }
 
-      // Kaynak bakiyesi kontrolü
-      const resRow = await query(
-        'SELECT amount FROM resources WHERE user_id = $1 AND resource_type = $2',
-        [userId, resourceType]
+      // Kaynak bakiyesi ve altın kapasitesi kontrolü
+      const resRows = await query(
+        'SELECT resource_type, amount, capacity FROM resources WHERE user_id = $1 AND resource_type = ANY($2)',
+        [userId, [resourceType, 'gold']]
       );
-      if (!resRow.rows[0] || resRow.rows[0].amount < qty) {
+      const resMap = {};
+      resRows.rows.forEach(r => resMap[r.resource_type] = r);
+
+      if (!resMap[resourceType] || resMap[resourceType].amount < qty) {
         return res.status(400).json({ success: false, message: 'Yetersiz kaynak' });
       }
 
       const goldEarned = Math.floor((qty / rate.per) * rate.gold);
+      const currentGold = resMap['gold']?.amount || 0;
+      const goldCapacity = resMap['gold']?.capacity || 10000;
+
+      if (currentGold + goldEarned > goldCapacity) {
+        return res.status(400).json({ success: false, message: `Altın deposu dolu (max ${goldCapacity})` });
+      }
 
       // Kaynağı düş
       await query(

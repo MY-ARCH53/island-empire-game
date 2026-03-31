@@ -64,7 +64,7 @@ class SpinController {
   // POST /api/spin/daily  { userId }
   static async spin(req, res) {
     try {
-      const { userId } = req.body;
+      const userId = req.userId;
 
       const userRes = await query('SELECT last_spin_at, level FROM users WHERE id = $1', [userId]);
       if (!userRes.rows.length) return res.status(404).json({ success: false });
@@ -85,9 +85,18 @@ class SpinController {
       const baseGold = Math.min(Math.max(500, level * 100), 3000);
       const goldEarned = baseGold * prize.multiplier;
 
-      // Altını ver
+      // Kapasite kontrolü
+      const goldRes = await query(
+        "SELECT amount, capacity FROM resources WHERE user_id = $1 AND resource_type = 'gold'",
+        [userId]
+      );
+      const currentGold = goldRes.rows[0]?.amount || 0;
+      const goldCapacity = goldRes.rows[0]?.capacity || 10000;
+      const actualGold = Math.min(goldEarned, goldCapacity - currentGold);
+
+      // Altını ver (kapasiteyi aşmadan)
       await query(
-        "UPDATE resources SET amount = amount + $1 WHERE user_id = $2 AND resource_type = 'gold'",
+        "UPDATE resources SET amount = LEAST(amount + $1, capacity) WHERE user_id = $2 AND resource_type = 'gold'",
         [goldEarned, userId]
       );
 
