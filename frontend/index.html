@@ -135,9 +135,10 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
-      const BUILD_VERSION = '20260330-8';
+      const BUILD_VERSION = '20260330-9';
       const stored = localStorage.getItem('app_version');
       if (stored && stored !== BUILD_VERSION) {
+        localStorage.removeItem('pu_last');
         localStorage.setItem('app_version', BUILD_VERSION);
         window.location.reload(true);
       } else if (!stored) {
