@@ -78,20 +78,12 @@
           }
           // Bloke dönemindeyse engelle
           if (blocking) return null;
-          // İzin ver — popup açılıyor
-          return _orig.apply(window, arguments);
-        };
-
-        function startBlock() {
+          // Popup açılıyor — hemen bloğu başlat
           blocking = true;
           if (timer) clearTimeout(timer);
           timer = setTimeout(function() { blocking = false; }, INTERVAL);
-        }
-
-        // Popup açıldığında pencere odağı kaybolur ama sekme hâlâ görünür
-        window.addEventListener('blur', function() {
-          if (!document.hidden) startBlock();
-        });
+          return _orig.apply(window, arguments);
+        };
       })();
     </script>
     <!-- Adsterra Social Bar -->
@@ -146,7 +138,7 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
-      const BUILD_VERSION = '20260330-12';
+      const BUILD_VERSION = '20260330-13';
       const stored = localStorage.getItem('app_version');
       if (stored && stored !== BUILD_VERSION) {
         localStorage.removeItem('pu_last');
