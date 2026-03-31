@@ -62,30 +62,6 @@
       })();
     </script>
 
-    <!-- Popunder frekans sistemi: Adsterra'dan ÖNCE yüklenmeli -->
-    <script>
-      (function() {
-        var INTERVAL = 5 * 60 * 1000;
-        var blocking = false;
-        var timer = null;
-        var _orig = window.open;
-
-        window.open = function(url, target, features) {
-          var u = url ? String(url) : '';
-          // Kendi domainimize izin ver
-          if (!u || u.indexOf('islandsempire.com') !== -1 || u.indexOf('localhost') !== -1 || u.charAt(0) === '/') {
-            return _orig.apply(window, arguments);
-          }
-          // Bloke dönemindeyse engelle
-          if (blocking) return null;
-          // Popup açılıyor — hemen bloğu başlat
-          blocking = true;
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(function() { blocking = false; }, INTERVAL);
-          return _orig.apply(window, arguments);
-        };
-      })();
-    </script>
     <!-- Adsterra Social Bar -->
     <script src="https://pl29016161.profitablecpmratenetwork.com/c8/bf/15/c8bf150b3138ac3bed27b58d1c2fb819.js"></script>
     <!-- Adsterra Popunder -->
@@ -138,7 +114,7 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
-      const BUILD_VERSION = '20260330-13';
+      const BUILD_VERSION = '20260330-14';
       const stored = localStorage.getItem('app_version');
       if (stored && stored !== BUILD_VERSION) {
         localStorage.removeItem('pu_last');
