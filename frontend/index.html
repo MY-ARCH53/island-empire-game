@@ -62,6 +62,33 @@
       })();
     </script>
 
+    <!-- Popunder frequency guard: max 1 per 4 hours -->
+    <script>
+      (function() {
+        var INTERVAL_MS = 4 * 3600 * 1000;
+        var LS_KEY = 'pu_last';
+        var _origOpen = window.open;
+        window.open = function(url, name, features) {
+          var isPopunder = (!url || url === '' || url === 'about:blank') && !name && !features;
+          if (isPopunder) {
+            var now = Date.now();
+            var last = parseInt(localStorage.getItem(LS_KEY) || '0', 10);
+            if (now - last < INTERVAL_MS) {
+              return {
+                closed: false,
+                close: function() {},
+                blur: function() {},
+                focus: function() {},
+                location: { href: '' },
+                document: { write: function() {}, close: function() {} }
+              };
+            }
+            localStorage.setItem(LS_KEY, String(now));
+          }
+          return _origOpen.apply(this, arguments);
+        };
+      })();
+    </script>
     <!-- Adsterra Social Bar -->
     <script src="https://pl29016161.profitablecpmratenetwork.com/c8/bf/15/c8bf150b3138ac3bed27b58d1c2fb819.js"></script>
     <!-- Adsterra Popunder -->
@@ -114,7 +141,7 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // Versiyon kontrolü — her deploy'da BUILD_VERSION güncellenir
-      const BUILD_VERSION = '20260330-14';
+      const BUILD_VERSION = '20260401-01';
       const stored = localStorage.getItem('app_version');
       if (stored && stored !== BUILD_VERSION) {
         localStorage.removeItem('pu_last');
