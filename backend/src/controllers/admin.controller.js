@@ -1647,12 +1647,57 @@ class AdminController {
           FROM guild_donations gd
           WHERE gd.user_id = $1
 
+          UNION ALL
+
+          -- Bina üretimi toplandı
+          SELECT CASE WHEN rt.source = 'auto_production' THEN 'building_auto' ELSE 'building_collect' END,
+                 'Bina Üretimi (' || rt.resource_type || ')',
+                 CASE WHEN rt.resource_type = 'gold' THEN rt.amount::int ELSE 0 END,
+                 CASE WHEN rt.resource_type = 'wood' THEN rt.amount::int ELSE 0 END,
+                 CASE WHEN rt.resource_type = 'food' THEN rt.amount::int ELSE 0 END,
+                 COALESCE(
+                   CASE WHEN rt.meta->>'building_type' IS NOT NULL THEN rt.meta->>'building_type' ELSE 'Bina' END,
+                   'Bina'
+                 ) || ' · ' || rt.amount::text || ' ' || rt.resource_type,
+                 rt.created_at
+          FROM resource_transactions rt
+          WHERE rt.user_id = $1
+
         ) ledger
         ORDER BY created_at DESC
         LIMIT $2 OFFSET $3
       `;
 
       const result = await query(sql, [uid, limit, offset]);
+
+      // Özet istatistikler (tüm kayıtlar üzerinde)
+      const summarySql = `
+        SELECT
+          COUNT(*)::int                                                           AS total_events,
+          COALESCE(SUM(CASE WHEN gold_delta > 0 THEN gold_delta ELSE 0 END), 0)::bigint AS gold_earned,
+          COALESCE(SUM(CASE WHEN gold_delta < 0 THEN -gold_delta ELSE 0 END), 0)::bigint AS gold_spent,
+          COALESCE(SUM(gold_delta), 0)::bigint                                   AS gold_net,
+          COALESCE(SUM(CASE WHEN wood_delta > 0 THEN wood_delta ELSE 0 END), 0)::bigint AS wood_earned,
+          COALESCE(SUM(CASE WHEN food_delta > 0 THEN food_delta ELSE 0 END), 0)::bigint AS food_earned
+        FROM (
+          SELECT gold_delta, wood_delta, food_delta FROM (
+            SELECT b.reward_gold::int AS gold_delta, b.reward_wood::int AS wood_delta, b.reward_food::int AS food_delta FROM battles b WHERE b.attacker_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'attacker'
+            UNION ALL SELECT 0,0,0 FROM battles b WHERE b.attacker_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'defender'
+            UNION ALL SELECT -(b.reward_gold)::int, -(b.reward_wood)::int, -(b.reward_food)::int FROM battles b WHERE b.defender_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'attacker'
+            UNION ALL SELECT 0,0,0 FROM battles b WHERE b.defender_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'defender'
+            UNION ALL SELECT b.reward_gold::int, b.reward_wood::int, b.reward_food::int FROM battles b WHERE b.attacker_id = $1 AND b.battle_type = 'pirate' AND b.winner = 'attacker'
+            UNION ALL SELECT 0,0,0 FROM battles b WHERE b.attacker_id = $1 AND b.battle_type = 'pirate' AND b.winner = 'defender'
+            UNION ALL SELECT CASE WHEN mt.transaction_type='sell' THEN COALESCE(mt.price,0)::int ELSE -COALESCE(mt.price,0)::int END,0,0 FROM marketplace_transactions mt WHERE mt.user_id = $1
+            UNION ALL SELECT COALESCE(dr.reward_gold,0)::int, COALESCE(dr.reward_wood,0)::int, 0 FROM daily_rewards dr WHERE dr.user_id = $1 AND dr.claimed_at IS NOT NULL
+            UNION ALL SELECT CASE WHEN rg.resource_type='gold' THEN -(rg.amount)::int ELSE 0 END, CASE WHEN rg.resource_type='wood' THEN -(rg.amount)::int ELSE 0 END, CASE WHEN rg.resource_type='food' THEN -(rg.amount)::int ELSE 0 END FROM resource_gifts rg WHERE rg.sender_id = $1
+            UNION ALL SELECT CASE WHEN rg.resource_type='gold' THEN rg.amount::int ELSE 0 END, CASE WHEN rg.resource_type='wood' THEN rg.amount::int ELSE 0 END, CASE WHEN rg.resource_type='food' THEN rg.amount::int ELSE 0 END FROM resource_gifts rg WHERE rg.receiver_id = $1
+            UNION ALL SELECT CASE WHEN gd.resource_type='gold' THEN -(gd.amount)::int ELSE 0 END, CASE WHEN gd.resource_type='wood' THEN -(gd.amount)::int ELSE 0 END, CASE WHEN gd.resource_type='food' THEN -(gd.amount)::int ELSE 0 END FROM guild_donations gd WHERE gd.user_id = $1
+            UNION ALL SELECT CASE WHEN rt.resource_type='gold' THEN rt.amount::int ELSE 0 END, CASE WHEN rt.resource_type='wood' THEN rt.amount::int ELSE 0 END, CASE WHEN rt.resource_type='food' THEN rt.amount::int ELSE 0 END FROM resource_transactions rt WHERE rt.user_id = $1
+          ) x
+        ) summary
+      `;
+      const summaryRes = await query(summarySql, [uid]).catch(() => ({ rows: [{}] }));
+      const summary = summaryRes.rows[0] || {};
 
       res.json({
         success: true,
@@ -1667,6 +1712,14 @@ class AdminController {
             food:     Number(user.food)  || 0,
           },
           events:  result.rows,
+          summary: {
+            total_events: Number(summary.total_events) || 0,
+            gold_earned:  Number(summary.gold_earned)  || 0,
+            gold_spent:   Number(summary.gold_spent)   || 0,
+            gold_net:     Number(summary.gold_net)     || 0,
+            wood_earned:  Number(summary.wood_earned)  || 0,
+            food_earned:  Number(summary.food_earned)  || 0,
+          },
           limit,
           offset,
           hasMore: result.rows.length === limit,

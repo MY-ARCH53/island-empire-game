@@ -103,11 +103,11 @@ if (building.status === 'upgrading') {
   static async collectProduction(req, res) {
     try {
       const { productionId } = req.params;
-      const { userId } = req.body;
+      const userId = req.userId;
 
       // Üretim bilgisini al — bina sahibini de join et
       const productionSql = `
-        SELECT p.*, i.user_id AS island_user_id
+        SELECT p.*, b.type AS building_type, i.user_id AS island_user_id
         FROM productions p
         JOIN buildings b ON b.id = p.building_id
         JOIN islands i ON i.id = b.island_id
@@ -170,10 +170,9 @@ if (building.status === 'upgrading') {
       // İşlem logu kaydet
       await query(
         `INSERT INTO resource_transactions (user_id, resource_type, amount, source, meta)
-         VALUES ($1, $2, $3, 'production', $4)
-         ON CONFLICT DO NOTHING`,
-        [userId, resourceType, amount, JSON.stringify({ production_id: productionId, building_id: production.building_id })]
-      ).catch(() => {}); // Tablo yoksa sessizce geç
+         VALUES ($1, $2, $3, 'production', $4)`,
+        [userId, resourceType, amount, JSON.stringify({ production_id: productionId, building_id: production.building_id, building_type: production.building_type })]
+      ).catch(() => {});
 
       // Üretimi toplandı olarak işaretle
       await query(

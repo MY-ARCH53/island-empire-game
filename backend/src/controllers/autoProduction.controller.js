@@ -123,6 +123,12 @@ class AutoProductionController {
               'UPDATE resources SET amount = amount + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2 AND resource_type = $3',
               [production.quantity, userId, resourceType]
             );
+            // İşlem logu
+            await query(
+              `INSERT INTO resource_transactions (user_id, resource_type, amount, source, meta)
+               VALUES ($1, $2, $3, 'auto_production', $4)`,
+              [userId, resourceType, production.quantity, JSON.stringify({ production_id: production.id, building_id: building.id, building_type: building.type })]
+            ).catch(() => {});
             // Üretimi toplandı işaretle
             await query('UPDATE productions SET collected = true WHERE id = $1', [production.id]);
             // Binayı idle yap

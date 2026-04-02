@@ -62,6 +62,15 @@ interface LedgerUser {
   food: number;
 }
 
+interface LedgerSummary {
+  total_events: number;
+  gold_earned: number;
+  gold_spent: number;
+  gold_net: number;
+  wood_earned: number;
+  food_earned: number;
+}
+
 interface ActivityMetrics {
   total_players: number;
   active_today: number;
@@ -93,19 +102,21 @@ function ago(s: string | null) {
 type SortKey = keyof Player;
 
 // ─── type badges ─────────────────────────────────────────────────────────────
-const TYPE_META: Record<string, { icon: string; color: string }> = {
-  pvp_win:        { icon: '⚔️',  color: '#34d399' },
-  pvp_att_loss:   { icon: '💀',  color: '#f87171' },
-  pvp_def_loss:   { icon: '🏴',  color: '#f87171' },
-  pvp_def_win:    { icon: '🛡️',  color: '#60a5fa' },
-  pirate_win:     { icon: '🏴‍☠️', color: '#34d399' },
-  pirate_loss:    { icon: '💀',  color: '#f87171' },
-  trade_sell:     { icon: '💰',  color: '#fbbf24' },
-  trade_buy:      { icon: '🛒',  color: '#a78bfa' },
-  daily_reward:   { icon: '🎁',  color: '#38bdf8' },
-  gift_sent:      { icon: '📤',  color: '#fb923c' },
-  gift_received:  { icon: '📥',  color: '#86efac' },
-  guild_donation: { icon: '🏰',  color: '#e879f9' },
+const TYPE_META: Record<string, { icon: string; color: string; group: string }> = {
+  pvp_win:          { icon: '⚔️',  color: '#34d399', group: 'battle' },
+  pvp_att_loss:     { icon: '💀',  color: '#f87171', group: 'battle' },
+  pvp_def_loss:     { icon: '🏴',  color: '#ef4444', group: 'battle' },
+  pvp_def_win:      { icon: '🛡️',  color: '#60a5fa', group: 'battle' },
+  pirate_win:       { icon: '🏴‍☠️', color: '#34d399', group: 'battle' },
+  pirate_loss:      { icon: '💀',  color: '#f87171', group: 'battle' },
+  trade_sell:       { icon: '💰',  color: '#fbbf24', group: 'trade'  },
+  trade_buy:        { icon: '🛒',  color: '#a78bfa', group: 'trade'  },
+  daily_reward:     { icon: '🎁',  color: '#38bdf8', group: 'trade'  },
+  gift_sent:        { icon: '📤',  color: '#fb923c', group: 'trade'  },
+  gift_received:    { icon: '📥',  color: '#86efac', group: 'trade'  },
+  guild_donation:   { icon: '🏰',  color: '#e879f9', group: 'trade'  },
+  building_collect: { icon: '🏗️',  color: '#f59e0b', group: 'building' },
+  building_auto:    { icon: '⚙️',  color: '#94a3b8', group: 'building' },
 };
 
 // ─── component ───────────────────────────────────────────────────────────────
@@ -137,11 +148,12 @@ export default function Admin2Page() {
   const [ledgerSearch, setLedgerSearch]   = useState('');
   const [ledgerUser, setLedgerUser]       = useState<LedgerUser | null>(null);
   const [ledgerEvents, setLedgerEvents]   = useState<LedgerEvent[]>([]);
+  const [ledgerSummary, setLedgerSummary] = useState<LedgerSummary | null>(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerError, setLedgerError]     = useState('');
   const [ledgerOffset, setLedgerOffset]   = useState(0);
   const [ledgerHasMore, setLedgerHasMore] = useState(false);
-  const [ledgerFilter, setLedgerFilter]   = useState<'all' | 'gold' | 'battle' | 'trade'>('all');
+  const [ledgerFilter, setLedgerFilter]   = useState<'all' | 'gold' | 'battle' | 'trade' | 'building'>('all');
   const ledgerInputRef = useRef<HTMLInputElement>(null);
   const LEDGER_LIMIT = 100;
 
@@ -188,12 +200,17 @@ export default function Admin2Page() {
       const r = await admin2API.getUserLedger(username, LEDGER_LIMIT, offset);
       const d = r.data.data;
       setLedgerUser(d.user);
-      setLedgerEvents(offset === 0 ? d.events : prev => [...prev, ...d.events]);
+      if (offset === 0) {
+        setLedgerEvents(d.events);
+        setLedgerSummary(d.summary);
+      } else {
+        setLedgerEvents(prev => [...prev, ...d.events]);
+      }
       setLedgerOffset(offset);
       setLedgerHasMore(d.hasMore);
     } catch (e: any) {
       setLedgerError(e.response?.data?.message || 'Hata oluştu');
-      if (offset === 0) { setLedgerUser(null); setLedgerEvents([]); }
+      if (offset === 0) { setLedgerUser(null); setLedgerEvents([]); setLedgerSummary(null); }
     }
     setLedgerLoading(false);
   }
@@ -204,16 +221,41 @@ export default function Admin2Page() {
     if (!q) return;
     setLedgerEvents([]);
     setLedgerUser(null);
+    setLedgerSummary(null);
+    setLedgerFilter('all');
     fetchLedger(q, 0);
   }
 
   const filteredLedger = useMemo(() => {
-    if (ledgerFilter === 'all') return ledgerEvents;
-    if (ledgerFilter === 'gold') return ledgerEvents.filter(ev => ev.gold_delta !== 0);
-    if (ledgerFilter === 'battle') return ledgerEvents.filter(ev => ev.type.startsWith('pvp') || ev.type.startsWith('pirate'));
-    if (ledgerFilter === 'trade') return ledgerEvents.filter(ev => ev.type.startsWith('trade') || ev.type.startsWith('gift') || ev.type === 'guild_donation');
-    return ledgerEvents;
+    switch (ledgerFilter) {
+      case 'gold':     return ledgerEvents.filter(ev => ev.gold_delta !== 0);
+      case 'battle':   return ledgerEvents.filter(ev => ev.type.startsWith('pvp') || ev.type.startsWith('pirate'));
+      case 'trade':    return ledgerEvents.filter(ev => ev.type.startsWith('trade') || ev.type.startsWith('gift') || ev.type === 'guild_donation' || ev.type === 'daily_reward');
+      case 'building': return ledgerEvents.filter(ev => ev.type.startsWith('building'));
+      default:         return ledgerEvents;
+    }
   }, [ledgerEvents, ledgerFilter]);
+
+  // Running balance: en yeni event'ten geriye doğru hesapla
+  const runningBalances = useMemo(() => {
+    if (!ledgerUser) return [];
+    const balances: number[] = [];
+    let bal = ledgerUser.gold;
+    for (let i = 0; i < ledgerEvents.length; i++) {
+      balances.push(bal);
+      bal -= ledgerEvents[i].gold_delta;
+    }
+    return balances;
+  }, [ledgerEvents, ledgerUser]);
+
+  // Filtre sayaçları
+  const filterCounts = useMemo(() => ({
+    all:      ledgerEvents.length,
+    gold:     ledgerEvents.filter(ev => ev.gold_delta !== 0).length,
+    battle:   ledgerEvents.filter(ev => ev.type.startsWith('pvp') || ev.type.startsWith('pirate')).length,
+    trade:    ledgerEvents.filter(ev => ev.type.startsWith('trade') || ev.type.startsWith('gift') || ev.type === 'guild_donation' || ev.type === 'daily_reward').length,
+    building: ledgerEvents.filter(ev => ev.type.startsWith('building')).length,
+  }), [ledgerEvents]);
 
   async function openPlayerDetail(p: Player) {
     setSelectedPlayer(p);
@@ -514,181 +556,277 @@ export default function Admin2Page() {
       {/* ── LEDGER TAB ────────────────────────────────────────────────────── */}
       {tab === 'ledger' && (
         <div>
-          {/* Arama formu */}
-          <form onSubmit={handleLedgerSearch}
-            style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'center' }}>
-            <input
-              ref={ledgerInputRef}
-              value={ledgerSearch}
-              onChange={e => setLedgerSearch(e.target.value)}
-              placeholder="Kullanıcı adı gir ve Enter'a bas..."
-              style={{
-                padding: '10px 16px', borderRadius: 8, border: '2px solid #334155',
-                background: '#1e293b', color: '#e2e8f0', fontSize: 15, width: 320,
-                outline: 'none',
-              }}
-              autoFocus
-            />
-            <button type="submit" disabled={ledgerLoading || !ledgerSearch.trim()}
-              style={{
-                padding: '10px 22px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: '#38bdf8', color: '#0f172a', fontWeight: 'bold', fontSize: 14,
-                opacity: (!ledgerSearch.trim() || ledgerLoading) ? 0.5 : 1,
-              }}>
-              {ledgerLoading ? 'Aranıyor...' : 'Sorgula'}
+
+          {/* ── Arama formu ── */}
+          <form onSubmit={handleLedgerSearch} style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: 16 }}>🔍</span>
+              <input
+                ref={ledgerInputRef}
+                value={ledgerSearch}
+                onChange={e => setLedgerSearch(e.target.value)}
+                placeholder="Kullanıcı adı gir..."
+                style={{
+                  padding: '10px 16px 10px 38px', borderRadius: 8,
+                  border: '2px solid ' + (ledgerError ? '#f87171' : '#334155'),
+                  background: '#1e293b', color: '#e2e8f0', fontSize: 14, width: 280,
+                  outline: 'none', transition: 'border-color .2s',
+                }}
+                autoFocus
+              />
+            </div>
+            <button type="submit" disabled={ledgerLoading || !ledgerSearch.trim()} style={{
+              padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: '#38bdf8', color: '#0f172a', fontWeight: 'bold', fontSize: 14,
+              opacity: (!ledgerSearch.trim() || ledgerLoading) ? 0.5 : 1,
+              letterSpacing: '.3px',
+            }}>
+              {ledgerLoading && ledgerOffset === 0 ? '⏳ Sorgulanıyor...' : 'Sorgula'}
             </button>
+            {ledgerUser && (
+              <button type="button" onClick={() => { setLedgerSearch(''); setLedgerUser(null); setLedgerEvents([]); setLedgerSummary(null); setLedgerError(''); }} style={{
+                padding: '10px 16px', borderRadius: 8, border: '1px solid #334155', cursor: 'pointer',
+                background: 'transparent', color: '#64748b', fontSize: 13,
+              }}>
+                Temizle
+              </button>
+            )}
           </form>
 
           {ledgerError && (
-            <div style={{ background: '#450a0a', border: '1px solid #f87171', borderRadius: 8, padding: '10px 16px', color: '#f87171', marginBottom: 16 }}>
-              {ledgerError}
+            <div style={{ background: '#450a0a', border: '1px solid #f87171', borderRadius: 8, padding: '10px 16px', color: '#f87171', marginBottom: 16, fontSize: 13 }}>
+              ⚠️ {ledgerError}
             </div>
           )}
 
-          {/* Kullanıcı özeti */}
+          {/* ── Kullanıcı profil kartı ── */}
           {ledgerUser && (
             <div style={{
-              background: '#1e293b', borderRadius: 10, padding: '14px 20px',
-              marginBottom: 16, display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'center',
-              borderLeft: '4px solid #38bdf8',
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f2137 100%)',
+              borderRadius: 12, padding: '16px 22px', marginBottom: 16,
+              border: '1px solid #334155', borderLeft: '4px solid #38bdf8',
+              display: 'grid', gridTemplateColumns: 'auto 1fr repeat(3, auto)', gap: '0 32px', alignItems: 'center',
             }}>
               <div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Kullanıcı</div>
-                <div style={{ fontSize: 18, fontWeight: 'bold', color: '#e2e8f0' }}>
-                  #{ledgerUser.id} {ledgerUser.username}
+                <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 2 }}>Oyuncu</div>
+                <div style={{ fontSize: 17, fontWeight: 'bold', color: '#e2e8f0' }}>#{ledgerUser.id} — {ledgerUser.username}</div>
+                <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{ledgerUser.email}</div>
+              </div>
+              <div />
+              {[
+                { label: 'Seviye',      value: String(ledgerUser.level),  color: '#fbbf24' },
+                { label: 'Anlık Altın', value: fmt(ledgerUser.gold),      color: '#fbbf24' },
+                { label: 'Odun',        value: fmt(ledgerUser.wood),      color: '#a78bfa' },
+                { label: 'Yiyecek',     value: fmt(ledgerUser.food),      color: '#86efac' },
+              ].map(m => (
+                <div key={m.label} style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 2 }}>{m.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 'bold', color: m.color, fontVariantNumeric: 'tabular-nums' }}>{m.value}</div>
                 </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{ledgerUser.email}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Seviye</div>
-                <div style={{ fontSize: 18, fontWeight: 'bold', color: '#fbbf24' }}>{ledgerUser.level}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Mevcut Altın</div>
-                <div style={{ fontSize: 18, fontWeight: 'bold', color: '#fbbf24' }}>{fmt(ledgerUser.gold)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Odun</div>
-                <div style={{ fontSize: 16, fontWeight: 'bold', color: '#a78bfa' }}>{fmt(ledgerUser.wood)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Yiyecek</div>
-                <div style={{ fontSize: 16, fontWeight: 'bold', color: '#86efac' }}>{fmt(ledgerUser.food)}</div>
-              </div>
-              <div style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b' }}>
-                {ledgerEvents.length} işlem
-              </div>
+              ))}
             </div>
           )}
 
-          {/* Filtre butonları */}
-          {ledgerUser && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              {([
-                { key: 'all',    label: 'Tümü' },
-                { key: 'gold',   label: '🪙 Altın Etkili' },
-                { key: 'battle', label: '⚔️ Savaşlar' },
-                { key: 'trade',  label: '🔄 Ticaret / Hediye' },
-              ] as const).map(f => (
-                <button key={f.key} onClick={() => setLedgerFilter(f.key)} style={{
-                  padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                  background: ledgerFilter === f.key ? '#38bdf8' : '#1e293b',
-                  color: ledgerFilter === f.key ? '#0f172a' : '#94a3b8',
-                  fontWeight: ledgerFilter === f.key ? 'bold' : 'normal', fontSize: 13,
+          {/* ── Özet istatistik bar ── */}
+          {ledgerSummary && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: 10, marginBottom: 16,
+            }}>
+              {[
+                { label: 'Toplam İşlem',   value: fmt(ledgerSummary.total_events), color: '#94a3b8',  icon: '📊' },
+                { label: 'Altın Kazanılan', value: '+' + fmt(ledgerSummary.gold_earned), color: '#34d399', icon: '📈' },
+                { label: 'Altın Harcanan',  value: '-' + fmt(ledgerSummary.gold_spent),  color: '#f87171', icon: '📉' },
+                { label: 'Net Altın',       value: (ledgerSummary.gold_net >= 0 ? '+' : '') + fmt(ledgerSummary.gold_net), color: ledgerSummary.gold_net >= 0 ? '#34d399' : '#f87171', icon: '⚖️' },
+                { label: 'Odun Kazanılan',  value: '+' + fmt(ledgerSummary.wood_earned), color: '#a78bfa', icon: '🪵' },
+                { label: 'Yiyecek Kazanılan', value: '+' + fmt(ledgerSummary.food_earned), color: '#86efac', icon: '🌾' },
+              ].map(m => (
+                <div key={m.label} style={{
+                  background: '#1e293b', borderRadius: 8, padding: '10px 14px',
+                  border: '1px solid #334155', borderTop: '2px solid ' + m.color,
                 }}>
-                  {f.label}
-                </button>
+                  <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4 }}>{m.icon} {m.label}</div>
+                  <div style={{ fontSize: 17, fontWeight: 'bold', color: m.color, fontVariantNumeric: 'tabular-nums' }}>{m.value}</div>
+                </div>
               ))}
-              <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: 12, alignSelf: 'center' }}>
-                {filteredLedger.length} satır gösteriliyor
+            </div>
+          )}
+
+          {/* ── Filtre sekmeleri ── */}
+          {ledgerUser && (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+              {([
+                { key: 'all',      label: 'Tümü',            icon: '📋' },
+                { key: 'gold',     label: 'Altın Etkili',    icon: '🪙' },
+                { key: 'battle',   label: 'Savaşlar',        icon: '⚔️' },
+                { key: 'trade',    label: 'Ticaret / Hediye', icon: '🔄' },
+                { key: 'building', label: 'Binalar',          icon: '🏗️' },
+              ] as const).map(f => {
+                const count = filterCounts[f.key];
+                const active = ledgerFilter === f.key;
+                return (
+                  <button key={f.key} onClick={() => setLedgerFilter(f.key)} style={{
+                    padding: '6px 14px', borderRadius: 20, border: active ? 'none' : '1px solid #334155',
+                    cursor: 'pointer', fontSize: 12, fontWeight: active ? 'bold' : 'normal',
+                    background: active ? '#38bdf8' : '#1e293b',
+                    color: active ? '#0f172a' : '#94a3b8',
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    transition: 'all .15s',
+                  }}>
+                    <span>{f.icon} {f.label}</span>
+                    <span style={{
+                      background: active ? 'rgba(0,0,0,.15)' : '#334155',
+                      borderRadius: 10, padding: '1px 7px', fontSize: 11,
+                      color: active ? '#0f172a' : '#64748b',
+                    }}>{count}</span>
+                  </button>
+                );
+              })}
+              <span style={{ marginLeft: 'auto', color: '#475569', fontSize: 11, alignSelf: 'center' }}>
+                {filteredLedger.length} / {ledgerEvents.length} kayıt {ledgerHasMore ? '(daha fazla var)' : '(tümü yüklendi)'}
               </span>
             </div>
           )}
 
-          {/* İşlem tablosu */}
-          {ledgerUser && !ledgerLoading && filteredLedger.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
+          {/* ── İşlem tablosu ── */}
+          {ledgerUser && filteredLedger.length > 0 && (
+            <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #1e293b' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
-                  <tr style={{ background: '#1e293b' }}>
-                    {['Tarih & Saat', 'İşlem', 'Detay', 'Altın', 'Odun', 'Yiyecek'].map(h => (
-                      <th key={h} style={{ padding: '9px 12px', textAlign: 'left', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 600 }}>{h}</th>
+                  <tr style={{ background: '#1e293b', position: 'sticky', top: 0 }}>
+                    {[
+                      { label: 'Tarih & Saat',   align: 'left'  },
+                      { label: 'İşlem Türü',      align: 'left'  },
+                      { label: 'Detay',           align: 'left'  },
+                      { label: '🪙 Altın Değişimi', align: 'right' },
+                      { label: '🪵 Odun',          align: 'right' },
+                      { label: '🌾 Yiyecek',       align: 'right' },
+                      { label: '💰 Sonraki Bakiye', align: 'right' },
+                    ].map(h => (
+                      <th key={h.label} style={{
+                        padding: '10px 12px', textAlign: h.align as 'left' | 'right',
+                        color: '#64748b', whiteSpace: 'nowrap', fontWeight: 600,
+                        fontSize: 11, textTransform: 'uppercase', letterSpacing: '.4px',
+                        borderBottom: '1px solid #334155',
+                      }}>{h.label}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLedger.map((ev, i) => {
-                    const meta = TYPE_META[ev.type] || { icon: '•', color: '#94a3b8' };
-                    const goldPos = ev.gold_delta > 0;
-                    const goldNeg = ev.gold_delta < 0;
+                  {filteredLedger.map((ev, fi) => {
+                    // filteredLedger'daki event'in ledgerEvents'taki gerçek index'ini bul (running balance için)
+                    const realIdx = ledgerEvents.indexOf(ev);
+                    const balAfter = realIdx >= 0 ? runningBalances[realIdx] : null;
+
+                    const meta   = TYPE_META[ev.type] || { icon: '•', color: '#94a3b8', group: 'other' };
+                    const gPos   = ev.gold_delta > 0;
+                    const gNeg   = ev.gold_delta < 0;
+                    const rowBg  = fi % 2 === 0 ? '#0c1526' : '#0f172a';
+
                     return (
-                      <tr key={i}
-                        style={{ background: i % 2 === 0 ? '#0f172a' : '#111827', borderBottom: '1px solid #1e293b' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#1e3a5f')}
-                        onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? '#0f172a' : '#111827')}>
-                        <td style={{ padding: '7px 12px', color: '#64748b', whiteSpace: 'nowrap' }}>{dt(ev.created_at)}</td>
-                        <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                      <tr key={fi}
+                        style={{ background: rowBg, borderBottom: '1px solid #1e293b' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#172035')}
+                        onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
+
+                        {/* Tarih */}
+                        <td style={{ padding: '8px 12px', color: '#64748b', whiteSpace: 'nowrap', fontSize: 11 }}>
+                          {dt(ev.created_at)}
+                        </td>
+
+                        {/* İşlem türü badge */}
+                        <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
                           <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            background: meta.color + '22', color: meta.color,
-                            borderRadius: 4, padding: '2px 8px', fontWeight: 600, fontSize: 11,
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            background: meta.color + '18', color: meta.color,
+                            borderRadius: 5, padding: '3px 9px', fontWeight: 600, fontSize: 11,
+                            border: '1px solid ' + meta.color + '40',
                           }}>
                             {meta.icon} {ev.label}
                           </span>
                         </td>
-                        <td style={{ padding: '7px 12px', color: '#94a3b8', fontSize: 11 }}>{ev.detail}</td>
-                        <td style={{
-                          padding: '7px 12px', textAlign: 'right', fontWeight: 'bold',
-                          color: goldPos ? '#34d399' : goldNeg ? '#f87171' : '#475569',
-                        }}>
-                          {ev.gold_delta !== 0 ? (goldPos ? '+' : '') + fmt(ev.gold_delta) : '—'}
+
+                        {/* Detay */}
+                        <td style={{ padding: '8px 12px', color: '#94a3b8', fontSize: 11, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ev.detail}
                         </td>
-                        <td style={{
-                          padding: '7px 12px', textAlign: 'right',
-                          color: ev.wood_delta !== 0 ? (ev.wood_delta > 0 ? '#a78bfa' : '#fb923c') : '#475569',
-                        }}>
+
+                        {/* Altın değişimi */}
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 'bold', fontVariantNumeric: 'tabular-nums' }}>
+                          {ev.gold_delta !== 0 ? (
+                            <span style={{
+                              color: gPos ? '#34d399' : '#f87171',
+                              background: gPos ? '#052e1622' : '#450a0a22',
+                              borderRadius: 4, padding: '2px 7px',
+                            }}>
+                              {gPos ? '+' : ''}{fmt(ev.gold_delta)}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#334155' }}>—</span>
+                          )}
+                        </td>
+
+                        {/* Odun */}
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                          color: ev.wood_delta > 0 ? '#a78bfa' : ev.wood_delta < 0 ? '#fb923c' : '#334155' }}>
                           {ev.wood_delta !== 0 ? (ev.wood_delta > 0 ? '+' : '') + fmt(ev.wood_delta) : '—'}
                         </td>
-                        <td style={{
-                          padding: '7px 12px', textAlign: 'right',
-                          color: ev.food_delta !== 0 ? (ev.food_delta > 0 ? '#86efac' : '#fb923c') : '#475569',
-                        }}>
+
+                        {/* Yiyecek */}
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                          color: ev.food_delta > 0 ? '#86efac' : ev.food_delta < 0 ? '#fb923c' : '#334155' }}>
                           {ev.food_delta !== 0 ? (ev.food_delta > 0 ? '+' : '') + fmt(ev.food_delta) : '—'}
+                        </td>
+
+                        {/* Running balance */}
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                          {balAfter !== null ? (
+                            <span style={{ color: '#fbbf24', fontWeight: 600 }}>{fmt(balAfter)}</span>
+                          ) : (
+                            <span style={{ color: '#334155' }}>—</span>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
 
-              {/* Daha fazla yükle */}
-              {ledgerHasMore && (
-                <div style={{ textAlign: 'center', marginTop: 14 }}>
-                  <button
-                    onClick={() => fetchLedger(ledgerUser.username, ledgerOffset + LEDGER_LIMIT)}
-                    disabled={ledgerLoading}
-                    style={{
-                      padding: '8px 28px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                      background: '#334155', color: '#e2e8f0', fontSize: 13,
-                      opacity: ledgerLoading ? 0.5 : 1,
-                    }}>
-                    {ledgerLoading ? 'Yükleniyor...' : 'Daha Fazla Yükle'}
-                  </button>
-                </div>
-              )}
+          {/* Daha fazla yükle */}
+          {ledgerUser && ledgerHasMore && (
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <button
+                onClick={() => fetchLedger(ledgerUser.username, ledgerOffset + LEDGER_LIMIT)}
+                disabled={ledgerLoading}
+                style={{
+                  padding: '9px 32px', borderRadius: 8, border: '1px solid #334155',
+                  cursor: 'pointer', background: '#1e293b', color: '#e2e8f0', fontSize: 13,
+                  opacity: ledgerLoading ? 0.5 : 1,
+                }}>
+                {ledgerLoading ? '⏳ Yükleniyor...' : `⬇ Daha Fazla Yükle (${ledgerOffset + ledgerEvents.length}/${ledgerSummary?.total_events ?? '?'} kayıt)`}
+              </button>
             </div>
           )}
 
           {ledgerUser && !ledgerLoading && filteredLedger.length === 0 && (
-            <p style={{ color: '#64748b', fontSize: 14 }}>Bu filtre için işlem kaydı bulunamadı.</p>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#334155' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🔎</div>
+              <div style={{ fontSize: 13 }}>Bu filtre için işlem kaydı bulunamadı.</div>
+            </div>
           )}
 
           {!ledgerUser && !ledgerLoading && !ledgerError && (
-            <div style={{ textAlign: 'center', marginTop: 80, color: '#334155' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-              <div style={{ fontSize: 15 }}>Kullanıcı adı girerek işlem geçmişini sorgulayın</div>
+            <div style={{ textAlign: 'center', marginTop: 80, color: '#1e3a5f' }}>
+              <div style={{ fontSize: 56, marginBottom: 14 }}>📋</div>
+              <div style={{ fontSize: 16, color: '#334155', fontWeight: 600 }}>İşlem Defteri</div>
+              <div style={{ fontSize: 13, color: '#1e3a5f', marginTop: 6 }}>
+                Kullanıcı adı girerek tüm kaynak hareketlerini sorgulayın
+              </div>
             </div>
           )}
+
         </div>
       )}
 
