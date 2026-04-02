@@ -199,6 +199,8 @@ export const admin2API = {
   getPlayerDetail:  (id)       => api.get(`/admin/admin2/players/${id}`),
   getAllBattles:     (limit, offset) => api.get(`/admin/admin2/battles?limit=${limit || 200}&offset=${offset || 0}`),
   getActivityMetrics: ()       => api.get('/admin/admin2/activity'),
+  getUserLedger:    (username, limit, offset) =>
+    api.get(`/admin/admin2/ledger?username=${encodeURIComponent(username)}&limit=${limit || 100}&offset=${offset || 0}`),
 };
 
 // Chat API

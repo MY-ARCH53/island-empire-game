@@ -63,5 +63,6 @@ router.get('/admin2/players',         AdminController.getDetailedPlayers);
 router.get('/admin2/players/:id',     AdminController.getPlayerDetail);
 router.get('/admin2/battles',         AdminController.getAllBattles);
 router.get('/admin2/activity',        AdminController.getActivityMetrics);
+router.get('/admin2/ledger',          AdminController.getUserLedger);
 
 module.exports = router;

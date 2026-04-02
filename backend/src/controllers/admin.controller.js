@@ -1474,6 +1474,209 @@ class AdminController {
       res.status(500).json({ success: false, message: 'Kullanıcı istatistikleri alınamadı' });
     }
   }
+
+  // ── ADMIN2: Kullanıcı işlem defteri ─────────────────────────────────────────
+  static async getUserLedger(req, res) {
+    try {
+      const { username } = req.query;
+      if (!username || username.trim().length < 2) {
+        return res.status(400).json({ success: false, message: 'Kullanıcı adı en az 2 karakter olmalı' });
+      }
+
+      const userRes = await query(
+        `SELECT id, username, email, level,
+                (SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'gold' LIMIT 1) AS gold,
+                (SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'wood'  LIMIT 1) AS wood,
+                (SELECT amount FROM resources WHERE user_id = u.id AND resource_type = 'food'  LIMIT 1) AS food
+         FROM users u WHERE username ILIKE $1 AND (is_bot = FALSE OR is_bot IS NULL) LIMIT 1`,
+        [username.trim()]
+      );
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+      }
+      const user = userRes.rows[0];
+      const uid  = user.id;
+
+      const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
+      const offset = parseInt(req.query.offset) || 0;
+
+      const sql = `
+        SELECT type, label, gold_delta, wood_delta, food_delta, detail, created_at
+        FROM (
+
+          -- PvP: Saldıran kazandı
+          SELECT 'pvp_win'        AS type,
+                 'Savaş Kazandı (Saldırı)' AS label,
+                 b.reward_gold::int AS gold_delta,
+                 b.reward_wood::int AS wood_delta,
+                 b.reward_food::int AS food_delta,
+                 COALESCE(d.username, '?') AS detail,
+                 b.created_at
+          FROM battles b
+          LEFT JOIN users d ON d.id = b.defender_id
+          WHERE b.attacker_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'attacker'
+
+          UNION ALL
+
+          -- PvP: Saldıran kaybetti
+          SELECT 'pvp_att_loss',
+                 'Savaş Kaybetti (Saldırı)',
+                 0, 0, 0,
+                 COALESCE(d.username, '?'),
+                 b.created_at
+          FROM battles b
+          LEFT JOIN users d ON d.id = b.defender_id
+          WHERE b.attacker_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'defender'
+
+          UNION ALL
+
+          -- PvP: Savunma kaybetti (altın çalındı)
+          SELECT 'pvp_def_loss',
+                 'Saldırıya Uğradı (Kayıp)',
+                 -(b.reward_gold)::int,
+                 -(b.reward_wood)::int,
+                 -(b.reward_food)::int,
+                 COALESCE(a.username, '?') || ' saldırdı',
+                 b.created_at
+          FROM battles b
+          LEFT JOIN users a ON a.id = b.attacker_id
+          WHERE b.defender_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'attacker'
+
+          UNION ALL
+
+          -- PvP: Savunma galip
+          SELECT 'pvp_def_win',
+                 'Savunma Galibiyeti',
+                 0, 0, 0,
+                 COALESCE(a.username, '?') || ' saldırdı, savuşturuldu',
+                 b.created_at
+          FROM battles b
+          LEFT JOIN users a ON a.id = b.attacker_id
+          WHERE b.defender_id = $1 AND b.battle_type = 'pvp' AND b.winner = 'defender'
+
+          UNION ALL
+
+          -- Korsan: Kazandı
+          SELECT 'pirate_win',
+                 'Korsan Saldırısı (Kazandı)',
+                 b.reward_gold::int,
+                 b.reward_wood::int,
+                 b.reward_food::int,
+                 'Korsan gemisi',
+                 b.created_at
+          FROM battles b
+          WHERE b.attacker_id = $1 AND b.battle_type = 'pirate' AND b.winner = 'attacker'
+
+          UNION ALL
+
+          -- Korsan: Kaybetti
+          SELECT 'pirate_loss',
+                 'Korsan Saldırısı (Kaybetti)',
+                 0, 0, 0,
+                 'Korsan gemisi',
+                 b.created_at
+          FROM battles b
+          WHERE b.attacker_id = $1 AND b.battle_type = 'pirate' AND b.winner = 'defender'
+
+          UNION ALL
+
+          -- Ticaret: Kaynak sattı (altın kazandı)
+          SELECT CASE WHEN mt.transaction_type = 'sell' THEN 'trade_sell' ELSE 'trade_buy' END,
+                 CASE WHEN mt.transaction_type = 'sell'
+                      THEN 'Kaynak Sattı (' || mt.resource_type || ')'
+                      ELSE 'Kaynak Satın Aldı (' || mt.resource_type || ')' END,
+                 CASE WHEN mt.transaction_type = 'sell' THEN COALESCE(mt.price, 0)::int
+                      ELSE -COALESCE(mt.price, 0)::int END,
+                 0, 0,
+                 COALESCE(mt.amount, 0)::text || ' adet ' || mt.resource_type,
+                 mt.created_at
+          FROM marketplace_transactions mt
+          WHERE mt.user_id = $1
+
+          UNION ALL
+
+          -- Günlük ödül
+          SELECT 'daily_reward',
+                 'Günlük Ödül (Gün ' || dr.day_number || ')',
+                 COALESCE(dr.reward_gold, 0)::int,
+                 COALESCE(dr.reward_wood, 0)::int,
+                 0,
+                 'Gün ' || dr.day_number,
+                 dr.claimed_at
+          FROM daily_rewards dr
+          WHERE dr.user_id = $1 AND dr.claimed_at IS NOT NULL
+
+          UNION ALL
+
+          -- Kaynak hediyesi gönderdi
+          SELECT 'gift_sent',
+                 'Kaynak Gönderdi (' || rg.resource_type || ')',
+                 CASE WHEN rg.resource_type = 'gold' THEN -(rg.amount)::int ELSE 0 END,
+                 CASE WHEN rg.resource_type = 'wood' THEN -(rg.amount)::int ELSE 0 END,
+                 CASE WHEN rg.resource_type = 'food' THEN -(rg.amount)::int ELSE 0 END,
+                 COALESCE(rv.username, '?') || ' kullanıcısına',
+                 rg.created_at
+          FROM resource_gifts rg
+          LEFT JOIN users rv ON rv.id = rg.receiver_id
+          WHERE rg.sender_id = $1
+
+          UNION ALL
+
+          -- Kaynak hediyesi aldı
+          SELECT 'gift_received',
+                 'Kaynak Aldı (' || rg.resource_type || ')',
+                 CASE WHEN rg.resource_type = 'gold' THEN rg.amount::int ELSE 0 END,
+                 CASE WHEN rg.resource_type = 'wood' THEN rg.amount::int ELSE 0 END,
+                 CASE WHEN rg.resource_type = 'food' THEN rg.amount::int ELSE 0 END,
+                 COALESCE(sn.username, '?') || ' kullanıcısından',
+                 rg.created_at
+          FROM resource_gifts rg
+          LEFT JOIN users sn ON sn.id = rg.sender_id
+          WHERE rg.receiver_id = $1
+
+          UNION ALL
+
+          -- Guild bağışı
+          SELECT 'guild_donation',
+                 'Guild Bağışı (' || gd.resource_type || ')',
+                 CASE WHEN gd.resource_type = 'gold' THEN -(gd.amount)::int ELSE 0 END,
+                 CASE WHEN gd.resource_type = 'wood' THEN -(gd.amount)::int ELSE 0 END,
+                 CASE WHEN gd.resource_type = 'food' THEN -(gd.amount)::int ELSE 0 END,
+                 'Guild katkısı',
+                 gd.created_at
+          FROM guild_donations gd
+          WHERE gd.user_id = $1
+
+        ) ledger
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3
+      `;
+
+      const result = await query(sql, [uid, limit, offset]);
+
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id:       user.id,
+            username: user.username,
+            email:    user.email,
+            level:    user.level,
+            gold:     Number(user.gold)  || 0,
+            wood:     Number(user.wood)  || 0,
+            food:     Number(user.food)  || 0,
+          },
+          events:  result.rows,
+          limit,
+          offset,
+          hasMore: result.rows.length === limit,
+        },
+      });
+    } catch (error) {
+      console.error('getUserLedger error:', error);
+      res.status(500).json({ success: false, message: 'İşlem defteri alınamadı', error: error.message });
+    }
+  }
 }
 
 module.exports = AdminController;
