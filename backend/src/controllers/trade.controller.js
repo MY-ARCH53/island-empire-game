@@ -8,6 +8,8 @@ const TRADE_RATES = {
   wood:   { per: 100, gold: 20  }, // 100 odun = 20 altın
 };
 
+const DAILY_TRADE_GOLD_LIMIT = 500_000;
+
 class TradeController {
   // GET /api/trade/rates
   static async getRates(req, res) {
@@ -46,11 +48,24 @@ class TradeController {
       }
 
       const goldEarned = Math.floor((qty / rate.per) * rate.gold);
-      const currentGold = resMap['gold']?.amount || 0;
-      const goldCapacity = resMap['gold']?.capacity || 10000;
 
-      if (currentGold + goldEarned > goldCapacity) {
-        return res.status(400).json({ success: false, message: `Altın deposu dolu (max ${goldCapacity})` });
+      // Bugünkü dönüşüm toplamı kontrolü
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const dailyRes = await query(
+        `SELECT COALESCE(SUM(amount), 0)::int AS daily_total
+         FROM resource_transactions
+         WHERE user_id = $1 AND source = 'trade' AND resource_type = 'gold' AND created_at >= $2`,
+        [userId, todayStart.toISOString()]
+      ).catch(() => ({ rows: [{ daily_total: 0 }] }));
+      const dailyTotal = Number(dailyRes.rows[0].daily_total);
+
+      if (dailyTotal + goldEarned > DAILY_TRADE_GOLD_LIMIT) {
+        const remaining = Math.max(0, DAILY_TRADE_GOLD_LIMIT - dailyTotal);
+        return res.status(400).json({
+          success: false,
+          message: `Günlük dönüşüm limitine ulaştınız. Bugün kalan limit: ${remaining.toLocaleString('tr-TR')} altın (max ${DAILY_TRADE_GOLD_LIMIT.toLocaleString('tr-TR')}/gün)`,
+        });
       }
 
       // Kaynağı düş
@@ -59,11 +74,18 @@ class TradeController {
         [qty, userId, resourceType]
       );
 
-      // Altın ekle
+      // Altın ekle (kapasite kontrolü yok, günlük limit yeterli)
       await query(
         'UPDATE resources SET amount = amount + $1 WHERE user_id = $2 AND resource_type = $3',
         [goldEarned, userId, 'gold']
       );
+
+      // Günlük dönüşüm logu
+      await query(
+        `INSERT INTO resource_transactions (user_id, resource_type, amount, source, meta)
+         VALUES ($1, 'gold', $2, 'trade', $3)`,
+        [userId, goldEarned, JSON.stringify({ resource_type: resourceType, amount: qty })]
+      ).catch(() => {});
 
       // Güncel bakiyeleri döndür
       const updated = await query(
