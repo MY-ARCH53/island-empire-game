@@ -85,18 +85,9 @@ class SpinController {
       const baseGold = Math.min(Math.max(500, level * 100), 3000);
       const goldEarned = baseGold * prize.multiplier;
 
-      // Kapasite kontrolü
-      const goldRes = await query(
-        "SELECT amount, capacity FROM resources WHERE user_id = $1 AND resource_type = 'gold'",
-        [userId]
-      );
-      const currentGold = goldRes.rows[0]?.amount || 0;
-      const goldCapacity = goldRes.rows[0]?.capacity || 10000;
-      const actualGold = Math.min(goldEarned, goldCapacity - currentGold);
-
-      // Altını ver (kapasiteyi aşmadan)
+      // Altını ver
       await query(
-        "UPDATE resources SET amount = LEAST(amount + $1, capacity) WHERE user_id = $2 AND resource_type = 'gold'",
+        "UPDATE resources SET amount = amount + $1 WHERE user_id = $2 AND resource_type = 'gold'",
         [goldEarned, userId]
       );
 
