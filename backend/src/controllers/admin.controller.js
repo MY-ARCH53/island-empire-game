@@ -1475,6 +1475,78 @@ class AdminController {
     }
   }
 
+  // ── ADMIN2: Şüpheli oyuncular (davranış analizi) ────────────────────────────
+  static async getSuspiciousPlayers(req, res) {
+    try {
+      const sql = `
+        WITH attack_stats AS (
+          SELECT
+            pa.attacker_id AS user_id,
+            COUNT(*)::int                                                        AS attacks_today,
+            MIN(pa.created_at)                                                  AS first_attack_at,
+            MAX(pa.created_at)                                                  AS last_attack_at,
+            -- Toplam süre / (saldırı sayısı - 1) = ortalama aralık (saniye)
+            CASE WHEN COUNT(*) > 1
+              THEN ROUND(
+                EXTRACT(EPOCH FROM (MAX(pa.created_at) - MIN(pa.created_at)))
+                / NULLIF(COUNT(*) - 1, 0)
+              )
+              ELSE NULL
+            END                                                                 AS avg_interval_sec
+          FROM pirate_attacks pa
+          WHERE pa.attack_date = CURRENT_DATE
+          GROUP BY pa.attacker_id
+        ),
+        battle_stats AS (
+          SELECT
+            b.attacker_id AS user_id,
+            COUNT(*)::int AS pirate_battles_today,
+            SUM(b.reward_gold)::bigint AS gold_earned_today
+          FROM battles b
+          WHERE b.battle_type = 'pirate'
+            AND b.created_at >= CURRENT_DATE
+          GROUP BY b.attacker_id
+        )
+        SELECT
+          u.id,
+          u.username,
+          u.email,
+          u.last_seen,
+          COALESCE(u.daily_ad_resets, 0)                AS ad_resets_today,
+          COALESCE(ast.attacks_today, 0)                AS attacks_today,
+          ast.avg_interval_sec,
+          ast.first_attack_at,
+          ast.last_attack_at,
+          COALESCE(bs.pirate_battles_today, 0)          AS pirate_battles_today,
+          COALESCE(bs.gold_earned_today, 0)             AS gold_earned_today,
+          -- Şüphe skoru: düşük aralık + yüksek saldırı + yüksek reset
+          (
+            CASE WHEN COALESCE(ast.avg_interval_sec, 999) < 5  THEN 40 ELSE 0 END +
+            CASE WHEN COALESCE(ast.avg_interval_sec, 999) < 10 THEN 20 ELSE 0 END +
+            CASE WHEN COALESCE(ast.attacks_today, 0) > 30       THEN 20 ELSE 0 END +
+            CASE WHEN COALESCE(u.daily_ad_resets, 0) >= 3       THEN 10 ELSE 0 END +
+            CASE WHEN COALESCE(bs.gold_earned_today, 0) > 500000 THEN 10 ELSE 0 END
+          )                                             AS suspicion_score
+        FROM users u
+        LEFT JOIN attack_stats ast ON ast.user_id = u.id
+        LEFT JOIN battle_stats bs  ON bs.user_id  = u.id
+        WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
+          AND (
+            COALESCE(ast.attacks_today, 0) > 15
+            OR COALESCE(ast.avg_interval_sec, 999) < 10
+            OR COALESCE(u.daily_ad_resets, 0) >= 2
+          )
+        ORDER BY suspicion_score DESC, pirate_battles_today DESC
+        LIMIT 100
+      `;
+      const result = await query(sql);
+      res.json({ success: true, data: { players: result.rows } });
+    } catch (error) {
+      console.error('getSuspiciousPlayers error:', error);
+      res.status(500).json({ success: false, message: 'Hata oluştu', error: error.message });
+    }
+  }
+
   // ── ADMIN2: Kullanıcı işlem defteri ─────────────────────────────────────────
   static async getUserLedger(req, res) {
     try {

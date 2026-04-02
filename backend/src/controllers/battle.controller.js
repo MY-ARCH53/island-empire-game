@@ -156,7 +156,7 @@ class BattleController {
         [userId]
       );
       const lastSeen = presenceRes.rows[0]?.last_seen;
-      if (!lastSeen || (Date.now() - new Date(lastSeen).getTime()) > 120000) {
+      if (!lastSeen || (Date.now() - new Date(lastSeen).getTime()) > 60000) {
         return res.status(403).json({
           success: false,
           message: 'Korsan saldırısı için oyunun tarayıcıda açık olması gerekiyor'
@@ -665,12 +665,41 @@ class BattleController {
     try {
       const userId = req.userId;
 
+      // Günlük saldırı limitine ulaştı mı?
       const limitRes = await query(
         `SELECT COUNT(*) FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
         [userId]
       );
       if (parseInt(limitRes.rows[0].count) < 10) {
         return res.status(400).json({ success: false, message: 'Henüz limite ulaşmadın' });
+      }
+
+      // Günlük reklam reset limitini kontrol et
+      const adRes = await query(
+        `SELECT daily_ad_resets, daily_ad_resets_date, last_ad_reset_at FROM users WHERE id = $1`,
+        [userId]
+      );
+      const u = adRes.rows[0];
+      const today = new Date().toISOString().split('T')[0];
+      const resets = (u.daily_ad_resets_date === today) ? (u.daily_ad_resets || 0) : 0;
+
+      if (resets >= 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'Günlük reklam izleme limitine ulaştın (3/3). Yarın tekrar dene.',
+        });
+      }
+
+      // Son reset üzerinden 30 dakika geçti mi?
+      if (u.last_ad_reset_at) {
+        const minsSinceReset = (Date.now() - new Date(u.last_ad_reset_at).getTime()) / 60000;
+        if (minsSinceReset < 30) {
+          const remaining = Math.ceil(30 - minsSinceReset);
+          return res.status(400).json({
+            success: false,
+            message: `Bir sonraki reklam için ${remaining} dakika beklemelisin.`,
+          });
+        }
       }
 
       const token = crypto.randomBytes(32).toString('hex');
@@ -713,7 +742,8 @@ class BattleController {
       if (!token) return res.status(400).json({ success: false, message: 'Token gerekli' });
 
       const userRes = await query(
-        `SELECT ad_session_token, ad_session_started_at, ad_redirect_used FROM users WHERE id = $1`,
+        `SELECT ad_session_token, ad_session_started_at, ad_redirect_used,
+                daily_ad_resets, daily_ad_resets_date FROM users WHERE id = $1`,
         [userId]
       );
       const user = userRes.rows[0];
@@ -734,16 +764,33 @@ class BattleController {
         return res.status(400).json({ success: false, message: 'Reklam süresi doldu, tekrar dene' });
       }
 
+      // Günlük reset sayacını artır
+      const today = new Date().toISOString().split('T')[0];
       await query(
-        `UPDATE users SET ad_session_token = NULL, ad_session_started_at = NULL WHERE id = $1`,
-        [userId]
+        `UPDATE users SET
+           ad_session_token = NULL,
+           ad_session_started_at = NULL,
+           last_ad_reset_at = NOW(),
+           daily_ad_resets = CASE WHEN daily_ad_resets_date = $2 THEN COALESCE(daily_ad_resets, 0) + 1 ELSE 1 END,
+           daily_ad_resets_date = $2
+         WHERE id = $1`,
+        [userId, today]
       );
       await query(
         `DELETE FROM pirate_attacks WHERE attacker_id = $1 AND attack_date = CURRENT_DATE`,
         [userId]
       );
 
-      res.json({ success: true, message: 'Reklam ödülü alındı! Korsan saldırı hakkın yenilendi.' });
+      // Günlük kalan reset hakkını hesapla
+      const updatedRes = await query(`SELECT daily_ad_resets FROM users WHERE id = $1`, [userId]);
+      const usedResets = updatedRes.rows[0]?.daily_ad_resets || 1;
+      const remaining = Math.max(0, 3 - usedResets);
+
+      res.json({
+        success: true,
+        message: `Reklam ödülü alındı! Korsan saldırı hakkın yenilendi. Bugün kalan reklam hakkın: ${remaining}/3`,
+        data: { resets_used: usedResets, resets_remaining: remaining },
+      });
     } catch (error) {
       console.error('Watch ad reward error:', error);
       res.status(500).json({ success: false, message: 'Hata oluştu' });

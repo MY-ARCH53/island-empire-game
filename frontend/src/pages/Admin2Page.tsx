@@ -121,7 +121,7 @@ const TYPE_META: Record<string, { icon: string; color: string; group: string }> 
 
 // ─── component ───────────────────────────────────────────────────────────────
 export default function Admin2Page() {
-  const [tab, setTab] = useState<'players' | 'battles' | 'activity' | 'ledger'>('players');
+  const [tab, setTab] = useState<'players' | 'battles' | 'activity' | 'ledger' | 'suspicious'>('players');
 
   // players
   const [players, setPlayers]           = useState<Player[]>([]);
@@ -144,6 +144,10 @@ export default function Admin2Page() {
   const [activity, setActivity]         = useState<ActivityMetrics | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
 
+  // suspicious
+  const [suspicious, setSuspicious]             = useState<any[]>([]);
+  const [suspiciousLoading, setSuspiciousLoading] = useState(false);
+
   // ledger
   const [ledgerSearch, setLedgerSearch]   = useState('');
   const [ledgerUser, setLedgerUser]       = useState<LedgerUser | null>(null);
@@ -159,9 +163,10 @@ export default function Admin2Page() {
 
   // ── fetch ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (tab === 'players' && players.length === 0) fetchPlayers();
-    if (tab === 'battles' && battles.length === 0) fetchBattles(0);
-    if (tab === 'activity' && !activity) fetchActivity();
+    if (tab === 'players'    && players.length === 0)  fetchPlayers();
+    if (tab === 'battles'    && battles.length === 0)  fetchBattles(0);
+    if (tab === 'activity'   && !activity)             fetchActivity();
+    if (tab === 'suspicious' && suspicious.length === 0) fetchSuspicious();
   }, [tab]);
 
   async function fetchPlayers() {
@@ -191,6 +196,15 @@ export default function Admin2Page() {
       setActivity(r.data.data);
     } catch { /* ignore */ }
     setActivityLoading(false);
+  }
+
+  async function fetchSuspicious() {
+    setSuspiciousLoading(true);
+    try {
+      const r = await admin2API.getSuspiciousPlayers();
+      setSuspicious(r.data.data.players);
+    } catch { /* ignore */ }
+    setSuspiciousLoading(false);
   }
 
   async function fetchLedger(username: string, offset: number) {
@@ -308,13 +322,15 @@ export default function Admin2Page() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {(['players', 'battles', 'activity', 'ledger'] as const).map(t => (
+        {(['players', 'battles', 'activity', 'ledger', 'suspicious'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: tab === t ? '#38bdf8' : '#1e293b', color: tab === t ? '#0f172a' : '#94a3b8',
+            background: tab === t ? (t === 'suspicious' ? '#ef4444' : '#38bdf8') : '#1e293b',
+            color: tab === t ? '#fff' : (t === 'suspicious' ? '#f87171' : '#94a3b8'),
             fontWeight: tab === t ? 'bold' : 'normal', fontSize: 14,
+            border: t === 'suspicious' && tab !== t ? '1px solid #7f1d1d' : 'none',
           }}>
-            {t === 'players' ? 'Oyuncular' : t === 'battles' ? 'Savaslar' : t === 'activity' ? 'Aktivite' : '📋 İşlem Defteri'}
+            {t === 'players' ? 'Oyuncular' : t === 'battles' ? 'Savaslar' : t === 'activity' ? 'Aktivite' : t === 'ledger' ? '📋 İşlem Defteri' : '🚨 Şüpheli Oyuncular'}
           </button>
         ))}
       </div>
@@ -549,6 +565,96 @@ export default function Admin2Page() {
             </div>
           ) : (
             <p style={{ color: '#f87171' }}>Veri yuklenemedi.</p>
+          )}
+        </div>
+      )}
+
+      {/* ── SUSPICIOUS PLAYERS TAB ───────────────────────────────────────── */}
+      {tab === 'suspicious' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+            <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: '10px 16px', fontSize: 12, color: '#fca5a5', flex: 1 }}>
+              🚨 Bu tablo <strong>bugünkü veriye</strong> dayanır. Şüphe skoru: düşük saldırı aralığı + yüksek saldırı sayısı + yüksek reklam reset. <strong>Kırmızı (&gt;60)</strong> = bot ihtimali yüksek.
+            </div>
+            <button onClick={() => { setSuspicious([]); fetchSuspicious(); }} disabled={suspiciousLoading}
+              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#334155', color: '#e2e8f0', cursor: 'pointer', fontSize: 13 }}>
+              {suspiciousLoading ? '⏳' : 'Yenile'}
+            </button>
+          </div>
+
+          {suspiciousLoading ? (
+            <p style={{ color: '#64748b' }}>Analiz yapılıyor...</p>
+          ) : suspicious.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#334155' }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+              <div style={{ fontSize: 14 }}>Bugün şüpheli aktivite tespit edilmedi.</div>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #1e293b' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: '#1e293b' }}>
+                    {[
+                      'Şüphe Skoru', 'Kullanıcı', 'Bugün Saldırı', 'Ort. Aralık (sn)',
+                      'İlk Saldırı', 'Son Saldırı', 'Reklam Reset', 'Kazanılan Altın', 'Son Görülen'
+                    ].map(h => (
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#94a3b8', whiteSpace: 'nowrap', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.4px', borderBottom: '1px solid #334155' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {suspicious.map((p, i) => {
+                    const score = p.suspicion_score || 0;
+                    const scoreColor = score >= 60 ? '#ef4444' : score >= 30 ? '#f59e0b' : '#34d399';
+                    const avgInt = p.avg_interval_sec;
+                    const intColor = avgInt === null ? '#64748b' : avgInt < 5 ? '#ef4444' : avgInt < 10 ? '#f59e0b' : '#34d399';
+                    const rowBg = i % 2 === 0 ? '#0c1526' : '#0f172a';
+                    return (
+                      <tr key={p.id}
+                        style={{ background: rowBg, borderBottom: '1px solid #1e293b', borderLeft: score >= 60 ? '3px solid #ef4444' : score >= 30 ? '3px solid #f59e0b' : '3px solid transparent' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#172035')}
+                        onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
+                        {/* Şüphe skoru */}
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{ background: scoreColor + '22', color: scoreColor, borderRadius: 6, padding: '3px 10px', fontWeight: 'bold', fontSize: 13 }}>
+                            {score}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <div style={{ fontWeight: 'bold', color: '#e2e8f0' }}>{p.username}</div>
+                          <div style={{ fontSize: 10, color: '#475569' }}>#{p.id}</div>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 'bold', color: p.attacks_today > 30 ? '#ef4444' : '#fbbf24' }}>
+                          {p.attacks_today}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 'bold', color: intColor }}>
+                          {avgInt !== null ? (
+                            <span title={avgInt < 5 ? '⚠️ Bot şüphesi: çok düzenli ve hızlı' : ''}>
+                              {avgInt < 5 ? '🤖 ' : ''}{avgInt}s
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td style={{ padding: '8px 12px', color: '#64748b', whiteSpace: 'nowrap', fontSize: 11 }}>{dt(p.first_attack_at)}</td>
+                        <td style={{ padding: '8px 12px', color: '#64748b', whiteSpace: 'nowrap', fontSize: 11 }}>{dt(p.last_attack_at)}</td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          <span style={{
+                            background: p.ad_resets_today >= 3 ? '#ef444422' : '#1e293b',
+                            color: p.ad_resets_today >= 3 ? '#ef4444' : '#94a3b8',
+                            borderRadius: 4, padding: '2px 8px', fontWeight: p.ad_resets_today >= 3 ? 'bold' : 'normal',
+                          }}>
+                            {p.ad_resets_today}/3
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
+                          {fmt(p.gold_earned_today)}
+                        </td>
+                        <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap', fontSize: 11 }}>{ago(p.last_seen)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

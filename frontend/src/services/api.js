@@ -201,6 +201,7 @@ export const admin2API = {
   getActivityMetrics: ()       => api.get('/admin/admin2/activity'),
   getUserLedger:    (username, limit, offset) =>
     api.get(`/admin/admin2/ledger?username=${encodeURIComponent(username)}&limit=${limit || 100}&offset=${offset || 0}`),
+  getSuspiciousPlayers: () => api.get('/admin/admin2/suspicious'),
 };
 
 // Chat API
