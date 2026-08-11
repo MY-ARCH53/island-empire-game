@@ -104,6 +104,8 @@ func gain_xp(amount: float) -> void:
 		xp -= xp_needed
 		level += 1
 		xp_needed = _xp_for_level(level)
+		health = max_health
+		health_changed.emit(health, max_health)
 		var choices: Array = Upgrades.random_weapon_or_upgrade_choices(owned_weapons, level_up_choice_count())
 		leveled_up.emit(level, choices)
 	xp_changed.emit(xp, xp_needed)
