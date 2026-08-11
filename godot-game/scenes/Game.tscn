@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1"]
 [ext_resource type="Script" path="res://scripts/game.gd" id="2"]
@@ -7,12 +7,16 @@
 [ext_resource type="Script" path="res://scripts/game_over_screen.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/virtual_joystick.gd" id="6"]
 [ext_resource type="TileSet" path="res://assets/tileset/meadow_terrain.tres" id="7"]
+[ext_resource type="TileSet" path="res://assets/tileset/coast_terrain.tres" id="8"]
 
 [node name="Game" type="Node2D"]
 script = ExtResource("2")
 
 [node name="Ground" type="TileMapLayer" parent="."]
 tile_set = ExtResource("7")
+
+[node name="GroundCoast" type="TileMapLayer" parent="."]
+tile_set = ExtResource("8")
 
 [node name="GroundDecor" type="Node2D" parent="."]
 

@@ -5,7 +5,10 @@ const XPOrbScene := preload("res://scenes/XPOrb.tscn")
 const TreeScene := preload("res://scenes/Tree.tscn")
 const PondScene := preload("res://scenes/Pond.tscn")
 const RockClusterScene := preload("res://scenes/RockCluster.tscn")
+const HouseScene := preload("res://scenes/House.tscn")
+const WellScene := preload("res://scenes/Well.tscn")
 const TerrainLookup := preload("res://assets/tileset/meadow_terrain_lookup.gd")
+const CoastLookup := preload("res://assets/tileset/coast_terrain_lookup.gd")
 
 const TreeTextures := [
 	preload("res://assets/props/tree_oak.png"),
@@ -20,6 +23,11 @@ const DecorationTextures := [
 const PondTexture := preload("res://assets/props/pond.png")
 const RockBigTexture := preload("res://assets/props/rock_cluster_big.png")
 const RockSmallTexture := preload("res://assets/props/rock_cluster_small.png")
+const HouseTextures := [
+	preload("res://assets/props/house_thatch.png"),
+	preload("res://assets/props/house_tile_roof.png"),
+]
+const WellTexture := preload("res://assets/props/well.png")
 
 @onready var world: Node2D = $World
 @onready var ground_decor: Node2D = $GroundDecor
@@ -29,16 +37,31 @@ const RockSmallTexture := preload("res://assets/props/rock_cluster_small.png")
 @onready var game_over_screen = $GameOverScreen
 @onready var spawn_timer: Timer = $SpawnTimer
 @onready var ground: TileMapLayer = $Ground
+@onready var ground_coast: TileMapLayer = $GroundCoast
 
 const BOSS_SPAWN_TIME := 300.0
+
+# --- Dünya hikayesi: kasaba (merkez) -> açık alan -> sahil -> deniz (dünya sınırı) ---
+# "Kan Adası" adını gerçek bir ada haline getiren radyal bölgeleme.
+const GROUND_MIN := -40
+const GROUND_MAX := 40
+const VILLAGE_RADIUS := 220.0       # bu yarıçapın içi: çıplak patika (kasaba)
+const FIELD_MID_RADIUS := 500.0     # çim yoğunluğunun doruğa ulaştığı yarıçap
+const FIELD_RADIUS := 950.0         # kara biter, sahil/deniz tileset'i başlar
+const COAST_TAPER := 150.0          # kara -> sahil geçiş genişliği
+const SHORE_BASE_RADIUS := FIELD_RADIUS + 70.0
+const SHORE_NOISE_AMPLITUDE := 90.0 # kıyı çizgisi düzgün daire olmasın diye
+const WORLD_HALF_EXTENT := 1280.0
+const VILLAGE_CLEAR_RADIUS := 260.0 # vahşi dekorasyon/ağaç/peyzaj bu yarıçapın dışında başlar
+const WILDERNESS_OUTER_MARGIN := 60.0 # sahil kenarında da boş bırak
+
 const TREE_COUNT := 55
-const TREE_CLEAR_RADIUS := 220.0
 const DECORATION_COUNT := 180
-const DECORATION_CLEAR_RADIUS := 100.0
-const WORLD_HALF_EXTENT := 1200.0
-const POND_COUNT := 4
-const ROCK_CLUSTER_COUNT := 12
+const POND_COUNT := 3
+const ROCK_CLUSTER_COUNT := 10
 const LANDMARK_MIN_SPACING := 260.0
+
+var _coast_noise := FastNoiseLite.new()
 
 var elapsed: float = 0.0
 var enemy_pool: Array = ["bat", "bat", "skeleton", "ghost"]
@@ -49,10 +72,15 @@ var boss_ref: Node2D = null
 var _hitstop_active: bool = false
 
 func _ready() -> void:
+	_coast_noise.seed = randi()
+	_coast_noise.frequency = 0.015
 	_paint_ground()
+	_paint_coast()
+	_spawn_village()
 	_spawn_trees()
 	_spawn_decorations()
 	_spawn_landmarks()
+	_spawn_world_boundary()
 	player.died.connect(_on_player_died)
 	player.health_changed.connect(hud.set_health)
 	player.xp_changed.connect(hud.set_xp)
@@ -69,35 +97,49 @@ func _ready() -> void:
 	hud.set_level(1)
 	hud.set_timer(0.0)
 
-const GROUND_MIN := -40
-const GROUND_MAX := 40
+# Merkeze (kasaba) yakınken 0, tarlanın ortasında 1, sahile yaklaşırken tekrar
+# 0'a düşen bir "çim olasılığı" zarfı — kasaba çıplak patika, sahil kumsal olsun.
+func _grass_envelope(dist: float) -> float:
+	if dist < VILLAGE_RADIUS:
+		return 0.0
+	if dist < FIELD_MID_RADIUS:
+		return clampf((dist - VILLAGE_RADIUS) / (FIELD_MID_RADIUS - VILLAGE_RADIUS), 0.0, 1.0)
+	if dist < FIELD_RADIUS - COAST_TAPER:
+		return 1.0
+	if dist < FIELD_RADIUS:
+		return clampf((FIELD_RADIUS - dist) / COAST_TAPER, 0.0, 1.0)
+	return 0.0
 
 # NOT: TileMapLayer.set_cells_terrain_connect() elle yazılmış (PixelLab'dan
-# dönüştürülmüş) bu TileSet kaynağıyla sessizce hiçbir hücre boyamıyor
+# dönüştürülmüş) bu TileSet kaynaklarıyla sessizce hiçbir hücre boyamıyor
 # (doğrulandı: manuel set_cell() çalışıyor, connect() 0 hücre üretiyor).
 # Bunun yerine köşe (Wang) eşleştirmesini kendimiz yapıp set_cell() ile
 # yerleştiriyoruz — bkz. tools/generate_tileset.js çıktısı olan *_lookup.gd.
 func _paint_ground() -> void:
 	# vertex(x,y) = cell(x,y)'nin sol-üst köşesi. 0=alt terrain (toprak), 1=üst (çim).
-	# Yamalar tek düzgün dikdörtgen yerine üst üste binen birkaç "blob"tan
-	# oluşuyor — doğal, düzensiz çim kümeleri için (bkz. araştırma notları).
 	var vertices: Dictionary = {}
 
-	for i in range(16):
-		var center_x: int = randi_range(-33, 33)
-		var center_y: int = randi_range(-33, 33)
-		var blob_count: int = randi_range(3, 5)
+	for i in range(90):
+		var cx: int = randi_range(GROUND_MIN, GROUND_MAX)
+		var cy: int = randi_range(GROUND_MIN, GROUND_MAX)
+		var center_dist: float = Vector2(cx, cy).length() * 32.0
+		if randf() > _grass_envelope(center_dist):
+			continue
+		var blob_count: int = randi_range(2, 4)
 		for b in range(blob_count):
-			var bx: int = center_x + randi_range(-4, 4)
-			var by: int = center_y + randi_range(-4, 4)
-			var w: int = randi_range(3, 7)
-			var h: int = randi_range(3, 7)
+			var bx: int = cx + randi_range(-3, 3)
+			var by: int = cy + randi_range(-3, 3)
+			var w: int = randi_range(3, 6)
+			var h: int = randi_range(3, 6)
 			for vx in range(bx, bx + w + 1):
 				for vy in range(by, by + h + 1):
 					vertices[Vector2i(vx, vy)] = 1
 
 	for x in range(GROUND_MIN, GROUND_MAX + 1):
 		for y in range(GROUND_MIN, GROUND_MAX + 1):
+			var world_dist: float = Vector2(x, y).length() * 32.0
+			if world_dist >= FIELD_RADIUS:
+				continue # bu hücreler GroundCoast katmanına ait
 			var nw: int = vertices.get(Vector2i(x, y), 0)
 			var ne: int = vertices.get(Vector2i(x + 1, y), 0)
 			var sw: int = vertices.get(Vector2i(x, y + 1), 0)
@@ -106,17 +148,51 @@ func _paint_ground() -> void:
 			var atlas_coords: Vector2i = TerrainLookup.LOOKUP.get(key, Vector2i(2, 1))
 			ground.set_cell(Vector2i(x, y), 0, atlas_coords, 0)
 
+# Sahil/deniz katmanı: kum(1)/deniz(0), kıyı çizgisi gürültüyle dalgalanır
+# (mükemmel daire olmasın diye) — FastNoiseLite ile doğal bir kıyı hattı.
+func _coast_terrain_at(vx: int, vy: int) -> int:
+	var world_dist: float = Vector2(vx, vy).length() * 32.0
+	var noise_val: float = _coast_noise.get_noise_2d(vx * 6.0, vy * 6.0)
+	var shoreline: float = SHORE_BASE_RADIUS + noise_val * SHORE_NOISE_AMPLITUDE
+	return 1 if world_dist <= shoreline else 0
+
+func _paint_coast() -> void:
+	for x in range(GROUND_MIN, GROUND_MAX + 1):
+		for y in range(GROUND_MIN, GROUND_MAX + 1):
+			var world_dist: float = Vector2(x, y).length() * 32.0
+			if world_dist < FIELD_RADIUS - 32.0:
+				continue # kara katmanıyla küçük bir örtüşme payı dışında burada değil
+			var nw: int = _coast_terrain_at(x, y)
+			var ne: int = _coast_terrain_at(x + 1, y)
+			var sw: int = _coast_terrain_at(x, y + 1)
+			var se: int = _coast_terrain_at(x + 1, y + 1)
+			var key: String = "%d,%d,%d,%d" % [nw, ne, sw, se]
+			var atlas_coords: Vector2i = CoastLookup.LOOKUP.get(key, Vector2i(2, 1))
+			ground_coast.set_cell(Vector2i(x, y), 0, atlas_coords, 0)
+
+# Kasaba: oyuncu doğduğunda çevresinde 4-5 ev + bir kuyu — hikayenin başlangıcı.
+func _spawn_village() -> void:
+	var building_count: int = 5
+	for i in range(building_count):
+		var angle: float = (TAU / building_count) * i + randf_range(-0.2, 0.2)
+		var dist: float = randf_range(120.0, 190.0)
+		var pos: Vector2 = Vector2(cos(angle), sin(angle)) * dist
+		var house := HouseScene.instantiate()
+		world.add_child(house)
+		house.global_position = pos
+		house.set_texture(HouseTextures[randi() % HouseTextures.size()])
+
+	var well := WellScene.instantiate()
+	world.add_child(well)
+	well.global_position = Vector2(0, 90)
+	well.set_texture(WellTexture)
+
 func _spawn_trees() -> void:
 	var placed := 0
 	var attempts := 0
 	while placed < TREE_COUNT and attempts < TREE_COUNT * 6:
 		attempts += 1
-		var pos := Vector2(
-			randf_range(-WORLD_HALF_EXTENT, WORLD_HALF_EXTENT),
-			randf_range(-WORLD_HALF_EXTENT, WORLD_HALF_EXTENT)
-		)
-		if pos.length() < TREE_CLEAR_RADIUS:
-			continue
+		var pos := _random_field_position()
 		var tree := TreeScene.instantiate()
 		world.add_child(tree)
 		tree.global_position = pos
@@ -125,12 +201,7 @@ func _spawn_trees() -> void:
 
 func _spawn_decorations() -> void:
 	for i in range(DECORATION_COUNT):
-		var pos := Vector2(
-			randf_range(-WORLD_HALF_EXTENT, WORLD_HALF_EXTENT),
-			randf_range(-WORLD_HALF_EXTENT, WORLD_HALF_EXTENT)
-		)
-		if pos.length() < DECORATION_CLEAR_RADIUS:
-			continue
+		var pos := _random_field_position()
 		var deco := Sprite2D.new()
 		deco.texture = DecorationTextures[randi() % DecorationTextures.size()]
 		deco.scale = Vector2.ONE * randf_range(0.6, 1.15)
@@ -167,12 +238,7 @@ func _spawn_landmarks() -> void:
 
 func _find_landmark_position(existing: Array[Vector2]):
 	for attempt in range(20):
-		var pos := Vector2(
-			randf_range(-WORLD_HALF_EXTENT, WORLD_HALF_EXTENT),
-			randf_range(-WORLD_HALF_EXTENT, WORLD_HALF_EXTENT)
-		)
-		if pos.length() < TREE_CLEAR_RADIUS:
-			continue
+		var pos := _random_field_position()
 		var ok := true
 		for p in existing:
 			if p.distance_to(pos) < LANDMARK_MIN_SPACING:
@@ -181,6 +247,47 @@ func _find_landmark_position(existing: Array[Vector2]):
 		if ok:
 			return pos
 	return null
+
+# Sadece "açık alan" halkasında (kasaba dışı, sahil öncesi) rastgele bir nokta.
+func _random_field_position() -> Vector2:
+	var angle: float = randf() * TAU
+	var min_r: float = VILLAGE_CLEAR_RADIUS
+	var max_r: float = FIELD_RADIUS - WILDERNESS_OUTER_MARGIN
+	var dist: float = sqrt(randf_range(min_r * min_r, max_r * max_r))
+	return Vector2(cos(angle), sin(angle)) * dist
+
+# Kıyı çizgisinde görünmez bir engel halkası — dünyanın "adaya" sığması,
+# oyuncu/düşmanların açık denize yüzememesi için (bkz. game.gd tepesindeki
+# hikaye notu: kenarlar deniz ile çevrili). Her ışın _coast_terrain_at() ile
+# gerçek kum->deniz geçişini bulur, böylece görünmez duvar görsel kıyı
+# çizgisiyle tam örtüşür (rastgele bağımsız gürültü örneklemiyor).
+func _spawn_world_boundary() -> void:
+	var segment_count := 64
+	for i in range(segment_count):
+		var angle: float = (TAU / segment_count) * i
+		var dir := Vector2(cos(angle), sin(angle))
+		var shore_radius: float = _find_shoreline_radius(dir)
+		var body := StaticBody2D.new()
+		body.collision_layer = 1
+		body.collision_mask = 0
+		var shape := CollisionShape2D.new()
+		var circle := CircleShape2D.new()
+		circle.radius = 85.0
+		shape.shape = circle
+		body.add_child(shape)
+		world.add_child(body)
+		body.global_position = dir * (shore_radius + 15.0)
+
+func _find_shoreline_radius(dir: Vector2) -> float:
+	var r: float = FIELD_RADIUS
+	while r < WORLD_HALF_EXTENT:
+		var pos: Vector2 = dir * r
+		var vx: int = int(roundi(pos.x / 32.0))
+		var vy: int = int(roundi(pos.y / 32.0))
+		if _coast_terrain_at(vx, vy) == 0: # deniz başladı
+			return r
+		r += 16.0
+	return WORLD_HALF_EXTENT
 
 func _process(delta: float) -> void:
 	elapsed += delta
@@ -242,10 +349,16 @@ func _hit_stop(duration: float = 0.06, slowdown: float = 0.05) -> void:
 	Engine.time_scale = 1.0
 	_hitstop_active = false
 
+# Düşman spawn noktası oyuncu etrafında ama daima kara (tarla) sınırları içinde
+# kalır — sahile/denize taşmasın diye orijine göre de kırpılır.
 func _random_spawn_position() -> Vector2:
 	var angle: float = randf() * TAU
 	var dist: float = 520.0
-	return player.global_position + Vector2(cos(angle), sin(angle)) * dist
+	var pos: Vector2 = player.global_position + Vector2(cos(angle), sin(angle)) * dist
+	var max_r: float = FIELD_RADIUS - WILDERNESS_OUTER_MARGIN
+	if pos.length() > max_r:
+		pos = pos.normalized() * max_r
+	return pos
 
 func _on_enemy_died(pos: Vector2, xp_value: int) -> void:
 	player.register_kill()

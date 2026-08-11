@@ -238,6 +238,55 @@ yeterli — hepsi `game.gd`'nin başında.
   haritaya 4 göl + 12 kaya kümesi yerleştirir, birbirinden en az
   `LANDMARK_MIN_SPACING` (260 birim) uzakta olacak şekilde.
 
+## Harita2 — hikaye tabanlı bölgeli dünya ("Kan Adası" gerçek bir ada oldu)
+
+Önceki tek-tip rastgele dağıtım yerine, oyuncunun mesafesine göre değişen
+biome'lar kullanan (araştırılmış, oyun endüstrisinde standart bir teknik —
+bkz. sohbet geçmişindeki kaynaklar) **radyal bölgeleme** kullanılıyor.
+Eski uniform harita `assets/tileset/graveyard_terrain.tres` /
+`meadow_terrain.tres` ile hâlâ mevcut (git geçmişinde "harita1" commit'i
+olarak da işaretli), ama `Game.tscn`/`game.gd` artık bu yeni tasarımı
+kullanıyor:
+
+```
+merkez (0-220):     Kasaba   — oyuncu burada doğar, 5 ev + kuyu, çıplak patika
+220-950:             Açık alan — asıl savaş alanı (ağaç/çiçek/göl/kaya)
+950-~1100:            Sahil    — kum, dalgalı/gürültülü kıyı çizgisi (mükemmel
+                                  daire değil — FastNoiseLite ile)
+~1100+:                Deniz    — dünyanın sınırı, gerçek çarpışmalı (yüzülemez)
+```
+
+- **Zemin boyama** (`game.gd → _grass_envelope`): çim olasılığı merkezde 0
+  (çıplak patika/kasaba), tarlanın ortasında (500 birim) 1'e çıkıyor, sahile
+  yaklaşırken tekrar 0'a düşüyor (kum rengiyle aynı krem/toprak tonuna
+  yumuşakça geçsin diye — ayrı bir "kasaba" veya "sahil" tileset'i
+  üretmeden, mevcut `meadow_terrain.tres`'in dirt/grass iki-terrain
+  sistemini radyal bir zarfla modüle ederek).
+- **Sahil/deniz** yeni bir katman: `GroundCoast` (`assets/tileset/coast_terrain.tres`,
+  `coast_terrain_lookup.gd`) — kum(upper)/deniz(lower) Wang tileset'i,
+  `game.gd → _paint_coast()` + `_coast_terrain_at()` ile FastNoiseLite
+  tabanlı düzensiz bir kıyı çizgisi çiziyor (mükemmel daire olmasın diye).
+- **Kasaba** (`game.gd → _spawn_village()`): merkez etrafında 120-190 birim
+  yarıçapta 5 ev (`scenes/House.tscn`, 2 doku varyantı) + bir kuyu
+  (`scenes/Well.tscn`) — hepsi gerçek engel (`tree.gd` script'i yeniden
+  kullanılıyor, generic `set_texture()` sayesinde).
+- **Dünya sınırı** (`game.gd → _spawn_world_boundary()`): kıyı çizgisi
+  boyunca 64 görünmez `StaticBody2D` çarpışma segmenti — her biri
+  `_find_shoreline_radius()` ile gerçek kum→deniz geçiş noktasını bularak
+  yerleştiriliyor, böylece görünmez duvar görsel kıyı çizgisiyle tam
+  örtüşüyor (bağımsız rastgele değer kullanmıyor). Düşman/boss spawn
+  noktaları da artık orijine göre `FIELD_RADIUS` içinde kalacak şekilde
+  kırpılıyor (`_random_spawn_position()`), sahile/denize taşmasın diye.
+- Ağaç/dekorasyon/göl/kaya kümesi dağıtımı artık `_random_field_position()`
+  üzerinden sadece "açık alan" halkasında (kasaba dışı, sahil öncesi)
+  oluyor — eşit alan dağılımı için `sqrt(randf_range(min_r², max_r²))`
+  tekniği kullanıldı (basit `randf_range(min_r, max_r)` merkeze yakın
+  bölgeyi yoğunlaştırırdı).
+
+Bölge yarıçaplarını ayarlamak istersen hepsi `game.gd`'nin başında:
+`VILLAGE_RADIUS`, `FIELD_MID_RADIUS`, `FIELD_RADIUS`, `COAST_TAPER`,
+`SHORE_BASE_RADIUS`, `SHORE_NOISE_AMPLITUDE`.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`
