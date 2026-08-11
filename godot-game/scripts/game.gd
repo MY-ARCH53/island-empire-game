@@ -305,7 +305,7 @@ func _update_difficulty() -> void:
 		enemy_pool.append("kabus")
 	if elapsed > 60.0 and not enemy_pool.has("brute"):
 		enemy_pool.append("brute")
-	if elapsed > 100.0 and not enemy_pool.has("gulyabani"):
+	if elapsed > 300.0 and not enemy_pool.has("gulyabani"):
 		enemy_pool.append("gulyabani")
 	if elapsed >= BOSS_SPAWN_TIME and not boss_spawned:
 		boss_spawned = true
