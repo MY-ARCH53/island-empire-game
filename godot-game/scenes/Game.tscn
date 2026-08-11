@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1"]
 [ext_resource type="Script" path="res://scripts/game.gd" id="2"]
@@ -8,6 +8,28 @@
 [ext_resource type="Script" path="res://scripts/virtual_joystick.gd" id="6"]
 [ext_resource type="TileSet" path="res://assets/tileset/meadow_terrain.tres" id="7"]
 [ext_resource type="TileSet" path="res://assets/tileset/coast_terrain.tres" id="8"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xp_fill"]
+bg_color = Color(0.85, 0.65, 0.15, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_boss_fill"]
+bg_color = Color(0.55, 0.1, 0.35, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
 
 [node name="Game" type="Node2D"]
 script = ExtResource("2")
@@ -70,6 +92,7 @@ value = 100.0
 show_percentage = false
 
 [node name="XPBar" type="ProgressBar" parent="HUD/Margin/VBox"]
+theme_override_styles/fill = SubResource("StyleBoxFlat_xp_fill")
 max_value = 12.0
 value = 0.0
 show_percentage = false
@@ -83,6 +106,7 @@ horizontal_alignment = 1
 theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
 
 [node name="BossHealthBar" type="ProgressBar" parent="HUD/Margin/VBox/BossContainer"]
+theme_override_styles/fill = SubResource("StyleBoxFlat_boss_fill")
 max_value = 1400.0
 value = 1400.0
 show_percentage = false

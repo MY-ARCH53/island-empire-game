@@ -287,6 +287,33 @@ Bölge yarıçaplarını ayarlamak istersen hepsi `game.gd`'nin başında:
 `VILLAGE_RADIUS`, `FIELD_MID_RADIUS`, `FIELD_RADIUS`, `COAST_TAPER`,
 `SHORE_BASE_RADIUS`, `SHORE_NOISE_AMPLITUDE`.
 
+## Arayüz teması (menüler, HUD)
+
+Tüm `Button`/`PanelContainer`/`ProgressBar`/`Label`/`LineEdit` görünümü tek
+bir kaynaktan geliyor: `assets/ui/theme.tres`, `project.godot`'ta
+`[gui] theme/custom` ile **proje genelinde** uygulanıyor — bu yüzden
+MainMenu, HUD, LevelUpMenu, ShopScreen, GameOverScreen'in hepsi tek bir
+değişiklikle yenilendi, sahne dosyalarına tek tek dokunmaya gerek kalmadı.
+
+- Font: PixelLab `create_font` ile üretilen gerçek bir `.ttf`
+  (`assets/ui/gothic_font.ttf`) — piksel-art görünümlü ama vektörel, her
+  boyutta net.
+- Panel/buton/bar çerçeveleri: PixelLab `create_ui_asset` ile üretildi.
+  `create_ui_asset` tek çağrıda birden fazla varyant içeren bir sprite sheet
+  döndürebiliyor (`gothic_window_sheet.png`) — Godot CLI/ImageMagick
+  olmadığından, `tools/analyze_sheet.js` (alfa kanalına göre içerik
+  bloklarını bulur) + `tools/crop_sheet.js` (pngjs ile kesin kırpma) ile
+  ihtiyaç duyulan tek paneli çıkardım (`assets/ui/panel_window.png` vb.).
+  Bu iki script'i yeni bir UI sheet için de kullanabilirsin — sadece
+  `node analyze_sheet.js <dosya.png>` çalıştırıp bulduğu blok koordinatlarını
+  `crop_sheet.js`'e ver.
+- 9-slice marjları (`texture_margin_*` in `theme.tres`) gözle tahmin edildi
+  (kesin ölçüm yapılmadı) — büyütülmüş bir panelde köşe süslemeleri hafif
+  gerilmiş görünüyorsa marjı artır.
+- Can/XP/boss barlarının dolgu rengi tema genelinde DEĞİL, her `ProgressBar`
+  node'unda ayrı `theme_override_styles/fill` ile (`Game.tscn`) — kırmızı/
+  altın/bordo ayrımı için.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`

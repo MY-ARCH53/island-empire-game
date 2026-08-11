@@ -27,6 +27,10 @@ BackendBridge="*res://scripts/autoload/backend_bridge.gd"
 Audio="*res://scripts/autoload/audio_manager.gd"
 Effects="*res://scripts/autoload/effects.gd"
 
+[gui]
+
+theme/custom="res://assets/ui/theme.tres"
+
 [display]
 
 window/size/viewport_width=1280
