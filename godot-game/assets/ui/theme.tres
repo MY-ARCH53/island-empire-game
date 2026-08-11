@@ -1,8 +1,7 @@
-[gd_resource type="Theme" load_steps=9 format=3]
+[gd_resource type="Theme" load_steps=8 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/ui/panel_window.png" id="1"]
 [ext_resource type="Texture2D" path="res://assets/ui/panel_button.png" id="2"]
-[ext_resource type="Texture2D" path="res://assets/ui/panel_bar.png" id="3"]
 [ext_resource type="FontFile" path="res://assets/ui/gothic_font.ttf" id="4"]
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_panel"]
@@ -14,41 +13,34 @@ texture_margin_bottom = 40.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_button_normal"]
 texture = ExtResource("2")
-texture_margin_left = 14.0
-texture_margin_top = 12.0
-texture_margin_right = 14.0
-texture_margin_bottom = 12.0
+texture_margin_left = 44.0
+texture_margin_top = 38.0
+texture_margin_right = 44.0
+texture_margin_bottom = 38.0
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_button_hover"]
 texture = ExtResource("2")
-texture_margin_left = 14.0
-texture_margin_top = 12.0
-texture_margin_right = 14.0
-texture_margin_bottom = 12.0
+texture_margin_left = 44.0
+texture_margin_top = 38.0
+texture_margin_right = 44.0
+texture_margin_bottom = 38.0
 modulate_color = Color(1.2, 1.15, 1.05, 1)
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_button_pressed"]
 texture = ExtResource("2")
-texture_margin_left = 14.0
-texture_margin_top = 12.0
-texture_margin_right = 14.0
-texture_margin_bottom = 12.0
+texture_margin_left = 44.0
+texture_margin_top = 38.0
+texture_margin_right = 44.0
+texture_margin_bottom = 38.0
 modulate_color = Color(0.75, 0.7, 0.65, 1)
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_button_disabled"]
 texture = ExtResource("2")
-texture_margin_left = 14.0
-texture_margin_top = 12.0
-texture_margin_right = 14.0
-texture_margin_bottom = 12.0
+texture_margin_left = 44.0
+texture_margin_top = 38.0
+texture_margin_right = 44.0
+texture_margin_bottom = 38.0
 modulate_color = Color(0.6, 0.6, 0.6, 0.7)
-
-[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_bar_bg"]
-texture = ExtResource("3")
-texture_margin_left = 24.0
-texture_margin_top = 22.0
-texture_margin_right = 24.0
-texture_margin_bottom = 22.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lineedit"]
 bg_color = Color(0.11, 0.08, 0.07, 1)
@@ -66,16 +58,24 @@ content_margin_top = 6.0
 content_margin_right = 10.0
 content_margin_bottom = 6.0
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar_bg"]
+bg_color = Color(0.07, 0.05, 0.04, 0.9)
+border_color = Color(0.5, 0.38, 0.22, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_left = 4
+corner_radius_bottom_right = 4
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar_fill_default"]
 bg_color = Color(0.65, 0.15, 0.15, 1)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_left = 3
 corner_radius_bottom_right = 3
-content_margin_left = 4.0
-content_margin_top = 4.0
-content_margin_right = 4.0
-content_margin_bottom = 4.0
 
 [resource]
 default_font = ExtResource("4")
@@ -94,9 +94,10 @@ Button/font_sizes/font_size = 18
 
 PanelContainer/styles/panel = SubResource("StyleBoxTexture_panel")
 
-ProgressBar/styles/background = SubResource("StyleBoxTexture_bar_bg")
+ProgressBar/styles/background = SubResource("StyleBoxFlat_bar_bg")
 ProgressBar/styles/fill = SubResource("StyleBoxFlat_bar_fill_default")
 ProgressBar/colors/font_color = Color(0.95, 0.9, 0.8, 1)
+ProgressBar/font_sizes/font_size = 13
 
 Label/colors/font_color = Color(0.9, 0.85, 0.75, 1)
 Label/colors/font_shadow_color = Color(0, 0, 0, 0.6)

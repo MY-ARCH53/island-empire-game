@@ -1,13 +1,13 @@
 extends CanvasLayer
 
-@onready var health_bar: ProgressBar = $Margin/VBox/HealthBar
-@onready var xp_bar: ProgressBar = $Margin/VBox/XPBar
-@onready var timer_label: Label = $Margin/VBox/TopRow/TimerLabel
-@onready var kills_label: Label = $Margin/VBox/TopRow/KillsLabel
-@onready var level_label: Label = $Margin/VBox/TopRow/LevelLabel
-@onready var boss_bar_container: VBoxContainer = $Margin/VBox/BossContainer
-@onready var boss_bar: ProgressBar = $Margin/VBox/BossContainer/BossHealthBar
-@onready var boss_name_label: Label = $Margin/VBox/BossContainer/BossNameLabel
+@onready var health_bar: ProgressBar = $TopLeft/HealthBar
+@onready var xp_bar: ProgressBar = $TopLeft/XPBar
+@onready var timer_label: Label = $TopLeft/InfoRow/TimerLabel
+@onready var kills_label: Label = $TopLeft/KillsLabel
+@onready var level_label: Label = $TopLeft/InfoRow/LevelLabel
+@onready var boss_bar_container: VBoxContainer = $BossPanel
+@onready var boss_bar: ProgressBar = $BossPanel/BossHealthBar
+@onready var boss_name_label: Label = $BossPanel/BossNameLabel
 
 func set_health(current: float, max_h: float) -> void:
 	health_bar.max_value = max_h

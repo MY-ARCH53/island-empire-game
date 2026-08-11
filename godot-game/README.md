@@ -313,6 +313,20 @@ değişiklikle yenilendi, sahne dosyalarına tek tek dokunmaya gerek kalmadı.
 - Can/XP/boss barlarının dolgu rengi tema genelinde DEĞİL, her `ProgressBar`
   node'unda ayrı `theme_override_styles/fill` ile (`Game.tscn`) — kırmızı/
   altın/bordo ayrımı için.
+- **Dikkat — `create_ui_asset` + `elements=["button"]`**: PixelLab bu
+  parametreyle üretilen dokunun üzerine otomatik bir "Button" demo yazısı
+  basıyor. Godot `StyleBoxTexture` olarak bu dokuyu `Button`'a arka plan
+  yapınca, `Button.text` da üstüne render olduğundan çift/okunmaz yazı
+  ortaya çıkıyor. Çözüm: `elements` parametresini hiç vermeden (boş panel
+  iskeleti) ve açıklamaya "no text/letters/words/writing" ekleyerek
+  üret, indirilen görseli kullanmadan önce mutlaka görsel olarak kontrol
+  et (`panel_button.png` bu şekilde yeniden üretildi).
+- HUD barları (`HealthBar`/`XPBar`) artık tüm genişliğe yayılan bir
+  `Margin`/`VBox` içinde değil, sol üstte sabit `custom_minimum_size`'lı
+  (~210px) kompakt bir `TopLeft` VBoxContainer içinde (`Game.tscn`).
+  Boss barı ayrı, üst-ortada sabit boyutlu bir `BossPanel`'de. Bar arka
+  planı da ornate `StyleBoxTexture` yerine sade `StyleBoxFlat`'e çevrildi
+  (`theme.tres`) — küçük boyutlarda 9-slice süsleme dağılıyordu.
 
 ## Denge sabitleri (tune edilebilir)
 

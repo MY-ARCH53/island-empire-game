@@ -54,59 +54,76 @@ autostart = false
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("3")
 
-[node name="Margin" type="MarginContainer" parent="HUD"]
-anchor_right = 1.0
-anchor_bottom = 1.0
-theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 16
+[node name="TopLeft" type="VBoxContainer" parent="HUD"]
+offset_left = 14.0
+offset_top = 14.0
+offset_right = 224.0
+offset_bottom = 96.0
+theme_override_constants/separation = 3
 mouse_filter = 2
 
-[node name="VBox" type="VBoxContainer" parent="HUD/Margin"]
+[node name="InfoRow" type="HBoxContainer" parent="HUD/TopLeft"]
+custom_minimum_size = Vector2(210, 0)
+layout_mode = 2
 mouse_filter = 2
 
-[node name="TopRow" type="HBoxContainer" parent="HUD/Margin/VBox"]
-mouse_filter = 2
-
-[node name="TimerLabel" type="Label" parent="HUD/Margin/VBox/TopRow"]
-text = "00:00"
-
-[node name="Spacer1" type="Control" parent="HUD/Margin/VBox/TopRow"]
-size_flags_horizontal = 3
-mouse_filter = 2
-
-[node name="LevelLabel" type="Label" parent="HUD/Margin/VBox/TopRow"]
+[node name="LevelLabel" type="Label" parent="HUD/TopLeft/InfoRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
 text = "Lv 1"
 
-[node name="Spacer2" type="Control" parent="HUD/Margin/VBox/TopRow"]
+[node name="Spacer1" type="Control" parent="HUD/TopLeft/InfoRow"]
+layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="KillsLabel" type="Label" parent="HUD/Margin/VBox/TopRow"]
+[node name="TimerLabel" type="Label" parent="HUD/TopLeft/InfoRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "00:00"
+
+[node name="KillsLabel" type="Label" parent="HUD/TopLeft"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
 text = "Öldürme: 0"
 
-[node name="HealthBar" type="ProgressBar" parent="HUD/Margin/VBox"]
+[node name="HealthBar" type="ProgressBar" parent="HUD/TopLeft"]
+custom_minimum_size = Vector2(210, 18)
+layout_mode = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
 
-[node name="XPBar" type="ProgressBar" parent="HUD/Margin/VBox"]
+[node name="XPBar" type="ProgressBar" parent="HUD/TopLeft"]
 theme_override_styles/fill = SubResource("StyleBoxFlat_xp_fill")
+custom_minimum_size = Vector2(210, 10)
+layout_mode = 2
 max_value = 12.0
 value = 0.0
 show_percentage = false
 
-[node name="BossContainer" type="VBoxContainer" parent="HUD/Margin/VBox"]
+[node name="BossPanel" type="VBoxContainer" parent="HUD"]
 visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -170.0
+offset_top = 14.0
+offset_right = 170.0
+offset_bottom = 56.0
+theme_override_constants/separation = 2
+mouse_filter = 2
 
-[node name="BossNameLabel" type="Label" parent="HUD/Margin/VBox/BossContainer"]
-text = "Kan Lordu"
+[node name="BossNameLabel" type="Label" parent="HUD/BossPanel"]
+layout_mode = 2
 horizontal_alignment = 1
-theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_colors/font_color = Color(1, 0.35, 0.35, 1)
+theme_override_font_sizes/font_size = 14
+text = "Kan Lordu"
 
-[node name="BossHealthBar" type="ProgressBar" parent="HUD/Margin/VBox/BossContainer"]
+[node name="BossHealthBar" type="ProgressBar" parent="HUD/BossPanel"]
 theme_override_styles/fill = SubResource("StyleBoxFlat_boss_fill")
+custom_minimum_size = Vector2(340, 16)
+layout_mode = 2
 max_value = 1400.0
 value = 1400.0
 show_percentage = false
