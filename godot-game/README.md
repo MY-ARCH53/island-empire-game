@@ -310,6 +310,20 @@ değişiklikle yenilendi, sahne dosyalarına tek tek dokunmaya gerek kalmadı.
 - 9-slice marjları (`texture_margin_*` in `theme.tres`) gözle tahmin edildi
   (kesin ölçüm yapılmadı) — büyütülmüş bir panelde köşe süslemeleri hafif
   gerilmiş görünüyorsa marjı artır.
+- **Dikkat — `texture_margin_*` dokunun boyutuna göre değil, EKRANDA
+  gösterileceği boyuta göre seçilir**: Godot bu marjları ekran pikseli
+  olarak birebir çizer (dokunun kendi çözünürlüğüyle orantılı ölçeklenmez).
+  `panel_button.png` 312x152'ye büyütüldüğünde marj da (44/38) dokunun
+  "oranına göre" büyütülmüştü — ama sahnedeki asıl butonlar hâlâ 48-64px
+  yükseklikteydi, bu yüzden StyleBoxTexture'ın kendi minimum boyutu
+  (marj toplamı) buton için istenen `custom_minimum_size`'ı ezip geçti;
+  Dükkan ve Seviye Atlama menülerindeki butonlar aşırı büyüyüp sabit
+  boyutlu `Panel` kutusunun dışına taştı ("ölçeklendirme hatası"). Düzeltme:
+  marjlar en küçük buton yüksekliğine (48px) göre küçültüldü (20/16), ayrıca
+  `ShopScreen`/`LevelUpMenu`'nun `Panel`'i artık sabit `offset` kutusu değil,
+  bir `CenterContainer` içinde içeriğe göre kendiliğinden boyutlanıyor —
+  böylece gelecekte içerik (öğe sayısı, buton boyutu) değişse bile taşma
+  riski kalmıyor.
 - Can/XP/boss barlarının dolgu rengi tema genelinde DEĞİL, her `ProgressBar`
   node'unda ayrı `theme_override_styles/fill` ile (`Game.tscn`) — kırmızı/
   altın/bordo ayrımı için.

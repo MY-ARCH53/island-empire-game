@@ -1,9 +1,9 @@
 extends CanvasLayer
 
-@onready var essence_label: Label = $Panel/VBox/EssenceLabel
-@onready var status_label: Label = $Panel/VBox/StatusLabel
-@onready var items_container: VBoxContainer = $Panel/VBox/ScrollContainer/Items
-@onready var close_button: Button = $Panel/VBox/CloseButton
+@onready var essence_label: Label = $Center/Panel/VBox/EssenceLabel
+@onready var status_label: Label = $Center/Panel/VBox/StatusLabel
+@onready var items_container: VBoxContainer = $Center/Panel/VBox/ScrollContainer/Items
+@onready var close_button: Button = $Center/Panel/VBox/CloseButton
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS

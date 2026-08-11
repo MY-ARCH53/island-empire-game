@@ -2,8 +2,8 @@ extends CanvasLayer
 
 signal choice_selected(choice: Dictionary)
 
-@onready var title_label: Label = $Panel/VBox/TitleLabel
-@onready var button_container: VBoxContainer = $Panel/VBox/Choices
+@onready var title_label: Label = $Center/Panel/VBox/TitleLabel
+@onready var button_container: VBoxContainer = $Center/Panel/VBox/Choices
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
