@@ -8,6 +8,7 @@ extends CanvasLayer
 @onready var boss_bar_container: VBoxContainer = $BossPanel
 @onready var boss_bar: ProgressBar = $BossPanel/BossHealthBar
 @onready var boss_name_label: Label = $BossPanel/BossNameLabel
+@onready var evolution_label: Label = $EvolutionBanner
 
 func set_health(current: float, max_h: float) -> void:
 	health_bar.max_value = max_h
@@ -39,3 +40,13 @@ func hide_boss_bar() -> void:
 func set_boss_health(current: float, max_h: float) -> void:
 	boss_bar.max_value = max_h
 	boss_bar.value = current
+
+func show_evolution(evolved_name: String) -> void:
+	evolution_label.text = "⚔ SİLAH EVRİMİ: %s ⚔" % evolved_name
+	evolution_label.modulate = Color(1, 1, 1, 1)
+	evolution_label.visible = true
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_interval(1.6)
+	tween.tween_property(evolution_label, "modulate:a", 0.0, 0.6)
+	tween.tween_callback(func(): evolution_label.visible = false)

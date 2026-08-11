@@ -85,6 +85,7 @@ func _ready() -> void:
 	player.health_changed.connect(hud.set_health)
 	player.xp_changed.connect(hud.set_xp)
 	player.leveled_up.connect(_on_leveled_up)
+	player.weapon_evolved.connect(_on_weapon_evolved)
 	level_up_menu.choice_selected.connect(_on_choice_selected)
 	game_over_screen.play_again_pressed.connect(_on_play_again)
 	game_over_screen.main_menu_pressed.connect(_on_back_to_menu)
@@ -386,6 +387,10 @@ func _show_next_levelup() -> void:
 		level_up_menu.open(item["level"], item["choices"], "Boss Ödülü — Bir Silah Seç!")
 	else:
 		level_up_menu.open(item["level"], item["choices"])
+
+func _on_weapon_evolved(_weapon_id: String, evolved_name: String) -> void:
+	hud.show_evolution(evolved_name)
+	Effects.spawn_burst(world, player.global_position, Color(1.0, 0.85, 0.3), 30, 240.0)
 
 func _on_choice_selected(choice: Dictionary) -> void:
 	player.apply_choice(choice)

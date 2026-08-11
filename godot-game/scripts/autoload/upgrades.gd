@@ -45,6 +45,39 @@ const WEAPONS := {
 	},
 }
 
+# Silah evrimi: silah azami seviyeye ulaşıp, eşleşen istatistik
+# EVOLUTION_STAT_LEVEL_REQUIRED kez seçildiğinde otomatik gerçekleşir
+# (level_up_menu'de ayrı bir seçenek değil — player.gd _check_evolutions()).
+const EVOLUTION_STAT_LEVEL_REQUIRED := 5
+
+const EVOLUTIONS := {
+	"magic_bolt": {
+		"requires_stat": "damage",
+		"name": "Arkan Yağmuru",
+		"desc": "Aynı anda üç güçlü büyü cismi fırlatır.",
+	},
+	"orbit_blade": {
+		"requires_stat": "area",
+		"name": "Kan Girdabı",
+		"desc": "Dev, kanlı bir kılıç girdabı — daha geniş ve daha yıkıcı.",
+	},
+	"nova_pulse": {
+		"requires_stat": "attack_speed",
+		"name": "Kıyamet Dalgası",
+		"desc": "Çok daha sık patlayan, geniş alanlı bir yıkım dalgası.",
+	},
+	"poison_cloud": {
+		"requires_stat": "xp_gain",
+		"name": "Veba Bulutu",
+		"desc": "Çok daha geniş, uzun süren ve güçlü bir veba alanı bırakır.",
+	},
+	"chain_lightning": {
+		"requires_stat": "pickup_radius",
+		"name": "Fırtına Zinciri",
+		"desc": "Çok daha uzun menzilli, çok daha fazla düşmana sıçrar.",
+	},
+}
+
 # İstatistik yükseltme bilgisi — id: {name, desc}
 const STAT_UPGRADE_INFO := {
 	"max_health":    {"name": "Azami Can +20",        "desc": "Maksimum canını artırır ve can doldurur."},

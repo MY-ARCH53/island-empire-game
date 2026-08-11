@@ -63,7 +63,8 @@ hesabı varsa onunla, yoksa `POST /api/auth/register` ile yeni hesap aç.
   script'lerine bak (PixelLab indirmelerini `res://` yapısına dönüştürüyorlar).
 - **Silahlar** (`scripts/autoload/upgrades.gd`): Büyü Cismi (mermi), Dönen
   Kılıçlar (orbit), Nova Patlaması (AoE pulse), Zehir Bulutu (DoT alan),
-  Zincir Şimşek (sıçrayan hasar).
+  Zincir Şimşek (sıçrayan hasar) — hepsi azami seviyede evrimleşebilir,
+  bkz. [Silah evrimi](#silah-evrimi).
 - **Düşmanlar**: Yarasa, İskelet, Hayalet, Vahşi, Kabus (hızlı sürü),
   Gulyabani (oyuncuya teleport eden) — ve 5. dakikada beliren boss
   **Kan Lordu** (telegraflı alan saldırısı, HUD'da can barı, ölünce garanti
@@ -356,6 +357,49 @@ değişiklikle yenilendi, sahne dosyalarına tek tek dokunmaya gerek kalmadı.
   Boss barı ayrı, üst-ortada sabit boyutlu bir `BossPanel`'de. Bar arka
   planı da ornate `StyleBoxTexture` yerine sade `StyleBoxFlat`'e çevrildi
   (`theme.tres`) — küçük boyutlarda 9-slice süsleme dağılıyordu.
+
+## Silah evrimi
+
+Klasik Vampire Survivors tarzı: bir silah **azami seviyeye** (Lv 8) ulaşıp
+oyuncu eşleşen istatistik yükseltmesini **5 kez** seçtiğinde, silah otomatik
+olarak evrimleşir — level-up menüsünde ayrı bir seçenek değil, koşullar
+karşılanır karşılanmaz anında gerçekleşir (`player.gd → _check_evolutions`,
+her `add_weapon`/`_apply_stat_upgrade` sonrası çağrılır). Eşleşmeler ve
+evrim sonrası isim/açıklama `scripts/autoload/upgrades.gd → EVOLUTIONS`'ta:
+
+| Silah | Gereken istatistik | Evrim |
+|---|---|---|
+| Büyü Cismi | Hasar ×5 | Arkan Yağmuru — 3'lü yayılan atış |
+| Dönen Kılıçlar | Alan ×5 | Kan Girdabı — daha geniş, daha büyük kılıçlar |
+| Nova Patlaması | Saldırı Hızı ×5 | Kıyamet Dalgası — çok daha sık patlama |
+| Zehir Bulutu | Tecrübe ×5 | Veba Bulutu — daha geniş/uzun/güçlü alan |
+| Zincir Şimşek | Toplama Menzili ×5 | Fırtına Zinciri — çok daha uzun zincir |
+
+Evrimleşen silahlar aynı `weapon_id`'yi korur (`player.evolved_weapons`
+sözlüğünde ayrı bir bayrak) — yeni bir silah ID'si icat edip
+`_weapon_timers`/`owned_weapons` gibi mevcut altyapıyı çoğaltmak yerine, her
+`_fire_*`/`_update_orbit_blades`/`_update_weapon_timer` fonksiyonu
+`evolved_weapons.get(id, false)` kontrolüyle dallanıyor: hasar/alan/menzil
+çarpanı artıyor, ateşleme hızı geneli %45 kısalıyor (`_update_weapon_timer`),
+görsel olarak renk tonu değişiyor (mermi/orbit/nova/yıldırım/bulut). Yeni
+PixelLab görseli üretilmedi — ayrım tamamen `modulate` rengi + ölçek ile
+yapılıyor (bkz. Faz 0'daki asset bütçesi kısıtı).
+
+Evrim anında `hud.gd → show_evolution()` ekranda 2 saniyelik altın bir
+"⚔ SİLAH EVRİMİ: <isim> ⚔" pankartı gösterir + `Effects.spawn_burst` parçacık
+patlaması + `camera_shake` + `boss_slam` sesi (normal level-up chime'ından
+ayrışsın diye). Bu banner'ın tween'i `TWEEN_PAUSE_PROCESS` ile işaretli —
+level-up menüsü açıkken (`get_tree().paused`) tetiklenirse bile donmuyor,
+aynı `Effects.spawn_burst`'ün zaten kullandığı `PROCESS_MODE_ALWAYS` deseni.
+
+**Doğrulama notu**: Bu özellik gerçek bir Godot koşusuyla test edildi —
+geçici bir script ile oyuncunun tüm silahlarını azami seviyeye çıkarıp
+ilgili istatistiği 5 kez uyguladım, `evolved_weapons` sözlüğünün gerçekten
+`true` olduğunu `print()` ile doğruladım, sonra `get_viewport().get_texture()
+.get_image().save_png(...)` ile ekran görüntüsü alıp evrim banner'ının ve
+görsel farklılaşmanın (kırmızı büyük kılıçlar, üçlü büyü cismi atışı vb.)
+gerçekten doğru render olduğunu gözle kontrol ettim. Script'ler işim
+bitince silindi (kalıcı değiller).
 
 ## Denge sabitleri (tune edilebilir)
 

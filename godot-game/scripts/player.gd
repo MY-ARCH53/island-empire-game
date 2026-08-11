@@ -4,6 +4,7 @@ signal died
 signal health_changed(current: float, max_h: float)
 signal xp_changed(current: float, needed: float)
 signal leveled_up(new_level: int, choices: Array)
+signal weapon_evolved(weapon_id: String, evolved_name: String)
 
 const ProjectileScene := preload("res://scenes/Projectile.tscn")
 const PoisonCloudScene := preload("res://scenes/PoisonCloud.tscn")
@@ -29,6 +30,8 @@ var kills: int = 0
 var alive: bool = true
 
 var owned_weapons: Dictionary = {}
+var stat_levels: Dictionary = {}
+var evolved_weapons: Dictionary = {}
 var _weapon_timers: Dictionary = {}
 var _orbit_blades: Array = []
 var _orbit_angle: float = 0.0
@@ -118,6 +121,7 @@ func apply_choice(choice: Dictionary) -> void:
 		_apply_stat_upgrade(choice["id"])
 
 func _apply_stat_upgrade(id: String) -> void:
+	stat_levels[id] = stat_levels.get(id, 0) + 1
 	match id:
 		"max_health":
 			max_health += 20.0
@@ -137,6 +141,7 @@ func _apply_stat_upgrade(id: String) -> void:
 			xp_mult += 0.10
 		"pickup_radius":
 			pickup_radius *= 1.20
+	_check_evolutions()
 
 func add_weapon(weapon_id: String) -> void:
 	var max_lvl: int = Upgrades.WEAPONS[weapon_id]["max_level"]
@@ -156,13 +161,40 @@ func add_weapon(weapon_id: String) -> void:
 			_weapon_timers[weapon_id] = timer
 		_update_weapon_timer(weapon_id)
 		_weapon_timers[weapon_id].start()
+	_check_evolutions()
 
 func _update_weapon_timer(weapon_id: String) -> void:
 	if not _weapon_timers.has(weapon_id):
 		return
 	var data: Dictionary = Upgrades.WEAPONS[weapon_id]
 	var cooldown: float = data["base_cooldown"] * pow(0.9, owned_weapons[weapon_id] - 1) / attack_speed_mult
+	if evolved_weapons.get(weapon_id, false):
+		cooldown *= 0.55
 	_weapon_timers[weapon_id].wait_time = max(0.15, cooldown)
+
+# Silah azami seviyeye ulaşıp eşleşen istatistik EVOLUTION_STAT_LEVEL_REQUIRED
+# kez seçildiğinde otomatik tetiklenir (bkz. Upgrades.EVOLUTIONS).
+func _check_evolutions() -> void:
+	for wid in Upgrades.EVOLUTIONS.keys():
+		if evolved_weapons.get(wid, false):
+			continue
+		var lvl: int = owned_weapons.get(wid, 0)
+		if lvl < Upgrades.WEAPONS[wid]["max_level"]:
+			continue
+		var req: Dictionary = Upgrades.EVOLUTIONS[wid]
+		if stat_levels.get(req["requires_stat"], 0) < Upgrades.EVOLUTION_STAT_LEVEL_REQUIRED:
+			continue
+		_evolve_weapon(wid)
+
+func _evolve_weapon(weapon_id: String) -> void:
+	evolved_weapons[weapon_id] = true
+	if weapon_id == "orbit_blade":
+		_rebuild_orbit_blades()
+	elif _weapon_timers.has(weapon_id):
+		_update_weapon_timer(weapon_id)
+	camera_shake(10.0, 4.0)
+	Audio.play("boss_slam", 2.0, 0.85)
+	weapon_evolved.emit(weapon_id, Upgrades.EVOLUTIONS[weapon_id]["name"])
 
 func _fire_weapon(weapon_id: String) -> void:
 	if not alive:
@@ -183,33 +215,43 @@ func _fire_magic_bolt() -> void:
 		return
 	var data: Dictionary = Upgrades.WEAPONS["magic_bolt"]
 	var lvl: int = owned_weapons["magic_bolt"]
-	var proj := ProjectileScene.instantiate()
-	get_parent().add_child(proj)
-	proj.global_position = global_position
+	var is_evo: bool = evolved_weapons.get("magic_bolt", false)
 	var dir: Vector2 = (target.global_position - global_position).normalized()
-	var dmg: float = data["base_damage"] * (1.0 + 0.25 * (lvl - 1)) * damage_mult
-	proj.setup(dir, data["projectile_speed"], dmg)
+	var dmg: float = data["base_damage"] * (1.0 + 0.25 * (lvl - 1)) * damage_mult * (1.5 if is_evo else 1.0)
+	var spreads: Array = [0.0, -0.18, 0.18] if is_evo else [0.0]
+	for spread in spreads:
+		var proj := ProjectileScene.instantiate()
+		get_parent().add_child(proj)
+		proj.global_position = global_position
+		proj.setup(dir.rotated(spread), data["projectile_speed"], dmg)
+		if is_evo:
+			proj.modulate = Color(1.0, 0.8, 0.3)
 
 func _fire_nova_pulse() -> void:
 	var data: Dictionary = Upgrades.WEAPONS["nova_pulse"]
 	var lvl: int = owned_weapons["nova_pulse"]
-	var radius: float = 110.0 * area_mult * (1.0 + 0.08 * (lvl - 1))
-	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult
+	var is_evo: bool = evolved_weapons.get("nova_pulse", false)
+	var radius: float = 110.0 * area_mult * (1.0 + 0.08 * (lvl - 1)) * (1.4 if is_evo else 1.0)
+	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult * (1.5 if is_evo else 1.0)
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if is_instance_valid(enemy) and global_position.distance_to(enemy.global_position) <= radius:
 			enemy.take_damage(dmg)
-	camera_shake(5.0)
-	_spawn_nova_visual(radius)
+	camera_shake(8.0 if is_evo else 5.0)
+	_spawn_nova_visual(radius, is_evo)
 
 func _fire_poison_cloud() -> void:
 	var data: Dictionary = Upgrades.WEAPONS["poison_cloud"]
 	var lvl: int = owned_weapons["poison_cloud"]
-	var radius: float = data["radius"] * area_mult * (1.0 + 0.06 * (lvl - 1))
-	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult
+	var is_evo: bool = evolved_weapons.get("poison_cloud", false)
+	var radius: float = data["radius"] * area_mult * (1.0 + 0.06 * (lvl - 1)) * (1.5 if is_evo else 1.0)
+	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult * (1.4 if is_evo else 1.0)
+	var duration: float = data["duration"] * (1.6 if is_evo else 1.0)
 	var cloud := PoisonCloudScene.instantiate()
 	get_parent().add_child(cloud)
 	cloud.global_position = global_position
-	cloud.setup(radius, dmg, data["duration"], data["tick_interval"])
+	cloud.setup(radius, dmg, duration, data["tick_interval"])
+	if is_evo:
+		cloud.modulate = Color(0.55, 1.0, 0.4)
 
 func _fire_chain_lightning() -> void:
 	var first := _find_nearest_enemy()
@@ -217,9 +259,10 @@ func _fire_chain_lightning() -> void:
 		return
 	var data: Dictionary = Upgrades.WEAPONS["chain_lightning"]
 	var lvl: int = owned_weapons["chain_lightning"]
-	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult
-	var chain_count: int = int(data["chain_count"]) + int(lvl / 2.0)
-	var chain_range: float = data["chain_range"] * area_mult
+	var is_evo: bool = evolved_weapons.get("chain_lightning", false)
+	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult * (1.4 if is_evo else 1.0)
+	var chain_count: int = int(data["chain_count"]) + int(lvl / 2.0) + (4 if is_evo else 0)
+	var chain_range: float = data["chain_range"] * area_mult * (1.5 if is_evo else 1.0)
 
 	var hit: Array = [first]
 	var points: Array = [global_position, first.global_position]
@@ -234,7 +277,7 @@ func _fire_chain_lightning() -> void:
 		points.append(next_target.global_position)
 		current = next_target
 
-	_spawn_lightning_visual(points)
+	_spawn_lightning_visual(points, is_evo)
 
 func _find_nearest_unhit_enemy(from_pos: Vector2, max_range: float, exclude: Array) -> Node2D:
 	var nearest: Node2D = null
@@ -248,10 +291,10 @@ func _find_nearest_unhit_enemy(from_pos: Vector2, max_range: float, exclude: Arr
 			nearest = enemy
 	return nearest
 
-func _spawn_lightning_visual(points: Array) -> void:
+func _spawn_lightning_visual(points: Array, is_evo: bool = false) -> void:
 	var line := Line2D.new()
-	line.width = 3.0
-	line.default_color = Color(0.6, 0.85, 1.0, 0.9)
+	line.width = 5.0 if is_evo else 3.0
+	line.default_color = Color(1.0, 0.9, 0.3, 0.95) if is_evo else Color(0.6, 0.85, 1.0, 0.9)
 	get_parent().add_child(line)
 	for p in points:
 		line.add_point(p)
@@ -259,12 +302,12 @@ func _spawn_lightning_visual(points: Array) -> void:
 	tween.tween_property(line, "modulate:a", 0.0, 0.25)
 	tween.tween_callback(line.queue_free)
 
-func _spawn_nova_visual(radius: float) -> void:
+func _spawn_nova_visual(radius: float, is_evo: bool = false) -> void:
 	var ring := Sprite2D.new()
 	ring.texture = NovaRingTexture
 	get_parent().add_child(ring)
 	ring.global_position = global_position
-	ring.modulate = Color(1, 1, 1, 0.8)
+	ring.modulate = Color(1, 0.45, 0.15, 0.85) if is_evo else Color(1, 1, 1, 0.8)
 	ring.scale = Vector2.ONE * 0.2
 	var target_scale: float = (radius * 2.0) / ring.texture.get_width()
 	var tween := ring.create_tween()
@@ -279,9 +322,13 @@ func _rebuild_orbit_blades() -> void:
 			b.queue_free()
 	_orbit_blades.clear()
 	var count: int = owned_weapons.get("orbit_blade", 0)
+	var is_evo: bool = evolved_weapons.get("orbit_blade", false)
 	for i in range(count):
 		var blade := Sprite2D.new()
 		blade.texture = OrbitBladeTexture
+		if is_evo:
+			blade.scale = Vector2.ONE * 1.4
+			blade.modulate = Color(1.0, 0.35, 0.35)
 		get_parent().add_child.call_deferred(blade)
 		_orbit_blades.append(blade)
 
@@ -289,11 +336,12 @@ func _update_orbit_blades(delta: float) -> void:
 	if _orbit_blades.is_empty():
 		return
 	_orbit_angle += delta * 2.2
-	var radius: float = 55.0 * area_mult
+	var is_evo: bool = evolved_weapons.get("orbit_blade", false)
+	var radius: float = 55.0 * area_mult * (1.35 if is_evo else 1.0)
 	var count: int = _orbit_blades.size()
 	var data: Dictionary = Upgrades.WEAPONS["orbit_blade"]
 	var lvl: int = owned_weapons["orbit_blade"]
-	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult
+	var dmg: float = data["base_damage"] * (1.0 + 0.2 * (lvl - 1)) * damage_mult * (1.6 if is_evo else 1.0)
 	for i in range(count):
 		var angle: float = _orbit_angle + i * TAU / count
 		var pos: Vector2 = global_position + Vector2(cos(angle), sin(angle)) * radius
