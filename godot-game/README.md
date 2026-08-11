@@ -324,6 +324,21 @@ değişiklikle yenilendi, sahne dosyalarına tek tek dokunmaya gerek kalmadı.
   bir `CenterContainer` içinde içeriğe göre kendiliğinden boyutlanıyor —
   böylece gelecekte içerik (öğe sayısı, buton boyutu) değişse bile taşma
   riski kalmıyor.
+- **Takip düzeltmesi — Dükkan hâlâ taşıyordu**: ilk düzeltmeden sonra
+  `ShopScreen/Center/Panel` sabit `custom_minimum_size.x = 520` idi, ama
+  içindeki `Items` listesi 480px genişlik + panelin kendi 9-slice marjı
+  (46+46=92px) = en az 572px gerektiriyordu. Aradaki fark yüzünden
+  `ScrollContainer` yatayda da kaymaya başlıyor, "Satın Al" butonları
+  panelin sağ kenarından taşıp kırpılıyordu. Bunu gözle tahmin yerine
+  gerçek bir ekran görüntüsüyle doğruladım: `get_viewport().get_texture()
+  .get_image().save_png(...)` çağıran geçici bir sahne/script ile Godot'u
+  headless çalıştırıp PNG'yi okudum (Godot MCP'de screenshot aracı yok).
+  Panel genişliği 580'e çıkarılınca sorun düzeldi; aynı yöntemle
+  `LevelUpMenu`'nun da sorunsuz olduğu teyit edildi. Benzer bir "sahnede
+  gerçekten nasıl görünüyor" belirsizliği olursa bu teknik tekrar
+  kullanılabilir (geçici bir script ile ilgili ekranı aç, `await` ile
+  birkaç frame bekle, `save_png`, sonra dosyayı Read ile görüntüle — işin
+  sonunda geçici dosyaları sil).
 - Can/XP/boss barlarının dolgu rengi tema genelinde DEĞİL, her `ProgressBar`
   node'unda ayrı `theme_override_styles/fill` ile (`Game.tscn`) — kırmızı/
   altın/bordo ayrımı için.

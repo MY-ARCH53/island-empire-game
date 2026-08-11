@@ -76,12 +76,13 @@ layer = 10
 script = ExtResource("2")
 
 [node name="Center" type="CenterContainer" parent="ShopScreen"]
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 
 [node name="Panel" type="PanelContainer" parent="ShopScreen/Center"]
-custom_minimum_size = Vector2(520, 0)
+custom_minimum_size = Vector2(580, 0)
 layout_mode = 2
 
 [node name="VBox" type="VBoxContainer" parent="ShopScreen/Center/Panel"]
