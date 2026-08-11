@@ -66,7 +66,7 @@ hesabı varsa onunla, yoksa `POST /api/auth/register` ile yeni hesap aç.
   Zincir Şimşek (sıçrayan hasar) — hepsi azami seviyede evrimleşebilir,
   bkz. [Silah evrimi](#silah-evrimi).
 - **Düşmanlar**: Yarasa, İskelet, Hayalet, Vahşi, Kabus (hızlı sürü),
-  Gulyabani (oyuncuya teleport eden) — ve 5. dakikada beliren boss
+  Gulyabani (oyuncuya teleport eden) — ve oyuncu seviye 20'ye ulaşınca beliren boss
   **Kan Lordu** (telegraflı alan saldırısı, HUD'da can barı, ölünce garanti
   silah ödülü).
 - **Seviye atlama**: XP topladıkça 3 (veya "Ekstra Seçenek Slotu" kalıcı
@@ -405,7 +405,7 @@ bitince silindi (kalıcı değiller).
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`
 - Zorluk eğrisi (spawn hızı, düşman havuzu, boss zamanlaması):
-  `scripts/game.gd → _update_difficulty` (`BOSS_SPAWN_TIME` = 300sn)
+  `scripts/game.gd → _update_difficulty` (`BOSS_SPAWN_LEVEL` = 20)
 - Ödül formülü, günlük/run tavanları, anti-hile sabitleri:
   `backend/src/controllers/minigame.controller.js`
 - Kalıcı yükseltme fiyat/seviye tanımları:

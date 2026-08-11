@@ -39,7 +39,7 @@ const WellTexture := preload("res://assets/props/well.png")
 @onready var ground: TileMapLayer = $Ground
 @onready var ground_coast: TileMapLayer = $GroundCoast
 
-const BOSS_SPAWN_TIME := 300.0
+const BOSS_SPAWN_LEVEL := 20
 
 # --- Dünya hikayesi: kasaba (merkez) -> açık alan -> sahil -> deniz (dünya sınırı) ---
 # "Kan Adası" adını gerçek bir ada haline getiren radyal bölgeleme.
@@ -307,7 +307,7 @@ func _update_difficulty() -> void:
 		enemy_pool.append("brute")
 	if elapsed > 900.0 and not enemy_pool.has("gulyabani"):
 		enemy_pool.append("gulyabani")
-	if elapsed >= BOSS_SPAWN_TIME and not boss_spawned:
+	if player.level >= BOSS_SPAWN_LEVEL and not boss_spawned:
 		boss_spawned = true
 		_spawn_boss()
 
