@@ -17,6 +17,7 @@ const adminRoutes = require('./routes/admin.routes');
 const tlcoinRoutes = require('./routes/tlcoin.routes');
 const tradeRoutes  = require('./routes/trade.routes');
 const spinRoutes   = require('./routes/spin.routes');
+const minigameRoutes = require('./routes/minigame.routes');
 const { startWorker } = require('./services/autoProductionWorker');
 const instagramRoutes = require('./routes/instagram.routes');
 const { startInstagramWorker } = require('./services/instagramWorker');
@@ -56,6 +57,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/tlcoin',          banCheck, tlcoinRoutes);
 app.use('/api/trade',           banCheck, tradeRoutes);
 app.use('/api/spin',            banCheck, spinRoutes);
+app.use('/api/minigame',        banCheck, minigameRoutes);
 app.use('/api/instagram', instagramRoutes);
 app.use('/api/chat',           banCheck, chatRoutes);
 

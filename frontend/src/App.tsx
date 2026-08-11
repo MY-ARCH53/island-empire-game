@@ -20,6 +20,7 @@ import Admin2Page from './pages/Admin2Page';
 import TLCoinPage from './pages/TLCoinPage';
 import ProfilePage from './pages/ProfilePage';
 import BattleDemoPage from './pages/BattleDemoPage';
+import MinigamePage from './pages/MinigamePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import AboutPage from './pages/AboutPage';
 import HowToPlayPage from './pages/HowToPlayPage';
@@ -64,6 +65,7 @@ function App() {
             <Route path="/tlcoin" element={<TLCoinPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/battle-demo" element={<BattleDemoPage />} />
+            <Route path="/minigame" element={<MinigamePage />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/how-to-play" element={<HowToPlayPage />} />

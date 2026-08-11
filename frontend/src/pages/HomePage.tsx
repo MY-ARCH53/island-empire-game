@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { key: 'tasks',       emoji: '📋', label: 'Görevler'  },
   { key: 'spin',        emoji: '🎰', label: 'Çark'      },
   { key: 'battle',      emoji: '⚔️', label: 'Savaş'    },
+  { key: 'minigame',    emoji: '🧛', label: 'Kan Adası' },
   { key: 'trade',       emoji: '🔄', label: 'Ticaret'   },
   // { key: 'market',      emoji: '🏪', label: 'Pazar'     },  // geçici olarak gizlendi
   { key: 'leaderboard', emoji: '🏆', label: 'Liderlik'  },
@@ -517,6 +518,7 @@ function HomePage() {
     } else if (key === 'market')       navigate('/marketplace');
     else if (key === 'leaderboard')    navigate('/leaderboard');
     else if (key === 'battle')         navigate('/battle');
+    else if (key === 'minigame')       navigate('/minigame');
     else if (key === 'chat')           navigate('/chat');
     else if (key === 'klan')           navigate('/klan');
   };
