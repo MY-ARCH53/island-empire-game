@@ -10,5 +10,6 @@ router.post('/character', OnlineController.createCharacter);
 router.get('/inventory', OnlineController.getInventory);
 router.post('/equip', OnlineController.equip);
 router.post('/unequip', OnlineController.unequip);
+router.get('/leaderboard', OnlineController.getLeaderboard);
 
 module.exports = router;

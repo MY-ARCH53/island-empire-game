@@ -1,4 +1,4 @@
-# Kan Adası: Online — Sunucu (Faz 0 + Faz 2)
+# Kan Adası: Online — Sunucu (Faz 0 + Faz 2 + Faz 3)
 
 Bu, "Kan Adası: Online" çok oyunculu genişlemesinin (bkz. plan:
 `C:\Users\musta\.claude\plans\humble-chasing-galaxy.md`) **headless Godot
@@ -6,11 +6,14 @@ sunucusu**. Kalıcı karakter/envanter verisi Faz 1'de `godot-game-v3` +
 Node backend'e eklendi (bu proje sadece gerçek zamanlı simülasyon
 otoritesi — bkz. planın "Veri sorumluluk ayrımı" bölümü).
 
-**Durum**: Faz 0 ✅ + Faz 2 ✅ (2026-08-12) — sunucu-otoriter PvE farm
-döngüsü uçtan uca çalışıyor: gerçek bir hesapla (JWT) bağlan → kimlik
-doğrula → düşman öldür → sunucu ödülü hesaplayıp Postgres'e yazar →
-istemciye bildirim gelir. `test_v2` hesabıyla gerçek bir koşuda doğrulandı
-(ekran görüntüsü + veritabanı satırı eşleşmesiyle).
+**Durum**: Faz 0 ✅ + Faz 2 ✅ + Faz 3 ✅ (2026-08-12) — sunucu-otoriter
+PvE farm döngüsü VE PvP savaş alanı uçtan uca çalışıyor. PvE: gerçek bir
+hesapla (JWT) bağlan → kimlik doğrula → düşman öldür → sunucu ödülü
+hesaplayıp Postgres'e yazar → istemciye bildirim gelir (`test_v2` ile
+doğrulandı, ekran görüntüsü + veritabanı satırı eşleşmesiyle). PvP: iki
+gerçek hesap (`test_v2`, `test_v3`) aynı anda bağlanıp birbirini öldürdü,
+NP kazanım/kayıp matematiği Postgres'te satır satır doğrulandı (bkz.
+"PvP haritası" bölümü).
 
 ## Görseller kasıtlı olarak basit
 
@@ -75,9 +78,55 @@ saldırıp ekran görüntüsü kaydeder — `res://farm_test_client_<id>.png`):
 Godot_v4.3-stable_win64_console.exe --path . --token=<JWT> --auto-attack
 ```
 
+## PvP haritası (Faz 3)
+
+Farm haritasından (`Main.tscn`/`main.gd`, port 9050) kasıtlı olarak ayrı
+bir sahne + script + port: `PvpMain.tscn`/`pvp_main.gd` (port 9051).
+Ayrımın nedeni: farm haritasında oyuncular arası hasar HİÇ istenmiyor —
+tek script'te birleştirmek yanlışlıkla PvP'yi PvE haritasına sızdırma
+riski taşırdı.
+
+- **Oyuncu**: `PvpPlayer.tscn`/`pvp_player.gd` — `RemotePlayer`'dan ayrı,
+  çünkü sadece burada bir `health` kavramı var.
+- **Kimlik doğrulama**: farm ile birebir aynı desen (`submit_auth` →
+  `/api/internal/authenticate` → `auth_result`).
+- **Saldırı**: SPACE'e basınca en yakın DİĞER oyuncuyu bulup
+  `request_pvp_attack(target_name)` RPC'siyle sunucudan doğrulama ister.
+  Sunucu menzil + bekleme süresini kontrol edip hasarı SADECE kendi
+  tarafında uygular (farm'daki `request_attack` ile aynı ilke).
+- **Kritik gotcha — can SUNUCU otoriter olmalı**: `PvpPlayer`'ın
+  `position`'ı istemci-otoriter (hareket akıcı olsun diye — spawn eden
+  eş `set_multiplayer_authority(id)` alır), ama `MultiplayerSynchronizer`
+  bir düğümün TÜM senkronize özellikleri için TEK bir otorite kullanır.
+  `health`'i de aynı senkronizatöre koyarsak, hedefin kendi istemcisindeki
+  DEĞİŞMEMİŞ `health=100` değeri her senkronizasyon turunda sunucunun az
+  önce uyguladığı hasarı EZER (test sırasında canlı olarak yakalandı: can
+  hep 80'de "sıkışıp" kalıyordu, hiç 0'a inmiyordu). Çözüm: `health`,
+  `PvpPlayer.tscn`'in `SceneReplicationConfig`'inden TAMAMEN çıkarıldı;
+  bunun yerine sunucu her değişiklikte `health_update` RPC'siyle tüm
+  eşlere açıkça yayın yapıyor (`pvp_main.gd → _broadcast_health`).
+- **Ölüm + NP**: can ≤ 0 olunca sunucu `/api/internal/pvp-kill`'e
+  `{killerUserId, victimUserId}` yazar (katil +50 NP, kurban −50 NP,
+  0'ın altına inmez), sonucu her iki oyuncuya da `pvp_kill_notification`
+  RPC'siyle bildirir, kurbanı rastgele bir noktada tam canla yeniden
+  doğurur.
+- **Liderlik tablosu**: `GET /api/online/leaderboard` — NP > 0 olan
+  karakterler, NP'ye göre azalan sırayla (ilk 20).
+
+Çalıştırma (farm ile aynı desen, sadece sahne + port farklı):
+```
+INTERNAL_SERVER_SECRET=... Godot_v4.3-stable_win64_console.exe --headless --path . scenes/PvpMain.tscn --server
+Godot_v4.3-stable_win64_console.exe --path . scenes/PvpMain.tscn --token=<JWT>
+```
+
+**Doğrulama** (2026-08-12): `test_v2` (user 18) ve `test_v3` (user 19)
+hesaplarıyla iki gerçek istemci eşzamanlı bağlandı, `--auto-attack` ile
+karşılıklı birbirini öldürdü. Sunucu logu + `GET /api/online/character`
++ `GET /api/online/leaderboard` üçü de aynı sonucu doğruladı (sıralı
+karşılıklı öldürmede beklenen matematik: user18 0→50→0, user19 0→0→50).
+Doğrulama sonrası her iki hesabın NP'si tekrar 0'a sıfırlandı (temiz
+başlangıç durumu için).
+
 ## Sıradaki adım
 
-Faz 3 — PvP haritası (KO Bifrost esintili): ayrı bir savaş alanı sahnesi,
-oyuncular birbirine hasar verebilir, NP kazan/kaybet, liderlik tablosu.
-Bu fazın saldırı-doğrulama altyapısı (`request_attack` deseni) buraya da
-taşınabilir, hedef sadece düşman değil oyuncu da olabilir hale gelir.
+Faz 4 — ekipmanın gerçek etkisi + item upgrade/enchant sistemi.

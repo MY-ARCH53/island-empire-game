@@ -123,6 +123,24 @@ class OnlineController {
       res.status(500).json({ success: false, message: 'Hata olustu' });
     }
   }
+
+  // GET /api/online/leaderboard — NP'ye göre ilk 20 (Faz 3, PvP)
+  static async getLeaderboard(req, res) {
+    try {
+      const result = await query(
+        `SELECT u.username, oc.class_id, oc.level, oc.np
+         FROM online_characters oc
+         JOIN users u ON u.id = oc.user_id
+         WHERE oc.np > 0
+         ORDER BY oc.np DESC, oc.level DESC
+         LIMIT 20`
+      );
+      res.json({ success: true, data: result.rows });
+    } catch (err) {
+      console.error('Online getLeaderboard error:', err.message);
+      res.status(500).json({ success: false, message: 'Hata olustu' });
+    }
+  }
 }
 
 module.exports = OnlineController;

@@ -8,6 +8,9 @@ const { verifyToken } = require('../utils/jwt');
 // ele geçirilmiş sunucu çağrısı ekonomiyi bozmasın diye.
 const MAX_SILVER_PER_KILL = 200;
 const MAX_XP_PER_KILL = 200;
+// Knight Online'daki gerçek desen: solo PvP kill +50 NP, ölüm -50 NP.
+const PVP_NP_GAIN = 50;
+const PVP_NP_LOSS = 50;
 
 function xpNeededForLevel(level) {
   return 50 + level * 30;
@@ -108,6 +111,44 @@ class InternalController {
       });
     } catch (err) {
       console.error('Internal rewardKill error:', err.message);
+      res.status(500).json({ success: false, message: 'Hata olustu' });
+    }
+  }
+  // POST /api/internal/pvp-kill  { killerUserId, victimUserId }
+  // KO deseni: öldüren +50 NP kazanır, ölen 50 NP kaybeder (0'ın altına inmez).
+  static async pvpKill(req, res) {
+    try {
+      const killerUserId = parseInt(req.body.killerUserId, 10);
+      const victimUserId = parseInt(req.body.victimUserId, 10);
+      if (!Number.isFinite(killerUserId) || !Number.isFinite(victimUserId)) {
+        return res.status(400).json({ success: false, message: 'Geçersiz kullanıcı' });
+      }
+      if (killerUserId === victimUserId) {
+        return res.status(400).json({ success: false, message: 'Kendi kendini öldüremezsin' });
+      }
+
+      const charsRes = await query(
+        'SELECT user_id, np FROM online_characters WHERE user_id IN ($1, $2)',
+        [killerUserId, victimUserId]
+      );
+      if (charsRes.rows.length < 2) {
+        return res.status(404).json({ success: false, message: 'Karakter(ler) bulunamadı' });
+      }
+      const byUser = {};
+      charsRes.rows.forEach(r => { byUser[r.user_id] = r.np; });
+
+      const newKillerNp = byUser[killerUserId] + PVP_NP_GAIN;
+      const newVictimNp = Math.max(0, byUser[victimUserId] - PVP_NP_LOSS);
+
+      await query('UPDATE online_characters SET np = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2', [newKillerNp, killerUserId]);
+      await query('UPDATE online_characters SET np = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2', [newVictimNp, victimUserId]);
+
+      res.json({
+        success: true,
+        data: { killerNp: newKillerNp, victimNp: newVictimNp },
+      });
+    } catch (err) {
+      console.error('Internal pvpKill error:', err.message);
       res.status(500).json({ success: false, message: 'Hata olustu' });
     }
   }
