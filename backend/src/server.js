@@ -19,6 +19,7 @@ const tradeRoutes  = require('./routes/trade.routes');
 const spinRoutes   = require('./routes/spin.routes');
 const minigameRoutes = require('./routes/minigame.routes');
 const onlineRoutes = require('./routes/online.routes');
+const internalRoutes = require('./routes/internal.routes');
 const { startWorker } = require('./services/autoProductionWorker');
 const instagramRoutes = require('./routes/instagram.routes');
 const { startInstagramWorker } = require('./services/instagramWorker');
@@ -60,6 +61,7 @@ app.use('/api/trade',           banCheck, tradeRoutes);
 app.use('/api/spin',            banCheck, spinRoutes);
 app.use('/api/minigame',        banCheck, minigameRoutes);
 app.use('/api/online',          banCheck, onlineRoutes);
+app.use('/api/internal', internalRoutes);
 app.use('/api/instagram', instagramRoutes);
 app.use('/api/chat',           banCheck, chatRoutes);
 

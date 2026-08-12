@@ -7,6 +7,7 @@ extends Node2D
 # senkronize olur.
 
 const SPEED := 220.0
+const ATTACK_SEARCH_RADIUS := 300.0
 
 func _ready() -> void:
 	var visual: ColorRect = $Visual
@@ -31,3 +32,25 @@ func _physics_process(delta: float) -> void:
 	if dir.length() > 0.0:
 		dir = dir.normalized()
 	position += dir * SPEED * delta
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_multiplayer_authority():
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
+		_try_attack()
+
+# En yakın düşmanı bulup sunucudan saldırı doğrulaması ister — hasarı
+# BURADA hesaplamıyoruz, sadece "şuna saldırmak istiyorum" diyoruz
+# (bkz. main.gd → request_attack, menzil/bekleme süresi sunucuda kontrol edilir).
+func _try_attack() -> void:
+	var main := get_parent()
+	var nearest: Node2D = null
+	var nearest_dist := INF
+	for child in main.get_children():
+		if child.name.begins_with("enemy_"):
+			var d: float = position.distance_to(child.position)
+			if d < nearest_dist and d <= ATTACK_SEARCH_RADIUS:
+				nearest_dist = d
+				nearest = child
+	if nearest:
+		main.rpc_id(1, "request_attack", nearest.name)
