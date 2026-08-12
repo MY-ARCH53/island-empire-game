@@ -405,6 +405,70 @@ görsel farklılaşmanın (kırmızı büyük kılıçlar, üçlü büyü cismi 
 gerçekten doğru render olduğunu gözle kontrol ettim. Script'ler işim
 bitince silindi (kalıcı değiller).
 
+## Karakterler (v2'de yeni)
+
+Vampire Survivors'ın karakter sistemi araştırılıp (wiki üzerinden Antonio,
+Imelda, Pasqualina, Gennaro, Suor Clerici, Krochi'nin gerçek sayıları
+doğrulanarak) buraya uyarlandı: her karakterin **tek bir başlangıç silahı**
+ve **seviyeye bağlı kademeli büyüyen tek bir imza pasifi** var — VS'teki
+"sabit tek seferlik bonus değil, seviye eşiklerinde kümülatif büyüyen bonus"
+deseni birebir. Veri `scripts/autoload/upgrades.gd → CHARACTERS`:
+
+| Karakter | Başlangıç silahı | Pasif (Lv eşiği → kümülatif bonus) | Açılım |
+|---|---|---|---|
+| Köylü | Büyü Cismi | — (sabit: +30 can, +%5 hız) | Ücretsiz/varsayılan |
+| Büyücü | Büyü Cismi | Hasar, Lv5-25 arası +%40'a kadar | 80 Kan Özü |
+| Kılıç Ustası | Dönen Kılıçlar | Alan, Lv5-25 arası +%40'a kadar | 80 Kan Özü |
+| Fırtına Rahibesi | Nova Patlaması | Saldırı Hızı, Lv5-25 arası +%30'a kadar | 100 Kan Özü |
+| Vebalı | Zehir Bulutu | Tecrübe, Lv5-15 arası +%30'a kadar | 100 Kan Özü |
+| Fırtına Avcısı | Zincir Şimşek | Toplama Menzili, Lv1'den +%10, Lv15'te +%40 | 120 Kan Özü |
+
+**Kasıtlı tasarım kararı**: Her uzman karakterin pasifi, kendi silahının
+evrimi için gereken istatistikle eşleşiyor (örn. Büyücü'nün Hasar pasifi,
+Büyü Cismi'nin evrimi olan Arkan Yağmuru'nun gerektirdiği istatistikle
+aynı) — ama bu pasif **evrim sayacına (`stat_levels`) katkı yapmıyor**,
+sadece build'i güçlendirip o yöne teşvik ediyor. Oyuncu evrim için yine
+level-up menüsünden bilinçli olarak 5 kez seçim yapmalı. Bu, kullanıcıyla
+birlikte netleştirilmiş bir tasarım kararıydı (alternatifi: pasif de
+sayaca katkı yapsın — daha ödüllendirici ama iki sistemi birbirine
+bağlıyor).
+
+- **Mimari**: `player.gd`'de `character_id`, `_character_tier_index`,
+  `_check_character_passive()` (her seviye atlayışta bir sonraki eşiğe
+  ulaşılıp ulaşılmadığını kontrol edip farkı ilgili çarpana ekler) ve
+  `_apply_character_flat_bonuses()` (Köylü gibi kademesiz sabit bonuslar
+  için). `_ready()`'deki eskiden sabit `add_weapon("magic_bolt")` artık
+  seçili karaktere göre.
+- **Ekran**: `scenes/CharacterSelect.tscn` yok — `MainMenu.tscn` içine
+  `ShopScreen` ile birebir aynı iskelet (`CenterContainer`+`PanelContainer`+
+  `ScrollContainer`) ile gömülü `CharacterSelect` CanvasLayer'ı,
+  `scripts/character_select.gd`. MainMenu'de "🗡 Karakter Seç" butonu.
+- **Ekonomi**: Kan Özü ile satın alma, mevcut Dükkan mimarisiyle aynı desen
+  — `backend/src/controllers/minigame.controller.js → CHARACTER_DEFS` +
+  `purchase-character`/`select-character` endpoint'leri, `minigame_progress`
+  tablosuna `unlocked_characters` (jsonb) ve `selected_character` (text)
+  kolonları eklendi (yerel `psql` ile — bu projede migration dosyası yerine
+  doğrudan eklenen diğer tablo/kolonlarla aynı desen, prod'a deploy öncesi
+  VPS'te de aynı `ALTER TABLE` çalıştırılmalı).
+
+**Test notu — iki gerçek bug bulundu ve düzeltildi bu özellik geliştirilirken**:
+1. `godot-game-v2/project.godot`'un `config/name`'i başta v1 ile AYNIYDI
+   ("Kan Adasi") — bu, Godot'un işletim sistemi düzeyindeki `user://`
+   kayıt dizinini (dolayısıyla `save.dat`/JWT token'ı) v1 ile PAYLAŞMASINA
+   yol açıyordu. Test sırasında arka planda gerçek bir eski oturumun sessizce
+   yüklenip test verisini ezdiği keşfedildi (ekran görüntüsünde seçili
+   karakter beklenenden farklı çıktı) — `config/name` "Kan Adasi v2" olarak
+   değiştirildi, v1/v2 artık tamamen izole. Gelecekte üçüncü bir sürüm
+   açılırsa aynı şekilde benzersiz bir isim vermek gerekir.
+2. Karakter maliyeti gösterimi ("Satın Al (80)") ekran görüntüsünde "(00)"
+   gibi görünüyordu — `print()` ile buton metninin gerçekte doğru
+   ("Satın Al (80)") olduğu doğrulandı; bu bir kod hatası değil,
+   `assets/ui/gothic_font.ttf`'in "8" rakamını bu boyutta neredeyse "0"a
+   benzer çizmesinden kaynaklanan bir **font okunabilirlik sorunu** —
+   mevcut Dükkan ekranındaki gelecekteki maliyetleri de etkileyebilir
+   (şimdiye kadar "8" içeren bir fiyat hiç ekrana gelmemişti). Kapsam dışı
+   bırakıldı, ayrı bir font/tipografi işi olarak not edildi.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`

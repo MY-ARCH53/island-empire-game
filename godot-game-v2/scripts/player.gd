@@ -36,22 +36,64 @@ var _weapon_timers: Dictionary = {}
 var _orbit_blades: Array = []
 var _orbit_angle: float = 0.0
 
+var character_id: String = "koylu"
+var _character_tier_index: int = 0
+
 func _ready() -> void:
 	add_to_group("player")
+	character_id = GameManager.selected_character if Upgrades.CHARACTERS.has(GameManager.selected_character) else "koylu"
+	var char_data: Dictionary = Upgrades.CHARACTERS[character_id]
 	_apply_permanent_upgrades()
+	_apply_character_flat_bonuses(char_data)
 	max_health = base_max_health
 	health = max_health
 	health_changed.emit(health, max_health)
 	xp_changed.emit(xp, xp_needed)
-	add_weapon("magic_bolt")
-	if GameManager.permanent_upgrades.get("lucky_start", 0) > 0:
+	add_weapon(char_data["starting_weapon"])
+	if GameManager.permanent_upgrades.get("lucky_start", 0) > 0 and char_data["starting_weapon"] != "orbit_blade":
 		add_weapon("orbit_blade")
+	_check_character_passive()
 
 func _apply_permanent_upgrades() -> void:
 	var upgrades: Dictionary = GameManager.permanent_upgrades
 	base_max_health += 10.0 * int(upgrades.get("max_health", 0))
 	move_speed_mult += 0.05 * int(upgrades.get("move_speed", 0))
 	pickup_radius *= pow(1.15, int(upgrades.get("pickup_radius", 0)))
+
+func _apply_character_flat_bonuses(char_data: Dictionary) -> void:
+	var flat: Dictionary = char_data.get("flat_bonuses", {})
+	base_max_health += flat.get("max_health", 0.0)
+	move_speed_mult += flat.get("move_speed", 0.0)
+
+# Karakterin kademeli pasifi: seviye bir sonraki eşiğe ulaştıkça farkı
+# (kümülatif bonus deltası) ilgili istatistiğe ekler. Silah evrimi sayacını
+# ETKİLEMEZ — bkz. Upgrades.CHARACTERS başındaki not.
+func _check_character_passive() -> void:
+	var char_data: Dictionary = Upgrades.CHARACTERS[character_id]
+	var tiers: Array = char_data.get("passive_tiers", [])
+	var stat_id: String = char_data.get("passive_stat", "")
+	if tiers.is_empty() or stat_id == "":
+		return
+	while _character_tier_index < tiers.size() and level >= tiers[_character_tier_index][0]:
+		var cumulative: float = tiers[_character_tier_index][1]
+		var prev_cumulative: float = 0.0 if _character_tier_index == 0 else tiers[_character_tier_index - 1][1]
+		_apply_character_stat_delta(stat_id, cumulative - prev_cumulative)
+		_character_tier_index += 1
+
+func _apply_character_stat_delta(stat_id: String, delta: float) -> void:
+	match stat_id:
+		"damage":
+			damage_mult += delta
+		"area":
+			area_mult += delta
+		"attack_speed":
+			attack_speed_mult += delta
+			for wid in owned_weapons.keys():
+				_update_weapon_timer(wid)
+		"xp_gain":
+			xp_mult += delta
+		"pickup_radius":
+			pickup_radius *= (1.0 + delta)
 
 func level_up_choice_count() -> int:
 	return 4 if GameManager.permanent_upgrades.get("extra_choice", 0) > 0 else 3
@@ -106,6 +148,7 @@ func gain_xp(amount: float) -> void:
 		xp_needed = _xp_for_level(level)
 		health = max_health
 		health_changed.emit(health, max_health)
+		_check_character_passive()
 		var choices: Array = Upgrades.random_weapon_or_upgrade_choices(owned_weapons, level_up_choice_count())
 		leveled_up.emit(level, choices)
 	xp_changed.emit(xp, xp_needed)

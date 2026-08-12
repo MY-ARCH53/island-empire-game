@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Kan Adasi"
+config/name="Kan Adasi v2"
 config/description="Island Empire - Vampire Survivors tarzi mini oyun"
 run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")

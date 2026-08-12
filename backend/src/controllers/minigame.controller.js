@@ -33,6 +33,20 @@ function costForLevel(def, currentLevel) {
   return Math.round(def.baseCost * Math.pow(currentLevel + 1, 1.5));
 }
 
+// Karakterler — sadece isim/açıklama/fiyat doğrulaması burada; başlangıç
+// silahı, kademeli pasif bonus gibi oynanış verisi Godot tarafında
+// (godot-game-v2/scripts/autoload/upgrades.gd → CHARACTERS). Fiyatlar
+// oradaki unlock_cost değerleriyle senkron tutulmalı.
+const CHARACTER_DEFS = {
+  koylu:            { name: 'Köylü',            cost: 0 },
+  buyucu:           { name: 'Büyücü',           cost: 80 },
+  kilic_ustasi:     { name: 'Kılıç Ustası',      cost: 80 },
+  firtina_rahibesi: { name: 'Fırtına Rahibesi', cost: 100 },
+  vebali:           { name: 'Vebalı',           cost: 100 },
+  firtina_avcisi:   { name: 'Fırtına Avcısı',   cost: 120 },
+};
+const DEFAULT_CHARACTER = 'koylu';
+
 class MinigameController {
   // GET /api/minigame/status
   static async getStatus(req, res) {
@@ -66,17 +80,22 @@ class MinigameController {
     }
   }
 
-  // GET /api/minigame/progress — Kan Özü bakiyesi + kalıcı yükseltme dükkanı
+  // GET /api/minigame/progress — Kan Özü bakiyesi + kalıcı yükseltme dükkanı + karakterler
   static async getProgress(req, res) {
     try {
       const userId = req.userId;
       const result = await query(
-        'SELECT blood_essence, upgrades FROM minigame_progress WHERE user_id = $1',
+        'SELECT blood_essence, upgrades, unlocked_characters, selected_character FROM minigame_progress WHERE user_id = $1',
         [userId]
       ).catch(() => ({ rows: [] }));
 
-      const row = result.rows[0] || { blood_essence: 0, upgrades: {} };
+      const row = result.rows[0] || {
+        blood_essence: 0, upgrades: {},
+        unlocked_characters: [DEFAULT_CHARACTER], selected_character: DEFAULT_CHARACTER,
+      };
       const upgrades = row.upgrades || {};
+      const unlockedCharacters = row.unlocked_characters || [DEFAULT_CHARACTER];
+      const selectedCharacter = row.selected_character || DEFAULT_CHARACTER;
 
       const shop = Object.entries(UPGRADE_DEFS).map(([id, def]) => {
         const level = upgrades[id] || 0;
@@ -91,9 +110,19 @@ class MinigameController {
         };
       });
 
+      const characters = Object.entries(CHARACTER_DEFS).map(([id, def]) => ({
+        id,
+        name: def.name,
+        cost: def.cost,
+        unlocked: unlockedCharacters.includes(id),
+      }));
+
       res.json({
         success: true,
-        data: { bloodEssence: row.blood_essence, upgrades, shop },
+        data: {
+          bloodEssence: row.blood_essence, upgrades, shop,
+          characters, selectedCharacter,
+        },
       });
     } catch (err) {
       console.error('Minigame progress error:', err.message);
@@ -145,6 +174,104 @@ class MinigameController {
       });
     } catch (err) {
       console.error('Purchase upgrade error:', err.message);
+      res.status(500).json({ success: false, message: 'Hata olustu' });
+    }
+  }
+
+  // POST /api/minigame/purchase-character  { characterId }
+  static async purchaseCharacter(req, res) {
+    try {
+      const userId = req.userId;
+      const { characterId } = req.body;
+      const def = CHARACTER_DEFS[characterId];
+      if (!def) {
+        return res.status(400).json({ success: false, message: 'Geçersiz karakter' });
+      }
+
+      const result = await query(
+        'SELECT blood_essence, unlocked_characters, selected_character FROM minigame_progress WHERE user_id = $1',
+        [userId]
+      ).catch(() => ({ rows: [] }));
+      const row = result.rows[0] || {
+        blood_essence: 0, unlocked_characters: [DEFAULT_CHARACTER], selected_character: DEFAULT_CHARACTER,
+      };
+      const unlocked = row.unlocked_characters || [DEFAULT_CHARACTER];
+
+      if (unlocked.includes(characterId)) {
+        return res.status(400).json({ success: false, message: 'Bu karakter zaten açık.' });
+      }
+      if (row.blood_essence < def.cost) {
+        return res.status(400).json({ success: false, message: 'Yetersiz Kan Özü.' });
+      }
+
+      const newUnlocked = [...unlocked, characterId];
+      const newEssence = row.blood_essence - def.cost;
+
+      await query(
+        `INSERT INTO minigame_progress (user_id, blood_essence, unlocked_characters)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE SET
+           blood_essence = $2, unlocked_characters = $3, updated_at = CURRENT_TIMESTAMP`,
+        [userId, newEssence, JSON.stringify(newUnlocked)]
+      );
+
+      const characters = Object.entries(CHARACTER_DEFS).map(([id, d]) => ({
+        id, name: d.name, cost: d.cost, unlocked: newUnlocked.includes(id),
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          bloodEssence: newEssence, characters,
+          selectedCharacter: row.selected_character || DEFAULT_CHARACTER,
+        },
+        message: `${def.name} açıldı!`,
+      });
+    } catch (err) {
+      console.error('Purchase character error:', err.message);
+      res.status(500).json({ success: false, message: 'Hata olustu' });
+    }
+  }
+
+  // POST /api/minigame/select-character  { characterId }
+  static async selectCharacter(req, res) {
+    try {
+      const userId = req.userId;
+      const { characterId } = req.body;
+      if (!CHARACTER_DEFS[characterId]) {
+        return res.status(400).json({ success: false, message: 'Geçersiz karakter' });
+      }
+
+      const result = await query(
+        'SELECT blood_essence, unlocked_characters FROM minigame_progress WHERE user_id = $1',
+        [userId]
+      ).catch(() => ({ rows: [] }));
+      const row = result.rows[0] || { blood_essence: 0, unlocked_characters: [DEFAULT_CHARACTER] };
+      const unlocked = row.unlocked_characters || [DEFAULT_CHARACTER];
+
+      if (!unlocked.includes(characterId)) {
+        return res.status(400).json({ success: false, message: 'Bu karakter henüz açık değil.' });
+      }
+
+      await query(
+        `INSERT INTO minigame_progress (user_id, blood_essence, selected_character)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE SET
+           selected_character = $3, updated_at = CURRENT_TIMESTAMP`,
+        [userId, row.blood_essence, characterId]
+      );
+
+      const characters = Object.entries(CHARACTER_DEFS).map(([id, d]) => ({
+        id, name: d.name, cost: d.cost, unlocked: unlocked.includes(id),
+      }));
+
+      res.json({
+        success: true,
+        data: { characters, selectedCharacter: characterId },
+        message: `${CHARACTER_DEFS[characterId].name} seçildi.`,
+      });
+    } catch (err) {
+      console.error('Select character error:', err.message);
       res.status(500).json({ success: false, message: 'Hata olustu' });
     }
   }

@@ -7,6 +7,8 @@ signal run_submitted(success: bool, data: Dictionary, message: String)
 signal login_result(success: bool, message: String)
 signal progress_result(success: bool, data: Dictionary, message: String)
 signal purchase_result(success: bool, data: Dictionary, message: String)
+signal character_purchase_result(success: bool, data: Dictionary, message: String)
+signal character_select_result(success: bool, data: Dictionary, message: String)
 
 const API_BASE_PROD := "https://api.islandsempire.com/api"
 const API_BASE_LOCAL := "http://localhost:3000/api"
@@ -149,6 +151,70 @@ func _on_purchase_completed(_result: int, code: int, _headers: PackedStringArray
 		if typeof(data) == TYPE_DICTIONARY:
 			msg = str(data.get("message", msg))
 		purchase_result.emit(false, {}, msg)
+
+func purchase_character(character_id: String) -> void:
+	if GameManager.jwt_token == "":
+		character_purchase_result.emit(false, {}, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_purchase_character_completed.bind(http))
+	var body := JSON.stringify({"characterId": character_id})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + GameManager.jwt_token,
+	]
+	var err := http.request(_api_base() + "/minigame/purchase-character", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		character_purchase_result.emit(false, {}, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_purchase_character_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		character_purchase_result.emit(false, {}, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		character_purchase_result.emit(true, data.get("data", {}), str(data.get("message", "")))
+	else:
+		var msg := "Satın alma başarısız"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		character_purchase_result.emit(false, {}, msg)
+
+func select_character(character_id: String) -> void:
+	if GameManager.jwt_token == "":
+		character_select_result.emit(false, {}, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_select_character_completed.bind(http))
+	var body := JSON.stringify({"characterId": character_id})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + GameManager.jwt_token,
+	]
+	var err := http.request(_api_base() + "/minigame/select-character", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		character_select_result.emit(false, {}, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_select_character_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		character_select_result.emit(false, {}, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		character_select_result.emit(true, data.get("data", {}), str(data.get("message", "")))
+	else:
+		var msg := "Karakter seçilemedi"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		character_select_result.emit(false, {}, msg)
 
 # Web build'de, React sayfasına postMessage ile sonucu bildir (toast göstermesi için).
 func _notify_parent_page(payload: Dictionary, message: String) -> void:

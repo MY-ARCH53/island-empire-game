@@ -12,6 +12,9 @@ var last_run_result: Dictionary = {}
 var blood_essence: int = 0
 var permanent_upgrades: Dictionary = {}
 var shop_items: Array = []
+var selected_character: String = "koylu"
+var unlocked_characters: Array = ["koylu"]
+var character_shop_items: Array = []
 
 func _ready() -> void:
 	_load_local_data()
@@ -60,3 +63,11 @@ func apply_progress(data: Dictionary) -> void:
 		permanent_upgrades = data.get("upgrades", {})
 	if data.has("shop"):
 		shop_items = data.get("shop", [])
+	if data.has("selectedCharacter"):
+		selected_character = str(data.get("selectedCharacter", "koylu"))
+	if data.has("characters"):
+		character_shop_items = data.get("characters", [])
+		unlocked_characters = []
+		for c in character_shop_items:
+			if c.get("unlocked", false):
+				unlocked_characters.append(c["id"])

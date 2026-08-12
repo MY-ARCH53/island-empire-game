@@ -1,5 +1,71 @@
 extends Node
 
+# Karakterler — her biri bir başlangıç silahı + kademeli (seviyeye bağlı büyüyen)
+# bir imza pasif bonusuyla gelir (Vampire Survivors'taki Antonio/Imelda/Pasqualina
+# deseni: sabit tek seferlik bonus değil, seviye eşiklerinde kümülatif büyüyen
+# bonus). passive_tiers: [[seviye_eşiği, o ana kadar kümülatif bonus], ...] —
+# player.gd _check_character_passive() her seviye atlayışta bir sonraki eşiğe
+# ulaşılıp ulaşılmadığını kontrol edip farkı (delta) ilgili çarpana ekler.
+# NOT: Bu pasif bonus, aynı istatistiğin silah evrimi sayacına (stat_levels)
+# KATKI YAPMAZ — evrim için oyuncu yine level-up menüsünden bilinçli olarak
+# 5 kez seçim yapmalı. Karakter sadece o build'i güçlendirir/teşvik eder.
+const CHARACTERS := {
+	"koylu": {
+		"name": "Köylü",
+		"desc": "Dengeli bir başlangıç karakteri. +30 azami can, +%5 hareket hızı.",
+		"starting_weapon": "magic_bolt",
+		"flat_bonuses": {"max_health": 30.0, "move_speed": 0.05},
+		"passive_stat": "",
+		"passive_tiers": [],
+		"unlock_cost": 0,
+	},
+	"buyucu": {
+		"name": "Büyücü",
+		"desc": "Büyü Cismi ile başlar. Seviye arttıkça hasarı katlanarak büyür (Lv25'te +%40 tavan).",
+		"starting_weapon": "magic_bolt",
+		"flat_bonuses": {},
+		"passive_stat": "damage",
+		"passive_tiers": [[5, 0.08], [10, 0.16], [15, 0.24], [20, 0.32], [25, 0.40]],
+		"unlock_cost": 80,
+	},
+	"kilic_ustasi": {
+		"name": "Kılıç Ustası",
+		"desc": "Dönen Kılıçlar ile başlar. Seviye arttıkça etki alanı büyür (Lv25'te +%40 tavan).",
+		"starting_weapon": "orbit_blade",
+		"flat_bonuses": {},
+		"passive_stat": "area",
+		"passive_tiers": [[5, 0.08], [10, 0.16], [15, 0.24], [20, 0.32], [25, 0.40]],
+		"unlock_cost": 80,
+	},
+	"firtina_rahibesi": {
+		"name": "Fırtına Rahibesi",
+		"desc": "Nova Patlaması ile başlar. Seviye arttıkça saldırı hızı artar (Lv25'te +%30 tavan).",
+		"starting_weapon": "nova_pulse",
+		"flat_bonuses": {},
+		"passive_stat": "attack_speed",
+		"passive_tiers": [[5, 0.06], [10, 0.12], [15, 0.18], [20, 0.24], [25, 0.30]],
+		"unlock_cost": 100,
+	},
+	"vebali": {
+		"name": "Vebalı",
+		"desc": "Zehir Bulutu ile başlar. Seviye arttıkça kazandığı tecrübe artar (Lv15'te +%30 tavan).",
+		"starting_weapon": "poison_cloud",
+		"flat_bonuses": {},
+		"passive_stat": "xp_gain",
+		"passive_tiers": [[5, 0.10], [10, 0.20], [15, 0.30]],
+		"unlock_cost": 100,
+	},
+	"firtina_avcisi": {
+		"name": "Fırtına Avcısı",
+		"desc": "Zincir Şimşek ile başlar. Baştan itibaren toplama menzili geniş, seviyeyle daha da artar (Lv15'te +%40 tavan).",
+		"starting_weapon": "chain_lightning",
+		"flat_bonuses": {},
+		"passive_stat": "pickup_radius",
+		"passive_tiers": [[1, 0.10], [5, 0.20], [10, 0.30], [15, 0.40]],
+		"unlock_cost": 120,
+	},
+}
+
 # Silah tanımları — id: {name, desc, base_cooldown, base_damage, max_level, ...}
 const WEAPONS := {
 	"magic_bolt": {
