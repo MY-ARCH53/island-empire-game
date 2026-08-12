@@ -34,4 +34,19 @@ async function getEquippedStats(userId) {
   return { damageBonus, armorBonus, maxHealthBonus };
 }
 
-module.exports = { effectiveStat, getEquippedStats, ENCHANT_BONUS_PER_LEVEL };
+// Faz 5 — sosyal katman. Ayrı bir "online klan" sistemi icat edilmedi:
+// ana oyunun mevcut guilds/guild_members tabloları doğrudan yeniden
+// kullanılıyor (aynı klan = KO'daki krallık hissinin hafif bir karşılığı).
+async function getGuildInfo(userId) {
+  const result = await query(
+    `SELECT g.id, g.name
+     FROM guild_members gm
+     JOIN guilds g ON g.id = gm.guild_id
+     WHERE gm.user_id = $1`,
+    [userId]
+  );
+  if (result.rows.length === 0) return null;
+  return { guildId: result.rows[0].id, guildName: result.rows[0].name };
+}
+
+module.exports = { effectiveStat, getEquippedStats, getGuildInfo, ENCHANT_BONUS_PER_LEVEL };

@@ -126,9 +126,11 @@ func _show_character(reload_inventory: bool) -> void:
 	character_box.visible = true
 	var class_id: String = _character.get("class_id", "koylu")
 	var class_display_name: String = Upgrades.CHARACTERS.get(class_id, {}).get("name", class_id)
-	info_label.text = "%s — Seviye %d\nTecrübe: %d   Gümüş: %d   NP: %d" % [
+	var guild = _character.get("guild")
+	var guild_line := "Klan: %s" % guild["guildName"] if guild != null else "Klan: —"
+	info_label.text = "%s — Seviye %d\nTecrübe: %d   Gümüş: %d   NP: %d\n%s" % [
 		class_display_name, int(_character.get("level", 1)), int(_character.get("xp", 0)),
-		int(_character.get("silver", 0)), int(_character.get("np", 0)),
+		int(_character.get("silver", 0)), int(_character.get("np", 0)), guild_line,
 	]
 	if reload_inventory:
 		BackendBridge.get_online_inventory()

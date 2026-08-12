@@ -1,4 +1,4 @@
-# Kan Adası: Online — Sunucu (Faz 0 + Faz 2 + Faz 3 + Faz 4)
+# Kan Adası: Online — Sunucu (Faz 0 + Faz 2 + Faz 3 + Faz 4 + Faz 5)
 
 Bu, "Kan Adası: Online" çok oyunculu genişlemesinin (bkz. plan:
 `C:\Users\musta\.claude\plans\humble-chasing-galaxy.md`) **headless Godot
@@ -160,6 +160,51 @@ OLABİLİR** (`ENCHANT_DESTROY_ON_FAIL`, +10'da %50 yok olma riski).
 yok oldu, envanterden silindiği (`DELETE FROM online_inventory`) ve bir
 daha güçlendirilemeyeceği doğrulandı.
 
+## Sosyal katman: parti + klan (Faz 5)
+
+**Parti (sadece farm haritası, oturum bazlı — kalıcı DB'ye hiç yazılmaz)**:
+`main.gd`'de `_party_of` (peer_id → party_id) ve `_pending_invites`
+(target_peer_id → inviter_peer_id) sözlükleriyle takip edilir. Oyuncu
+kontrolleri (`remote_player.gd`): **P** en yakın diğer oyuncuyu davet
+eder, **O** bekleyen daveti kabul eder, **L** partiden ayrılır. Düşman
+öldüğünde ödül (gümüş+tecrübe), öldüren partideyse TÜM parti üyeleri
+arasında eşit bölüşülür (`_on_enemy_died` → `_party_members`); eşya
+düşmesi ise ambiguity olmasın diye sadece gerçek öldürene gider. Parti
+oluşturma/dağılma anlık olarak `party_update` RPC'siyle tüm üyelere
+bildirilir (durum metni: "Parti (N kişi): sınıf1, sınıf2").
+
+**Klan (kalıcı — ana oyunun mevcut `guilds`/`guild_members` tabloları
+yeniden kullanıldı, ayrı bir online-klan sistemi icat edilmedi)**:
+`backend/src/utils/onlineStats.js → getGuildInfo(userId)` hem
+`GET /api/online/character`'a (görüntüleme) hem
+`/api/internal/authenticate`'e (godot-server'ın PvP kararı için) ekleniyor.
+`pvp_main.gd`, `request_pvp_attack`'ta saldıranın ve hedefin `guild_id`'sini
+karşılaştırıp aynıysa hasarı SUNUCU TARAFINDA tamamen reddediyor (KO'daki
+"aynı krallık dost ateşi yok" hissinin hafif bir karşılığı) — bu, tek
+başına yeterli olsa da, `backend/src/controllers/internal.controller.js
+→ pvpKill` de aynı kontrolü ikinci bir savunma katmanı olarak tekrarlıyor
+(internal endpoint'lere bile tam güvenilmiyor, mevcut proje felsefesiyle
+tutarlı). `GET /api/online/leaderboard` artık her satırda klan adını da
+döndürüyor.
+
+**Doğrulama** (2026-08-13): İki gerçek hesap (`test_v2`, `test_v3`)
+geçici bir test klanına eklenip PvP'de birbirine saldırmayı denedi —
+sunucu HER seferinde hasarı reddetti (0 NP değişimi, hem Godot sunucu
+logunda hem `/api/internal/pvp-kill`'in doğrudan curl testinde
+doğrulandı). Parti tarafında: iki hesap `--auto-party` test bayrağıyla
+(`main.gd → _try_invite_nearest_player`, sadece `godot-server`'da var,
+gerçek oyuncu akışı P/O/L tuşlarını kullanır) davet gönderip kabul etti,
+ardından farm'da öldürülen her düşmanın ödülü ikiye bölünüp her iki
+hesaba da doğru miktarda yazıldığı Postgres'te doğrulandı (`xp_share`/
+`silver_share` sunucu logunda + `GET /api/online/character` ile
+birebir eşleşti). Test sonrası klan silindi, hesaplar temiz duruma
+sıfırlandı. **Not**: `godot-game-v3` (gerçek istemci) tarafına da
+parti RPC stub'ları ve P/O/L tuşları eklendi (aynı desen, bkz.
+`godot-game-v3/scripts/online_farm_client.gd`), ama bu özel özellik
+oradan ayrıca uçtan uca test edilmedi — mekanizma (rpc_id stub
+gereksinimi) playability geçişinde zaten kanıtlanmıştı, risk düşük
+görüldü.
+
 ## Sıradaki adım
 
-Faz 5 — sosyal katman (parti/klan entegrasyonu).
+Faz 6 — anti-hile sağlamlaştırma (bkz. plan).

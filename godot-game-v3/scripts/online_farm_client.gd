@@ -83,12 +83,37 @@ func submit_auth(_token: String) -> void:
 func request_attack(_enemy_name: String) -> void:
 	pass
 
+# Faz 5 — parti (davet/kabul/ayrıl), bkz. godot-server/scripts/main.gd.
+@rpc("any_peer", "reliable")
+func request_party_invite(_target_name: String) -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func accept_party_invite() -> void:
+	pass
+
+@rpc("any_peer", "reliable")
+func leave_party() -> void:
+	pass
+
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
 	status_label.text = message
 
 @rpc("authority", "reliable")
 func reward_notification(message: String) -> void:
+	status_label.text = message
+
+@rpc("authority", "reliable")
+func party_invite_received(inviter_class: String) -> void:
+	status_label.text = "%s seni partiye davet etti — kabul için O'ya bas." % inviter_class
+
+@rpc("authority", "reliable")
+func party_update(text: String) -> void:
+	status_label.text = text
+
+@rpc("authority", "reliable")
+func party_error(message: String) -> void:
 	status_label.text = message
 
 func leave_map() -> void:

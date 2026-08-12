@@ -159,6 +159,7 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 		print("AUTH_OK ama peer zaten ayrıldı, spawn atlanıyor: ", peer_id)
 		return
 	var equipped: Dictionary = character.get("equippedStats", {})
+	var guild = character.get("guild")
 	_peer_user[peer_id] = {
 		"user_id": int(inner["userId"]),
 		"class_id": str(character.get("class_id", "koylu")),
@@ -167,6 +168,8 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 		"damage_bonus": float(equipped.get("damageBonus", 0)),
 		"armor_bonus": float(equipped.get("armorBonus", 0)),
 		"max_health_bonus": float(equipped.get("maxHealthBonus", 0)),
+		# Faz 5 — aynı klandan oyuncular birbirine hasar veremez (-1 = klansız).
+		"guild_id": (int(guild["guildId"]) if guild != null else -1),
 	}
 	print("AUTH_OK peer=", peer_id, " user_id=", _peer_user[peer_id]["user_id"], " class=", _peer_user[peer_id]["class_id"])
 	spawner.spawn(peer_id)
@@ -215,6 +218,14 @@ func request_pvp_attack(target_name: String) -> void:
 		return
 	var target_id := int(target_name) if target_name.is_valid_int() else -1
 	if target_id == -1 or not _peer_user.has(target_id) or target_id == sender_id:
+		return
+	# Faz 5 — aynı klandan oyuncular birbirine hasar veremez (KO'daki
+	# "aynı krallık dost ateşi yok" hissinin hafif bir karşılığı).
+	var sender_guild: int = int(_peer_user[sender_id].get("guild_id", -1))
+	var target_guild: int = int(_peer_user[target_id].get("guild_id", -1))
+	if sender_guild != -1 and sender_guild == target_guild:
+		if multiplayer.get_peers().has(sender_id):
+			rpc_id(sender_id, "pvp_kill_notification", "Aynı klandan bir üyeye saldıramazsın.")
 		return
 	var now := Time.get_ticks_msec() / 1000.0
 	var last: float = _last_attack_time.get(sender_id, 0.0)

@@ -25,6 +25,11 @@ var _peer_user: Dictionary = {}       # peer_id -> {user_id, class_id, level}
 var _last_attack_time: Dictionary = {}  # peer_id -> float saniye
 var _enemy_counter: int = 0
 
+# Faz 5 — parti sistemi (bu haritaya özgü, kalıcı değil — sadece bağlıyken
+# geçerli). party_id olarak partiyi kuran oyuncunun peer_id'si kullanılıyor.
+var _party_of: Dictionary = {}        # peer_id -> party_id (int)
+var _pending_invites: Dictionary = {} # target_peer_id -> inviter_peer_id
+
 var _my_jwt: String = ""
 var _local_player_id: int = -1
 
@@ -102,6 +107,14 @@ func _on_peer_disconnected(id: int) -> void:
 	print("PEER_DISCONNECTED id=", id)
 	_peer_user.erase(id)
 	_last_attack_time.erase(id)
+	if _party_of.has(id):
+		var party_id: int = _party_of[id]
+		_party_of.erase(id)
+		_broadcast_party_update(party_id)
+	_pending_invites.erase(id)
+	for key in _pending_invites.keys():
+		if _pending_invites[key] == id:
+			_pending_invites.erase(key)
 	var node_name := str(id)
 	if has_node(node_name):
 		get_node(node_name).queue_free()
@@ -182,6 +195,11 @@ func auth_result(success: bool, message: String) -> void:
 # çağrısıyla) periyodik ekran görüntüsü alır.
 func _run_auto_attack_test() -> void:
 	await get_tree().create_timer(0.5).timeout
+	if "--auto-party" in OS.get_cmdline_args():
+		for attempt in range(6):
+			if _try_invite_nearest_player():
+				break
+			await get_tree().create_timer(0.3).timeout
 	for i in range(12):
 		var me_name := str(_local_player_id)
 		if has_node(me_name):
@@ -203,6 +221,26 @@ func _run_auto_attack_test() -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png("res://farm_test_client_%d.png" % _local_player_id)
 	print("AUTO_ATTACK_DONE id=", _local_player_id)
+
+# Faz 5 doğrulama yardımcısı: --auto-party ile en yakın DİĞER oyuncuyu
+# partiye davet eder (kabul tarafı party_invite_received'daki auto-accept ile).
+func _try_invite_nearest_player() -> bool:
+	var me_name := str(_local_player_id)
+	if not has_node(me_name):
+		return false
+	var me: Node2D = get_node(me_name)
+	var nearest: Node2D = null
+	var nearest_dist := INF
+	for child in get_children():
+		if child.name != me_name and child.name.is_valid_int():
+			var d: float = me.position.distance_to(child.position)
+			if d < nearest_dist:
+				nearest_dist = d
+				nearest = child
+	if nearest:
+		rpc_id(1, "request_party_invite", nearest.name)
+		return true
+	return false
 
 # --- Düşmanlar (sadece sunucu spawn eder; MultiplayerSpawner'ın
 # spawnable_scenes listesi sayesinde istemcilere otomatik replike olur). ---
@@ -229,7 +267,21 @@ func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	var drop_id := _roll_item_drop()
 	enemy.queue_free()
 	if user_id != -1:
-		_send_reward(killer_peer_id, user_id, silver_reward, xp_reward, drop_id)
+		if _party_of.has(killer_peer_id):
+			# Faz 5 — partideyse ödül tüm parti üyeleri arasında eşit
+			# bölüşülür (item drop sadece gerçek öldürene gider, ambiguity
+			# olmasın diye).
+			var members := _party_members(_party_of[killer_peer_id])
+			var share_count: int = max(1, members.size())
+			var xp_share: int = max(1, xp_reward / share_count)
+			var silver_share: int = max(1, silver_reward / share_count)
+			print("PARTY_REWARD_SPLIT killer=", killer_peer_id, " members=", members, " xp_share=", xp_share, " silver_share=", silver_share)
+			for pid in members:
+				var member_user_id: int = int(_peer_user.get(pid, {}).get("user_id", -1))
+				if member_user_id != -1:
+					_send_reward(pid, member_user_id, silver_share, xp_share, drop_id if pid == killer_peer_id else "")
+		else:
+			_send_reward(killer_peer_id, user_id, silver_reward, xp_reward, drop_id)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	_spawn_one_enemy()
 
@@ -264,6 +316,87 @@ func request_attack(enemy_name: String) -> void:
 	_last_attack_time[sender_id] = now
 	var damage_bonus: float = float(_peer_user[sender_id].get("damage_bonus", 0))
 	enemy.take_damage(ATTACK_DAMAGE + damage_bonus, sender_id)
+
+# --- Parti: davet/kabul/ayrılma, sadece bu haritaya özgü geçici bir
+# gruplama (kalıcı DB'ye hiç yazılmıyor). ---
+
+@rpc("any_peer", "reliable")
+func request_party_invite(target_name: String) -> void:
+	if not _is_server:
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if not _peer_user.has(sender_id):
+		return
+	var target_id := int(target_name) if target_name.is_valid_int() else -1
+	if target_id == -1 or not _peer_user.has(target_id) or target_id == sender_id:
+		return
+	_pending_invites[target_id] = sender_id
+	if multiplayer.get_peers().has(target_id):
+		var inviter_class: String = str(_peer_user[sender_id].get("class_id", "?"))
+		rpc_id(target_id, "party_invite_received", inviter_class)
+
+@rpc("any_peer", "reliable")
+func accept_party_invite() -> void:
+	if not _is_server:
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if not _pending_invites.has(sender_id):
+		if multiplayer.get_peers().has(sender_id):
+			rpc_id(sender_id, "party_error", "Bekleyen bir davet yok.")
+		return
+	var inviter_id: int = _pending_invites[sender_id]
+	_pending_invites.erase(sender_id)
+	if not _peer_user.has(inviter_id):
+		return
+	var party_id: int = _party_of.get(inviter_id, inviter_id)
+	_party_of[inviter_id] = party_id
+	_party_of[sender_id] = party_id
+	print("PARTY_FORMED party_id=", party_id, " members=", _party_members(party_id))
+	_broadcast_party_update(party_id)
+
+@rpc("any_peer", "reliable")
+func leave_party() -> void:
+	if not _is_server:
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if not _party_of.has(sender_id):
+		return
+	var party_id: int = _party_of[sender_id]
+	_party_of.erase(sender_id)
+	if multiplayer.get_peers().has(sender_id):
+		rpc_id(sender_id, "party_error", "Partiden ayrıldın.")
+	_broadcast_party_update(party_id)
+
+func _party_members(party_id: int) -> Array:
+	var members: Array = []
+	for pid in _party_of.keys():
+		if _party_of[pid] == party_id:
+			members.append(pid)
+	return members
+
+func _broadcast_party_update(party_id: int) -> void:
+	var members := _party_members(party_id)
+	var names := PackedStringArray()
+	for pid in members:
+		names.append(str(_peer_user.get(pid, {}).get("class_id", "?")))
+	var text := "Parti (%d kişi): %s" % [members.size(), ", ".join(names)]
+	for pid in members:
+		if multiplayer.get_peers().has(pid):
+			rpc_id(pid, "party_update", text)
+
+@rpc("authority", "reliable")
+func party_invite_received(inviter_class: String) -> void:
+	status_label.text = "%s seni partiye davet etti — kabul için O'ya bas." % inviter_class
+	if "--auto-party" in OS.get_cmdline_args():
+		rpc_id(1, "accept_party_invite")
+
+@rpc("authority", "reliable")
+func party_update(text: String) -> void:
+	status_label.text = text
+
+@rpc("authority", "reliable")
+func party_error(message: String) -> void:
+	status_label.text = message
 
 # --- Ödül: sunucu Node internal API'sine yazar, sonucu öldüren istemciye bildirir. ---
 

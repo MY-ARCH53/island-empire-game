@@ -1,5 +1,5 @@
 const { query } = require('../config/database');
-const { effectiveStat } = require('../utils/onlineStats');
+const { effectiveStat, getGuildInfo } = require('../utils/onlineStats');
 
 // "Kan Adası: Online" — kalıcı karakter + envanter/ekipman altyapısı (Faz 1).
 // Silah evrimi/pasif gibi oynanış verisi Godot tarafında (godot-game-v3
@@ -24,7 +24,11 @@ class OnlineController {
         'SELECT class_id, level, xp, silver, np, created_at FROM online_characters WHERE user_id = $1',
         [req.userId]
       );
-      res.json({ success: true, data: result.rows[0] || null });
+      const character = result.rows[0] || null;
+      if (character) {
+        character.guild = await getGuildInfo(req.userId);
+      }
+      res.json({ success: true, data: character });
     } catch (err) {
       console.error('Online getCharacter error:', err.message);
       res.status(500).json({ success: false, message: 'Hata olustu' });
@@ -213,9 +217,11 @@ class OnlineController {
   static async getLeaderboard(req, res) {
     try {
       const result = await query(
-        `SELECT u.username, oc.class_id, oc.level, oc.np
+        `SELECT u.username, oc.class_id, oc.level, oc.np, g.name AS guild_name
          FROM online_characters oc
          JOIN users u ON u.id = oc.user_id
+         LEFT JOIN guild_members gm ON gm.user_id = oc.user_id
+         LEFT JOIN guilds g ON g.id = gm.guild_id
          WHERE oc.np > 0
          ORDER BY oc.np DESC, oc.level DESC
          LIMIT 20`

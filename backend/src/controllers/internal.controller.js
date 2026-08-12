@@ -1,6 +1,6 @@
 const { query } = require('../config/database');
 const { verifyToken } = require('../utils/jwt');
-const { getEquippedStats } = require('../utils/onlineStats');
+const { getEquippedStats, getGuildInfo } = require('../utils/onlineStats');
 
 // "Kan Adası: Online" — Godot sunucusu SADECE bu internal endpoint'ler
 // üzerinden kalıcı veriye yazar (bkz. plans/humble-chasing-galaxy.md).
@@ -41,6 +41,7 @@ class InternalController {
       // hasar/can hesabında kullanır (bkz. onlineStats.js).
       if (character) {
         character.equippedStats = await getEquippedStats(decoded.userId);
+        character.guild = await getGuildInfo(decoded.userId);
       }
 
       res.json({
@@ -132,6 +133,18 @@ class InternalController {
       }
       if (killerUserId === victimUserId) {
         return res.status(400).json({ success: false, message: 'Kendi kendini öldüremezsin' });
+      }
+
+      // Faz 5 — aynı klan üyeleri birbirinden NP çalamaz (godot-server zaten
+      // aynı hasarı client isteği aşamasında engelliyor, bu ikinci bir
+      // savunma katmanı — internal endpoint'lere bile tam güvenilmiyor,
+      // bkz. dosya başındaki savunma amaçlı üst sınırlar notu).
+      const [killerGuild, victimGuild] = await Promise.all([
+        getGuildInfo(killerUserId),
+        getGuildInfo(victimUserId),
+      ]);
+      if (killerGuild && victimGuild && killerGuild.guildId === victimGuild.guildId) {
+        return res.status(400).json({ success: false, message: 'Aynı klandan bir üyeyi öldüremezsin' });
       }
 
       const charsRes = await query(

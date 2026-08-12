@@ -36,8 +36,17 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_multiplayer_authority():
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
-		_try_attack()
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	match event.keycode:
+		KEY_SPACE:
+			_try_attack()
+		KEY_P:
+			_try_invite()
+		KEY_O:
+			get_parent().rpc_id(1, "accept_party_invite")
+		KEY_L:
+			get_parent().rpc_id(1, "leave_party")
 
 # En yakın düşmanı bulup sunucudan saldırı doğrulaması ister — hasarı
 # BURADA hesaplamıyoruz (bkz. online_farm_client.gd → request_attack).
@@ -53,3 +62,17 @@ func _try_attack() -> void:
 				nearest = child
 	if nearest:
 		main.rpc_id(1, "request_attack", nearest.name)
+
+# Faz 5 — en yakın DİĞER oyuncuyu (düşman değil) partiye davet eder.
+func _try_invite() -> void:
+	var main := get_parent()
+	var nearest: Node2D = null
+	var nearest_dist := INF
+	for child in main.get_children():
+		if child != self and child.name.is_valid_int():
+			var d: float = position.distance_to(child.position)
+			if d < nearest_dist and d <= ATTACK_SEARCH_RADIUS:
+				nearest_dist = d
+				nearest = child
+	if nearest:
+		main.rpc_id(1, "request_party_invite", nearest.name)
