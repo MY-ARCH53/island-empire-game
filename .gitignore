@@ -55,3 +55,8 @@ godot-game*/assets/characters/*/character.zip
 godot-game*/assets/characters/*/extracted/
 # Not: frontend/public/minigame/ (web export çıktısı) BİLEREK ignore edilmiyor —
 # public/game/ gibi statik olarak repoya commit edilip VPS'e öyle deploy ediliyor.
+
+# Kan Adası: Online — sunucu prototipi (bkz. godot-server/README.md)
+godot-server/.godot/
+godot-server/export_presets.cfg
+godot-server/mp_test_client_*.png
