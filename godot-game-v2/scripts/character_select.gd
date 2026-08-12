@@ -33,6 +33,7 @@ const CharacterPreviewScript := preload("res://scripts/character_preview.gd")
 
 func _add_row(char_id: String) -> void:
 	var char_data: Dictionary = Upgrades.CHARACTERS[char_id]
+	var unlocked: bool = GameManager.unlocked_characters.has(char_id)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 
@@ -46,7 +47,20 @@ func _add_row(char_id: String) -> void:
 		preview.sprite_frames = load(sprite_path)
 		preview.position = Vector2(36, 40)
 		preview.scale = Vector2.ONE * 1.4
+		if not unlocked:
+			# Kilitli karakter: koyu silüet + kilit ikonu (gri tonlama yerine
+			# modulate ile karartma — shader gerektirmeden anında "kilitli" hissi verir).
+			preview.modulate = Color(0.10, 0.10, 0.10, 1.0)
 		preview_box.add_child(preview)
+	if not unlocked:
+		var lock_label := Label.new()
+		lock_label.text = "🔒"
+		lock_label.add_theme_font_size_override("font_size", 26)
+		lock_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		preview_box.add_child(lock_label)
 	row.add_child(preview_box)
 
 	var label := Label.new()
@@ -58,7 +72,6 @@ func _add_row(char_id: String) -> void:
 
 	var action_btn := Button.new()
 	action_btn.custom_minimum_size = Vector2(170, 56)
-	var unlocked: bool = GameManager.unlocked_characters.has(char_id)
 	if char_id == GameManager.selected_character:
 		action_btn.text = "Seçili"
 		action_btn.disabled = true

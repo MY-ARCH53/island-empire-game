@@ -459,6 +459,22 @@ bağlıyor).
   `BackendBridge.progress_result`/`character_select_result`/
   `character_purchase_result` sinyallerine bağlı, karakter her
   değiştiğinde otomatik güncellenir.
+- **Kilitli karakterler görsel olarak belli**: `character_select.gd →
+  _add_row()` henüz satın alınmamış karakterlerin portresini koyu bir
+  silüete karartıyor (`modulate = Color(0.10, 0.10, 0.10, 1)` — shader
+  gerektirmeyen ucuz bir "kilitli" hissi) ve üzerine 🔒 emoji'sini
+  bindiriyor. Önceden sadece buton metninden ("Satın Al (...)") anlaşılan
+  kilitli durum artık portreden de anında görülüyor.
+- **Test notu**: `godot-game-v2`'nin kendi `user://save.dat`'ı artık gerçek
+  bir `test_v2` oturumu biriktirebiliyor (config/name izolasyonu doğru
+  çalıştığı için — bkz. yukarıdaki "iki gerçek bug" notu). Bu, GameManager
+  alanlarını elle set eden bir debug script'iyle test ederken kafa
+  karıştırabilir: `main_menu.gd`'nin kendi otomatik `_ready()`'si, senin
+  script'in `jwt_token`'ı boşaltmasından ÖNCE gerçek kayıtlı oturumla arka
+  planda bir `get_progress()` isteği atıp az sonra sonucu uygulayabilir —
+  ekranda beklenmedik (ama aslında doğru, gerçek hesap verisiyle tutarlı)
+  değerler görülür. Temiz/deterministik bir test için önce
+  `%APPDATA%\Godot\app_userdata\Kan Adasi v2\save.dat`'ı silmek gerekir.
 
 **Test notu — iki gerçek bug bulundu ve düzeltildi bu özellik geliştirilirken**:
 1. `godot-game-v2/project.godot`'un `config/name`'i başta v1 ile AYNIYDI
