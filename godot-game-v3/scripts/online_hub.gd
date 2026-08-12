@@ -12,6 +12,13 @@ const RARITY_COLORS := {
 	"epic": Color(0.75, 0.4, 0.95, 1),
 }
 
+# Faz 4 — item güçlendirme. Sunucudaki gerçek kaynak:
+# backend/src/controllers/online.controller.js (ENCHANT_SILVER_COST). Bu
+# liste sadece maliyet ÖNİZLEMESİ için — gerçek sonuç her zaman sunucuda
+# hesaplanır, istemci hiçbir zaman kendi başarı/yok olma zarını atmaz.
+const MAX_ENCHANT_LEVEL := 10
+const ENCHANT_SILVER_COST := [0, 200, 450, 800, 1250, 1800, 2450, 3200, 4050, 5000, 6050]
+
 @onready var status_label: Label = $Center/Panel/VBox/StatusLabel
 @onready var class_select_box: VBoxContainer = $Center/Panel/VBox/ClassSelectBox
 @onready var class_items: VBoxContainer = $Center/Panel/VBox/ClassSelectBox/ScrollContainer/Items
@@ -34,6 +41,7 @@ func _ready() -> void:
 	BackendBridge.online_inventory_result.connect(_on_inventory_result)
 	BackendBridge.online_equip_result.connect(_on_equip_result)
 	BackendBridge.online_unequip_result.connect(_on_unequip_result)
+	BackendBridge.online_upgrade_result.connect(_on_upgrade_result)
 
 func open() -> void:
 	visible = true
@@ -158,12 +166,14 @@ func _add_inventory_row(item: Dictionary) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 
+	var enchant_level: int = int(item.get("enchant_level", 0))
 	var label := Label.new()
 	var stats_parts: Array = []
-	var base_stats: Dictionary = item.get("base_stats", {})
-	for stat_key in base_stats.keys():
-		stats_parts.append("%s +%s" % [stat_key, str(base_stats[stat_key])])
-	label.text = "%s (%s)\n%s" % [item["name"], SLOT_NAMES.get(item["slot"], item["slot"]), ", ".join(stats_parts)]
+	var effective_stats: Dictionary = item.get("effective_stats", item.get("base_stats", {}))
+	for stat_key in effective_stats.keys():
+		stats_parts.append("%s +%s" % [stat_key, str(effective_stats[stat_key])])
+	var level_suffix := " +%d" % enchant_level if enchant_level > 0 else ""
+	label.text = "%s%s (%s)\n%s" % [item["name"], level_suffix, SLOT_NAMES.get(item["slot"], item["slot"]), ", ".join(stats_parts)]
 	label.add_theme_color_override("font_color", RARITY_COLORS.get(item.get("rarity", "common"), Color.WHITE))
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -179,6 +189,20 @@ func _add_inventory_row(item: Dictionary) -> void:
 		action_btn.text = "Kuşan"
 		action_btn.pressed.connect(_on_equip_pressed.bind(int(item["id"])))
 	row.add_child(action_btn)
+
+	var upgrade_btn := Button.new()
+	upgrade_btn.custom_minimum_size = Vector2(170, 56)
+	if enchant_level >= MAX_ENCHANT_LEVEL:
+		upgrade_btn.text = "En yüksek (+10)"
+		upgrade_btn.disabled = true
+	else:
+		var target := enchant_level + 1
+		var cost: int = ENCHANT_SILVER_COST[target]
+		upgrade_btn.text = "Güçlendir +%d (%d gümüş)" % [target, cost]
+		if target >= 5:
+			upgrade_btn.add_theme_color_override("font_color", Color(1.0, 0.4, 0.3, 1))
+		upgrade_btn.pressed.connect(_on_upgrade_pressed.bind(int(item["id"])))
+	row.add_child(upgrade_btn)
 
 	inventory_items.add_child(row)
 
@@ -196,3 +220,32 @@ func _on_unequip_result(success: bool, message: String) -> void:
 	status_label.text = message
 	if success:
 		BackendBridge.get_online_inventory()
+
+func _on_upgrade_pressed(inventory_item_id: int) -> void:
+	Audio.play("ui_click")
+	status_label.text = "Güçlendiriliyor..."
+	BackendBridge.upgrade_online_item(inventory_item_id)
+
+func _on_upgrade_result(success: bool, data: Dictionary, message: String) -> void:
+	if not success:
+		status_label.text = message
+		return
+	var outcome: String = data.get("outcome", "")
+	var item_name: String = data.get("itemName", "eşya")
+	match outcome:
+		"success":
+			status_label.text = "%s +%d oldu!" % [item_name, int(data.get("newLevel", 0))]
+			Audio.play("levelup", -6.0)
+		"destroyed":
+			status_label.text = "%s güçlendirme sırasında YOK OLDU!" % item_name
+			Audio.play("ui_click")
+		_:
+			status_label.text = "%s güçlendirme başarısız oldu." % item_name
+			Audio.play("ui_click")
+	# Gümüş değişti — get_online_character() çağırmıyoruz çünkü sonucu
+	# status_label'ı hemen sıfırlıyor (_on_character_result); onun yerine
+	# yerel karakter verisini yamalayıp sadece envanteri tazeliyoruz.
+	if data.has("silver"):
+		_character["silver"] = data["silver"]
+		_show_character(false)
+	BackendBridge.get_online_inventory()

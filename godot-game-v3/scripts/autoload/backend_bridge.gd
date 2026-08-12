@@ -18,6 +18,9 @@ signal online_character_created(success: bool, data: Dictionary, message: String
 signal online_inventory_result(success: bool, data: Dictionary, message: String)
 signal online_equip_result(success: bool, message: String)
 signal online_unequip_result(success: bool, message: String)
+# Faz 4 — item güçlendirme (KO tarzı riskli enchant). data.outcome:
+# "success" | "failed" | "destroyed".
+signal online_upgrade_result(success: bool, data: Dictionary, message: String)
 
 const API_BASE_PROD := "https://api.islandsempire.com/api"
 const API_BASE_LOCAL := "http://localhost:3000/api"
@@ -376,6 +379,38 @@ func _on_unequip_completed(_result: int, code: int, _headers: PackedStringArray,
 		if typeof(data) == TYPE_DICTIONARY:
 			msg = str(data.get("message", msg))
 		online_unequip_result.emit(false, msg)
+
+func upgrade_online_item(inventory_item_id: int) -> void:
+	if GameManager.jwt_token == "":
+		online_upgrade_result.emit(false, {}, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_upgrade_completed.bind(http))
+	var body := JSON.stringify({"inventoryItemId": inventory_item_id})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + GameManager.jwt_token,
+	]
+	var err := http.request(_api_base() + "/online/upgrade-item", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		online_upgrade_result.emit(false, {}, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_upgrade_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		online_upgrade_result.emit(false, {}, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		online_upgrade_result.emit(true, data.get("data", {}), "")
+	else:
+		var msg := "Güçlendirilemedi"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		online_upgrade_result.emit(false, {}, msg)
 
 # Web build'de, React sayfasına postMessage ile sonucu bildir (toast göstermesi için).
 func _notify_parent_page(payload: Dictionary, message: String) -> void:

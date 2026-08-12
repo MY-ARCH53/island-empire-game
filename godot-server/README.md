@@ -1,4 +1,4 @@
-# Kan Adası: Online — Sunucu (Faz 0 + Faz 2 + Faz 3)
+# Kan Adası: Online — Sunucu (Faz 0 + Faz 2 + Faz 3 + Faz 4)
 
 Bu, "Kan Adası: Online" çok oyunculu genişlemesinin (bkz. plan:
 `C:\Users\musta\.claude\plans\humble-chasing-galaxy.md`) **headless Godot
@@ -127,6 +127,39 @@ karşılıklı öldürmede beklenen matematik: user18 0→50→0, user19 0→0�
 Doğrulama sonrası her iki hesabın NP'si tekrar 0'a sıfırlandı (temiz
 başlangıç durumu için).
 
+## Ekipmanın gerçek etkisi + item güçlendirme (Faz 4)
+
+Kuşanılan silah/zırh/kalkan artık savaşı gerçekten etkiliyor — hem farm
+hem PvP haritasında. Hesaplama backend'de: `backend/src/utils/onlineStats.js
+→ getEquippedStats(userId)`, `/api/internal/authenticate` yanıtındaki
+`character.equippedStats` alanına eklenir, Godot sunucusu bunu
+`_peer_user[peer_id]` içine (`damage_bonus`, `armor_bonus`,
+`max_health_bonus`) yazar.
+
+- **Farm (`main.gd`)**: `request_attack` hasarı artık
+  `ATTACK_DAMAGE + damage_bonus` (kuşanılan silahın hasarı).
+- **PvP (`pvp_main.gd`)**: `request_pvp_attack` hasarı
+  `max(1, (ATTACK_DAMAGE + saldıranın damage_bonus'u) - hedefin armor_bonus'u)`;
+  can bonusu spawn anında `player.max_health = BASE_MAX_HEALTH + max_health_bonus`
+  olarak uygulanıyor (bkz. `_spawn_player`).
+- **Doğrulandı** (2026-08-13): `test_v2` (iron_sword +7 hasar, chain_armor
+  +5 zırh/+25 can, iron_shield +5 zırh kuşanılı — toplam damage_bonus=7,
+  armor_bonus=10, max_health_bonus=25) vs `test_v3` (hiç ekipman yok).
+  Farm'da hasar 12→19'a çıktı (doğrulandı). PvP'de test_v2 27 hasar
+  verirken sadece 10 hasar aldı, 125 canla savaştı — ekipmansız test_v3'ü
+  net bir üstünlükle yendi (sunucu logunda satır satır doğrulandı).
+
+Enchant/güçlendirme sistemi (KO tarzı, kullanıcı onaylı yüksek risk
+modeli): `POST /api/online/upgrade-item { inventoryItemId }`. +1'den
++10'a kadar seviye, her denemede gümüş harcanır (sonuçtan bağımsız —
+scroll tüketimiyle aynı ilke), her seviye temel istatistiği %15 artırır
+(`ENCHANT_BONUS_PER_LEVEL`, `onlineStats.js`). +1..+4 güvenli (başarısızlıkta
+sadece gümüş boşa gider); **+5'ten itibaren başarısızlıkta eşya YOK
+OLABİLİR** (`ENCHANT_DESTROY_ON_FAIL`, +10'da %50 yok olma riski).
+`test_v2` ile gerçek bir eşya +9'dan +10'a çıkma denemesinde gerçekten
+yok oldu, envanterden silindiği (`DELETE FROM online_inventory`) ve bir
+daha güçlendirilemeyeceği doğrulandı.
+
 ## Sıradaki adım
 
-Faz 4 — ekipmanın gerçek etkisi + item upgrade/enchant sistemi.
+Faz 5 — sosyal katman (parti/klan entegrasyonu).

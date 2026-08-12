@@ -1,5 +1,6 @@
 const { query } = require('../config/database');
 const { verifyToken } = require('../utils/jwt');
+const { getEquippedStats } = require('../utils/onlineStats');
 
 // "Kan Adası: Online" — Godot sunucusu SADECE bu internal endpoint'ler
 // üzerinden kalıcı veriye yazar (bkz. plans/humble-chasing-galaxy.md).
@@ -35,13 +36,19 @@ class InternalController {
         'SELECT class_id, level, xp, silver, np FROM online_characters WHERE user_id = $1',
         [decoded.userId]
       );
+      const character = charRes.rows[0] || null;
+      // Faz 4 — kuşanılan eşyanın gerçek savaş etkisi: godot-server bu değeri
+      // hasar/can hesabında kullanır (bkz. onlineStats.js).
+      if (character) {
+        character.equippedStats = await getEquippedStats(decoded.userId);
+      }
 
       res.json({
         success: true,
         data: {
           valid: true,
           userId: decoded.userId,
-          character: charRes.rows[0] || null,
+          character,
         },
       });
     } catch (err) {

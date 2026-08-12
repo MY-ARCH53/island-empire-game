@@ -159,10 +159,13 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 	if not multiplayer.get_peers().has(peer_id):
 		print("AUTH_OK ama peer zaten ayrıldı, spawn atlanıyor: ", peer_id)
 		return
+	var equipped: Dictionary = character.get("equippedStats", {})
 	_peer_user[peer_id] = {
 		"user_id": int(inner["userId"]),
 		"class_id": str(character.get("class_id", "koylu")),
 		"level": int(character.get("level", 1)),
+		# Faz 4 — kuşanılan silahın hasar bonusu (bkz. backend/src/utils/onlineStats.js).
+		"damage_bonus": float(equipped.get("damageBonus", 0)),
 	}
 	print("AUTH_OK peer=", peer_id, " user_id=", _peer_user[peer_id]["user_id"], " class=", _peer_user[peer_id]["class_id"])
 	spawner.spawn(peer_id)
@@ -259,7 +262,8 @@ func request_attack(enemy_name: String) -> void:
 	if attacker.position.distance_to(enemy.position) > ATTACK_RANGE:
 		return
 	_last_attack_time[sender_id] = now
-	enemy.take_damage(ATTACK_DAMAGE, sender_id)
+	var damage_bonus: float = float(_peer_user[sender_id].get("damage_bonus", 0))
+	enemy.take_damage(ATTACK_DAMAGE + damage_bonus, sender_id)
 
 # --- Ödül: sunucu Node internal API'sine yazar, sonucu öldüren istemciye bildirir. ---
 

@@ -11,6 +11,8 @@ const HOST := "127.0.0.1"
 const ATTACK_RANGE := 60.0
 const ATTACK_COOLDOWN := 0.6
 const ATTACK_DAMAGE := 20.0
+const BASE_MAX_HEALTH := 100.0
+const MIN_DAMAGE := 1.0
 
 const PvpPlayerScene := preload("res://scenes/PvpPlayer.tscn")
 
@@ -106,6 +108,10 @@ func _spawn_player(id: int) -> Node2D:
 	player.name = str(id)
 	player.set_multiplayer_authority(id)
 	player.position = Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
+	# Faz 4 — kuşanılan zırh/kalkanın can bonusu (bkz. backend/src/utils/onlineStats.js).
+	var max_health_bonus: float = float(_peer_user.get(id, {}).get("max_health_bonus", 0))
+	player.max_health = BASE_MAX_HEALTH + max_health_bonus
+	player.health = player.max_health
 	return player
 
 # --- Kimlik doğrulama: farm sunucusuyla birebir aynı desen (bkz. main.gd). ---
@@ -152,10 +158,15 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 	if not multiplayer.get_peers().has(peer_id):
 		print("AUTH_OK ama peer zaten ayrıldı, spawn atlanıyor: ", peer_id)
 		return
+	var equipped: Dictionary = character.get("equippedStats", {})
 	_peer_user[peer_id] = {
 		"user_id": int(inner["userId"]),
 		"class_id": str(character.get("class_id", "koylu")),
 		"level": int(character.get("level", 1)),
+		# Faz 4 — kuşanılan eşyanın savaş etkisi (bkz. backend/src/utils/onlineStats.js).
+		"damage_bonus": float(equipped.get("damageBonus", 0)),
+		"armor_bonus": float(equipped.get("armorBonus", 0)),
+		"max_health_bonus": float(equipped.get("maxHealthBonus", 0)),
 	}
 	print("AUTH_OK peer=", peer_id, " user_id=", _peer_user[peer_id]["user_id"], " class=", _peer_user[peer_id]["class_id"])
 	spawner.spawn(peer_id)
@@ -217,7 +228,10 @@ func request_pvp_attack(target_name: String) -> void:
 	if attacker.position.distance_to(target.position) > ATTACK_RANGE:
 		return
 	_last_attack_time[sender_id] = now
-	target.health -= ATTACK_DAMAGE
+	var damage_bonus: float = float(_peer_user[sender_id].get("damage_bonus", 0))
+	var armor_bonus: float = float(_peer_user[target_id].get("armor_bonus", 0))
+	var damage: float = max(MIN_DAMAGE, (ATTACK_DAMAGE + damage_bonus) - armor_bonus)
+	target.health -= damage
 	_broadcast_health(target_name, target.health)
 	if target.health <= 0.0:
 		_on_player_killed(sender_id, target_id, target)
