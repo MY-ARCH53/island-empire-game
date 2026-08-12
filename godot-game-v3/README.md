@@ -555,9 +555,8 @@ yeniden kullanıyor (varsayılan/en ucuz karakter, yeni sanat gerektirmedi).
 
 Tam plan: `C:\Users\musta\.claude\plans\humble-chasing-galaxy.md`. Bu, run-
 tabanlı roguelite'tan (yukarısı) **tamamen ayrı bir mod** — `MainMenu.tscn`'de
-"⚔️ Online (Beta)" butonuyla açılıyor. Henüz multiplayer'a bağlanmıyor (bkz.
-Faz 0 — `../godot-server/`), sadece kalıcı karakter oluşturma + envanter/
-ekipman görüntüleme.
+"⚔️ Online (Beta)" butonuyla açılıyor. Kalıcı karakter oluşturma + envanter/
+ekipman görüntüleme + (aşağıya bkz.) gerçek multiplayer haritalarına giriş.
 
 - **Sınıf = mevcut 6 karakter**: Ayrı bir sınıf sistemi icat edilmedi —
   `Upgrades.CHARACTERS` (Köylü/Büyücü/Kılıç Ustası/Fırtına Rahibesi/Vebalı/
@@ -588,6 +587,64 @@ ekipman görüntüleme.
   senkron mock veriyle (iki durumun da doğru render olduğu ekran
   görüntüsüyle) hem de `test_v2` hesabıyla GERÇEK bir uçtan uca çalıştırmayla
   (gerçek giriş → gerçek HTTP → gerçek DB → geri UI) doğrulandı.
+
+## Kan Adası: Online — gerçek multiplayer haritalarına giriş (oynanabilirlik)
+
+Faz 2/3/4 (`../godot-server/`) sadece dedicated Godot sunucularını ve
+saldırı/ödül/PvP mekaniklerini doğruladı — ama `godot-game-v3`'ün (gerçek
+oyuncunun oynadığı proje) haritalara girecek bir yolu YOKTU, sadece benim
+kendi headless test script'lerim `--token=` cmdline argümanıyla doğrudan
+`godot-server`'a bağlanıyordu. Bu, Faz 5'e (sosyal katman) geçmeden önce
+kapatıldı — sosyal özellikler oyuncunun asla giremeyeceği haritalara
+eklenmiş olurdu.
+
+**Ne eklendi**: `online_hub.gd`'deki karakter ekranına "🗡️ Farm Haritasına
+Gir" / "⚔️ PvP Alanına Gir" butonları (`MainMenu.tscn → OnlineHub →
+CharacterBox → MapButtonsRow`). Tıklanınca `get_tree().change_scene_to_file`
+ile `OnlineFarmMap.tscn`/`OnlinePvpMap.tscn`'e geçiliyor — bunlar
+`godot-server`'daki `Main.tscn`/`PvpMain.tscn`'in İSTEMCİ rolünün
+(`main.gd`/`pvp_main.gd`'nin `_is_server=false` dalı) `godot-game-v3`'e
+taşınmış hâli: `online_farm_client.gd`/`online_pvp_client.gd` +
+kopyalanan `OnlineRemotePlayer.tscn`/`OnlineFarmEnemy.tscn`/
+`OnlinePvpPlayer.tscn` sahneleri. Sunucu tarafı hiç kopyalanmadı (gerçek
+oyuncunun makinesinde sunucu mantığı çalışmaz, sadece dedicated
+`godot-server` sürecinde).
+
+**İki yeni, önceden hiç karşılaşılmamış Godot multiplayer gotcha'sı
+bulundu** (iki ayrı proje arasında client/server script'i bölünce ortaya
+çıktı — `godot-server`'da script her zaman paylaşıldığı için hiç
+görünmemişti):
+1. **`rpc_id()` çağıran tarafta da RPC imzası ister**: İstemci
+   `rpc_id(1, "submit_auth", token)` çağırdığında, Godot bu RPC'nin aktarım
+   modunu (reliable/unreliable) belirlemek için ÇAĞIRAN düğümün KENDİ
+   script'inde de `submit_auth` adında `@rpc` işaretli bir metot arıyor —
+   sadece alıcı tarafta (sunucuda) tanımlı olması yetmiyor. Çözüm: istemci
+   script'lerine boş gövdeli (`pass`) ama doğru `@rpc` imzalı stub'lar
+   eklendi (`submit_auth`, `request_attack`, `request_pvp_attack`).
+2. **MultiplayerSpawner'ın NodePath çözümlemesi kök düğüm ADINA bağlı**:
+   `godot-server/scenes/Main.tscn`'in kök düğümü `"Main"` adında;
+   `OnlineFarmMap.tscn`'i ilk yazdığımda kökü `"OnlineFarmMap"` yapmıştım
+   — sonuç: "Node not found: Main/EnemySpawner" + spawn mesajları sessizce
+   kayboluyordu (istemci hiçbir zaman diğer oyuncuları/düşmanları
+   göremiyordu). Kök düğüm adının SUNUCUYLA BİREBİR AYNI olması şart
+   (`"Main"`/`"PvpMain"`) — Godot'un yüksek seviye multiplayer API'si spawn
+   bilgisini bu isme göre serialize ediyor.
+
+**Sunucu adresi**: şimdilik sadece `127.0.0.1` (`FARM_SERVER_HOST`/
+`PVP_SERVER_HOST` ortam değişkenleriyle override edilebilir). `godot-server`
+henüz bir VPS'e deploy EDİLMEDİ — bu yüzden bu özellik şu an sadece
+editörde/debug build'de, karşılık gelen `godot-server` süreci elle
+(`Godot.exe --headless --path . scenes/Main.tscn --server`) yerelde
+çalışırken oynanabilir. Prod'da gerçekten oynanabilir olması için ayrı bir
+deploy adımı gerekiyor (sıradaki altyapı işi, henüz planlanmadı).
+
+**Doğrulama** (2026-08-13): `test_v2` hesabıyla GERÇEK `godot-game-v3`
+istemcisi (`OnlineFarmMap.tscn`/`OnlinePvpMap.tscn`, benim test script'lerim
+DEĞİL) hem farm hem PvP sunucusuna bağlandı, kimlik doğruladı, spawn oldu,
+saldırdı — farm'da düşman öldürüp ödül aldı (DB'de doğrulandı), PvP'de
+`godot-server`'ın kendi test istemcisiyle (test_v3) karşılıklı savaşıp NP
+kazandı/kaybetti (DB'de doğrulandı). Test sonrası hesaplar temiz duruma
+sıfırlandı.
 
 ## Denge sabitleri (tune edilebilir)
 

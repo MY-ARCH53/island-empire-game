@@ -234,6 +234,20 @@ horizontal_alignment = 1
 autowrap_mode = 3
 theme_override_font_sizes/font_size = 14
 
+[node name="MapButtonsRow" type="HBoxContainer" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="EnterFarmButton" type="Button" parent="OnlineHub/Center/Panel/VBox/CharacterBox/MapButtonsRow"]
+custom_minimum_size = Vector2(260, 52)
+layout_mode = 2
+text = "🗡️ Farm Haritasına Gir"
+
+[node name="EnterPvpButton" type="Button" parent="OnlineHub/Center/Panel/VBox/CharacterBox/MapButtonsRow"]
+custom_minimum_size = Vector2(260, 52)
+layout_mode = 2
+text = "⚔️ PvP Alanına Gir"
+
 [node name="ScrollContainer" type="ScrollContainer" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
 custom_minimum_size = Vector2(0, 280)
 layout_mode = 2

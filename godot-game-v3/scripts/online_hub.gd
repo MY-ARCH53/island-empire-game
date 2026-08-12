@@ -25,6 +25,8 @@ const ENCHANT_SILVER_COST := [0, 200, 450, 800, 1250, 1800, 2450, 3200, 4050, 50
 @onready var character_box: VBoxContainer = $Center/Panel/VBox/CharacterBox
 @onready var info_label: Label = $Center/Panel/VBox/CharacterBox/InfoLabel
 @onready var equipped_label: Label = $Center/Panel/VBox/CharacterBox/EquippedLabel
+@onready var enter_farm_button: Button = $Center/Panel/VBox/CharacterBox/MapButtonsRow/EnterFarmButton
+@onready var enter_pvp_button: Button = $Center/Panel/VBox/CharacterBox/MapButtonsRow/EnterPvpButton
 @onready var inventory_items: VBoxContainer = $Center/Panel/VBox/CharacterBox/ScrollContainer/Items
 @onready var close_button: Button = $Center/Panel/VBox/CloseButton
 
@@ -36,6 +38,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	close_button.pressed.connect(func(): Audio.play("ui_click"); close())
+	enter_farm_button.pressed.connect(_on_enter_farm_pressed)
+	enter_pvp_button.pressed.connect(_on_enter_pvp_pressed)
 	BackendBridge.online_character_result.connect(_on_character_result)
 	BackendBridge.online_character_created.connect(_on_character_created)
 	BackendBridge.online_inventory_result.connect(_on_inventory_result)
@@ -215,6 +219,14 @@ func _on_equip_result(success: bool, message: String) -> void:
 	status_label.text = message
 	if success:
 		BackendBridge.get_online_inventory()
+
+func _on_enter_farm_pressed() -> void:
+	Audio.play("ui_click")
+	get_tree().change_scene_to_file("res://scenes/OnlineFarmMap.tscn")
+
+func _on_enter_pvp_pressed() -> void:
+	Audio.play("ui_click")
+	get_tree().change_scene_to_file("res://scenes/OnlinePvpMap.tscn")
 
 func _on_unequip_result(success: bool, message: String) -> void:
 	status_label.text = message
