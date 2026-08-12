@@ -10,6 +10,15 @@ signal purchase_result(success: bool, data: Dictionary, message: String)
 signal character_purchase_result(success: bool, data: Dictionary, message: String)
 signal character_select_result(success: bool, data: Dictionary, message: String)
 
+# "Kan Adası: Online" (bkz. plans/humble-chasing-galaxy.md) — kalıcı karakter
+# + envanter/ekipman. data == null (Dictionary boş değil, gerçekten null)
+# demek "henüz online karakter oluşturulmamış" demektir.
+signal online_character_result(success: bool, data: Variant, message: String)
+signal online_character_created(success: bool, data: Dictionary, message: String)
+signal online_inventory_result(success: bool, data: Dictionary, message: String)
+signal online_equip_result(success: bool, message: String)
+signal online_unequip_result(success: bool, message: String)
+
 const API_BASE_PROD := "https://api.islandsempire.com/api"
 const API_BASE_LOCAL := "http://localhost:3000/api"
 
@@ -215,6 +224,158 @@ func _on_select_character_completed(_result: int, code: int, _headers: PackedStr
 		if typeof(data) == TYPE_DICTIONARY:
 			msg = str(data.get("message", msg))
 		character_select_result.emit(false, {}, msg)
+
+func get_online_character() -> void:
+	if GameManager.jwt_token == "":
+		online_character_result.emit(false, null, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_online_character_completed.bind(http))
+	var headers := ["Authorization: Bearer " + GameManager.jwt_token]
+	var err := http.request(_api_base() + "/online/character", headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		online_character_result.emit(false, null, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_online_character_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		online_character_result.emit(false, null, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		online_character_result.emit(true, data.get("data"), "")
+	else:
+		var msg := "Yüklenemedi"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		online_character_result.emit(false, null, msg)
+
+func create_online_character(class_id: String) -> void:
+	if GameManager.jwt_token == "":
+		online_character_created.emit(false, {}, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_create_online_character_completed.bind(http))
+	var body := JSON.stringify({"classId": class_id})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + GameManager.jwt_token,
+	]
+	var err := http.request(_api_base() + "/online/character", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		online_character_created.emit(false, {}, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_create_online_character_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		online_character_created.emit(false, {}, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 201 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		online_character_created.emit(true, data.get("data", {}), str(data.get("message", "")))
+	else:
+		var msg := "Karakter oluşturulamadı"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		online_character_created.emit(false, {}, msg)
+
+func get_online_inventory() -> void:
+	if GameManager.jwt_token == "":
+		online_inventory_result.emit(false, {}, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_online_inventory_completed.bind(http))
+	var headers := ["Authorization: Bearer " + GameManager.jwt_token]
+	var err := http.request(_api_base() + "/online/inventory", headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		online_inventory_result.emit(false, {}, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_online_inventory_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		online_inventory_result.emit(false, {}, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		online_inventory_result.emit(true, data.get("data", {}), "")
+	else:
+		var msg := "Yüklenemedi"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		online_inventory_result.emit(false, {}, msg)
+
+func equip_online_item(inventory_item_id: int) -> void:
+	if GameManager.jwt_token == "":
+		online_equip_result.emit(false, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_equip_completed.bind(http))
+	var body := JSON.stringify({"inventoryItemId": inventory_item_id})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + GameManager.jwt_token,
+	]
+	var err := http.request(_api_base() + "/online/equip", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		online_equip_result.emit(false, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_equip_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		online_equip_result.emit(false, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		online_equip_result.emit(true, str(data.get("message", "")))
+	else:
+		var msg := "Kuşanılamadı"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		online_equip_result.emit(false, msg)
+
+func unequip_online_item(slot: String) -> void:
+	if GameManager.jwt_token == "":
+		online_unequip_result.emit(false, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_unequip_completed.bind(http))
+	var body := JSON.stringify({"slot": slot})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + GameManager.jwt_token,
+	]
+	var err := http.request(_api_base() + "/online/unequip", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		online_unequip_result.emit(false, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_unequip_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		online_unequip_result.emit(false, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		online_unequip_result.emit(true, str(data.get("message", "")))
+	else:
+		var msg := "Çıkarılamadı"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		online_unequip_result.emit(false, msg)
 
 # Web build'de, React sayfasına postMessage ile sonucu bildir (toast göstermesi için).
 func _notify_parent_page(payload: Dictionary, message: String) -> void:

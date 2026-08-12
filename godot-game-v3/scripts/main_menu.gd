@@ -14,12 +14,15 @@ extends Control
 @onready var character_label: Label = $Center/VBox/SelectedCharacterRow/CharacterLabel
 @onready var shop_screen: CanvasLayer = $ShopScreen
 @onready var character_select: CanvasLayer = $CharacterSelect
+@onready var online_button: Button = $Center/VBox/OnlineButton
+@onready var online_hub: CanvasLayer = $OnlineHub
 
 func _ready() -> void:
 	best_label.text = "En iyi skor: %d" % GameManager.best_score
 	play_button.pressed.connect(_on_play_pressed)
 	shop_button.pressed.connect(_on_shop_pressed)
 	character_button.pressed.connect(_on_character_pressed)
+	online_button.pressed.connect(_on_online_pressed)
 	login_button.pressed.connect(_on_login_pressed)
 	BackendBridge.login_result.connect(_on_login_result)
 	BackendBridge.progress_result.connect(_on_progress_result)
@@ -33,6 +36,7 @@ func _refresh_auth_state() -> void:
 		play_button.visible = true
 		shop_button.visible = true
 		character_button.visible = true
+		online_button.visible = true
 		character_row.visible = true
 		status_label.text = ""
 		BackendBridge.get_progress()
@@ -41,6 +45,7 @@ func _refresh_auth_state() -> void:
 		play_button.visible = false
 		shop_button.visible = false
 		character_button.visible = false
+		online_button.visible = false
 		character_row.visible = false
 		status_label.text = "Oynamak için Island Empire hesabınla giriş yap."
 	_refresh_character_display()
@@ -76,6 +81,10 @@ func _on_shop_pressed() -> void:
 func _on_character_pressed() -> void:
 	Audio.play("ui_click")
 	character_select.open()
+
+func _on_online_pressed() -> void:
+	Audio.play("ui_click")
+	online_hub.open()
 
 func _on_login_pressed() -> void:
 	Audio.play("ui_click")

@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/main_menu.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/shop_screen.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/character_select.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/online_hub.gd" id="4"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -73,6 +74,11 @@ text = "🩸 Dükkan"
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "🗡 Karakter Seç"
+
+[node name="OnlineButton" type="Button" parent="Center/VBox"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "⚔️ Online (Beta)"
 
 [node name="LoginBox" type="VBoxContainer" parent="Center/VBox"]
 layout_mode = 2
@@ -169,6 +175,74 @@ custom_minimum_size = Vector2(560, 0)
 layout_mode = 2
 
 [node name="CloseButton" type="Button" parent="CharacterSelect/Center/Panel/VBox"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Kapat"
+
+[node name="OnlineHub" type="CanvasLayer" parent="."]
+layer = 10
+script = ExtResource("4")
+
+[node name="Center" type="CenterContainer" parent="OnlineHub"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="OnlineHub/Center"]
+custom_minimum_size = Vector2(660, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="OnlineHub/Center/Panel"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="OnlineHub/Center/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "⚔️ Kan Adası: Online"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="OnlineHub/Center/Panel/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ClassSelectBox" type="VBoxContainer" parent="OnlineHub/Center/Panel/VBox"]
+layout_mode = 2
+visible = false
+
+[node name="ScrollContainer" type="ScrollContainer" parent="OnlineHub/Center/Panel/VBox/ClassSelectBox"]
+custom_minimum_size = Vector2(0, 340)
+layout_mode = 2
+
+[node name="Items" type="VBoxContainer" parent="OnlineHub/Center/Panel/VBox/ClassSelectBox/ScrollContainer"]
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+
+[node name="CharacterBox" type="VBoxContainer" parent="OnlineHub/Center/Panel/VBox"]
+layout_mode = 2
+visible = false
+
+[node name="InfoLabel" type="Label" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="EquippedLabel" type="Label" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 14
+
+[node name="ScrollContainer" type="ScrollContainer" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
+custom_minimum_size = Vector2(0, 280)
+layout_mode = 2
+
+[node name="Items" type="VBoxContainer" parent="OnlineHub/Center/Panel/VBox/CharacterBox/ScrollContainer"]
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="OnlineHub/Center/Panel/VBox"]
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "Kapat"

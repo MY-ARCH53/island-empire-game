@@ -551,6 +551,44 @@ yeniden kullanıyor (varsayılan/en ucuz karakter, yeni sanat gerektirmedi).
   (varsayılan tüm yönler yerine) hem maliyeti hem başarısızlık yüzeyini
   azaltıyor (batı zaten kullanılmıyor).
 
+## Kan Adası: Online — Faz 1 (kalıcı karakter + envanter)
+
+Tam plan: `C:\Users\musta\.claude\plans\humble-chasing-galaxy.md`. Bu, run-
+tabanlı roguelite'tan (yukarısı) **tamamen ayrı bir mod** — `MainMenu.tscn`'de
+"⚔️ Online (Beta)" butonuyla açılıyor. Henüz multiplayer'a bağlanmıyor (bkz.
+Faz 0 — `../godot-server/`), sadece kalıcı karakter oluşturma + envanter/
+ekipman görüntüleme.
+
+- **Sınıf = mevcut 6 karakter**: Ayrı bir sınıf sistemi icat edilmedi —
+  `Upgrades.CHARACTERS` (Köylü/Büyücü/Kılıç Ustası/Fırtına Rahibesi/Vebalı/
+  Fırtına Avcısı) burada da "sınıf" olarak kullanılıyor, görsel/dönen
+  önizleme dahil (`character_preview.gd` yeniden kullanıldı). Online
+  karakterler ücretsiz (roguelite'taki Kan Özü ekonomisiyle karışmıyor).
+- **Backend**: `backend/src/controllers/online.controller.js` +
+  `backend/src/routes/online.routes.js` (`/api/online/character` GET/POST,
+  `/api/online/inventory` GET, `/api/online/equip`+`/unequip` POST) — mevcut
+  `auth.middleware.js` (JWT) ile korunuyor, `minigame.routes.js` ile aynı
+  desen (`router.use(auth)`).
+- **DB** (yerel `psql` ile eklendi, prod'a deploy öncesi VPS'te aynı `CREATE
+  TABLE`'lar çalıştırılmalı): `online_characters` (user_id PK, class_id,
+  level, xp, silver, np), `item_defs` (statik eşya tanımları — id, name,
+  slot, base_stats jsonb, rarity), `online_inventory`, `online_equipment`
+  (slot başına tek eşya, `ON CONFLICT (user_id, slot) DO UPDATE` ile
+  kuşanma değişimi). Test eşyaları `backend/scripts/seed_online_items.sql`
+  ile tohumlandı (9 eşya: her slot için common/rare/epic).
+- **Godot**: `scripts/online_hub.gd` (`MainMenu.tscn`'e gömülü
+  `OnlineHub` CanvasLayer, `ShopScreen`/`CharacterSelect` ile aynı
+  `CenterContainer`+`PanelContainer` iskeleti). İki durum: karakter yoksa
+  sınıf seçimi listesi, varsa karakter bilgisi + kuşanılan eşya özeti +
+  "Kuşan"/"Kuşanılı" butonlu envanter listesi (nadirliğe göre renkli:
+  gri/mavi/mor).
+- **Doğrulama**: Backend curl ile uçtan uca test edildi (karakter oluşturma,
+  tekrar oluşturmayı reddetme, envanter listeleme, kuşanma/slot değişimi,
+  çıkarma, başkasının eşyasını kuşanmayı reddetme). Godot tarafı hem
+  senkron mock veriyle (iki durumun da doğru render olduğu ekran
+  görüntüsüyle) hem de `test_v2` hesabıyla GERÇEK bir uçtan uca çalıştırmayla
+  (gerçek giriş → gerçek HTTP → gerçek DB → geri UI) doğrulandı.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`
