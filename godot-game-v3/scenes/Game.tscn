@@ -1,0 +1,218 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/game.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/level_up_menu.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/game_over_screen.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/virtual_joystick.gd" id="6"]
+[ext_resource type="TileSet" path="res://assets/tileset/meadow_terrain.tres" id="7"]
+[ext_resource type="TileSet" path="res://assets/tileset/coast_terrain.tres" id="8"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_xp_fill"]
+bg_color = Color(0.85, 0.65, 0.15, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_boss_fill"]
+bg_color = Color(0.55, 0.1, 0.35, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+
+[node name="Game" type="Node2D"]
+script = ExtResource("2")
+
+[node name="Ground" type="TileMapLayer" parent="."]
+tile_set = ExtResource("7")
+
+[node name="GroundCoast" type="TileMapLayer" parent="."]
+tile_set = ExtResource("8")
+
+[node name="GroundDecor" type="Node2D" parent="."]
+
+[node name="World" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="Player" parent="World" instance=ExtResource("1")]
+
+[node name="SpawnTimer" type="Timer" parent="."]
+wait_time = 1.4
+autostart = false
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("3")
+
+[node name="TopLeft" type="VBoxContainer" parent="HUD"]
+offset_left = 14.0
+offset_top = 14.0
+offset_right = 224.0
+offset_bottom = 96.0
+theme_override_constants/separation = 3
+mouse_filter = 2
+
+[node name="InfoRow" type="HBoxContainer" parent="HUD/TopLeft"]
+custom_minimum_size = Vector2(210, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LevelLabel" type="Label" parent="HUD/TopLeft/InfoRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Lv 1"
+
+[node name="Spacer1" type="Control" parent="HUD/TopLeft/InfoRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="TimerLabel" type="Label" parent="HUD/TopLeft/InfoRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "00:00"
+
+[node name="KillsLabel" type="Label" parent="HUD/TopLeft"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Öldürme: 0"
+
+[node name="HealthBar" type="ProgressBar" parent="HUD/TopLeft"]
+custom_minimum_size = Vector2(210, 18)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="XPBar" type="ProgressBar" parent="HUD/TopLeft"]
+theme_override_styles/fill = SubResource("StyleBoxFlat_xp_fill")
+custom_minimum_size = Vector2(210, 10)
+layout_mode = 2
+max_value = 12.0
+value = 0.0
+show_percentage = false
+
+[node name="BossPanel" type="VBoxContainer" parent="HUD"]
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -170.0
+offset_top = 14.0
+offset_right = 170.0
+offset_bottom = 56.0
+theme_override_constants/separation = 2
+mouse_filter = 2
+
+[node name="BossNameLabel" type="Label" parent="HUD/BossPanel"]
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.35, 0.35, 1)
+theme_override_font_sizes/font_size = 14
+text = "Kan Lordu"
+
+[node name="BossHealthBar" type="ProgressBar" parent="HUD/BossPanel"]
+theme_override_styles/fill = SubResource("StyleBoxFlat_boss_fill")
+custom_minimum_size = Vector2(340, 16)
+layout_mode = 2
+max_value = 1400.0
+value = 1400.0
+show_percentage = false
+
+[node name="EvolutionBanner" type="Label" parent="HUD"]
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -280.0
+offset_top = 150.0
+offset_right = 280.0
+offset_bottom = 190.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.3, 1)
+theme_override_font_sizes/font_size = 26
+horizontal_alignment = 1
+
+[node name="TouchControls" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="Joystick" type="Control" parent="TouchControls"]
+script = ExtResource("6")
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -240.0
+offset_right = 240.0
+offset_bottom = -20.0
+
+[node name="LevelUpMenu" type="CanvasLayer" parent="."]
+script = ExtResource("4")
+layer = 10
+
+[node name="Center" type="CenterContainer" parent="LevelUpMenu"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="LevelUpMenu/Center"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="LevelUpMenu/Center/Panel"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="LevelUpMenu/Center/Panel/VBox"]
+layout_mode = 2
+text = "Seviye Atladın!"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+
+[node name="Choices" type="VBoxContainer" parent="LevelUpMenu/Center/Panel/VBox"]
+layout_mode = 2
+
+[node name="GameOverScreen" type="CanvasLayer" parent="."]
+script = ExtResource("5")
+layer = 11
+
+[node name="Panel" type="PanelContainer" parent="GameOverScreen"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -200.0
+offset_right = 220.0
+offset_bottom = 200.0
+
+[node name="VBox" type="VBoxContainer" parent="GameOverScreen/Panel"]
+
+[node name="GameOverLabel" type="Label" parent="GameOverScreen/Panel/VBox"]
+text = "Öldün!"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 28
+
+[node name="StatsLabel" type="Label" parent="GameOverScreen/Panel/VBox"]
+text = ""
+horizontal_alignment = 1
+
+[node name="RewardLabel" type="Label" parent="GameOverScreen/Panel/VBox"]
+text = ""
+horizontal_alignment = 1
+
+[node name="PlayAgainButton" type="Button" parent="GameOverScreen/Panel/VBox"]
+text = "Tekrar Oyna"
+custom_minimum_size = Vector2(0, 48)
+
+[node name="MenuButton" type="Button" parent="GameOverScreen/Panel/VBox"]
+text = "Ana Menü"
+custom_minimum_size = Vector2(0, 48)

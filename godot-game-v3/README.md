@@ -1,10 +1,11 @@
 # Kan Adası — Island Empire Mini Oyunu
 
-> **v2 — dondurulmuş referans sürüm (2026-08-12 itibarıyla).** Silah evrimi,
-> karakter sistemi + görselleri, ana menü göstergesi burada tamamlandı ve
-> test edildi. Bundan sonraki tüm yeni geliştirme (çok oyunculu "Kan Adası:
-> Online" dahil) `godot-game-v3/`'te devam ediyor. Bu klasöre elle dokunma —
-> v1 gibi stabil bir geri dönüş noktası olarak duruyor.
+> **v3 — aktif geliştirme.** `godot-game-v2/` taban alınarak oluşturuldu;
+> bundan sonraki tüm yeni eklentiler (çok oyunculu "Kan Adası: Online" dahil,
+> bkz. `C:\Users\musta\.claude\plans\humble-chasing-galaxy.md`) burada. v1
+> ve v2 dondurulmuş referans noktaları olarak ayrı klasörlerde duruyor, elle
+> senkronize edilmiyor. Ayrıca bkz. `../godot-server/` — çok oyunculu
+> sunucu tarafı ayrı bir projede.
 
 Vampire Survivors tarzı, Godot 4.3 ile yazılmış bir "hayatta kal ve seviye
 atla" mini oyunu. Island Empire'ın ana web sitesine gömülü oynanabilir, aynı
