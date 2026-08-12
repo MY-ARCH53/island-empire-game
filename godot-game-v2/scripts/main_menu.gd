@@ -9,6 +9,9 @@ extends Control
 @onready var password_field: LineEdit = $Center/VBox/LoginBox/PasswordField
 @onready var login_button: Button = $Center/VBox/LoginBox/LoginButton
 @onready var status_label: Label = $Center/VBox/StatusLabel
+@onready var character_row: HBoxContainer = $Center/VBox/SelectedCharacterRow
+@onready var character_portrait: TextureRect = $Center/VBox/SelectedCharacterRow/Portrait
+@onready var character_label: Label = $Center/VBox/SelectedCharacterRow/CharacterLabel
 @onready var shop_screen: CanvasLayer = $ShopScreen
 @onready var character_select: CanvasLayer = $CharacterSelect
 
@@ -19,6 +22,9 @@ func _ready() -> void:
 	character_button.pressed.connect(_on_character_pressed)
 	login_button.pressed.connect(_on_login_pressed)
 	BackendBridge.login_result.connect(_on_login_result)
+	BackendBridge.progress_result.connect(_on_progress_result)
+	BackendBridge.character_select_result.connect(_on_character_changed)
+	BackendBridge.character_purchase_result.connect(_on_character_changed)
 	_refresh_auth_state()
 
 func _refresh_auth_state() -> void:
@@ -27,6 +33,7 @@ func _refresh_auth_state() -> void:
 		play_button.visible = true
 		shop_button.visible = true
 		character_button.visible = true
+		character_row.visible = true
 		status_label.text = ""
 		BackendBridge.get_progress()
 	else:
@@ -34,7 +41,29 @@ func _refresh_auth_state() -> void:
 		play_button.visible = false
 		shop_button.visible = false
 		character_button.visible = false
+		character_row.visible = false
 		status_label.text = "Oynamak için Island Empire hesabınla giriş yap."
+	_refresh_character_display()
+
+func _refresh_character_display() -> void:
+	var char_id: String = GameManager.selected_character if Upgrades.CHARACTERS.has(GameManager.selected_character) else "koylu"
+	var char_data: Dictionary = Upgrades.CHARACTERS[char_id]
+	character_label.text = "Karakter: %s" % char_data["name"]
+	var sprite_path: String = char_data.get("sprite_path", "")
+	if sprite_path != "" and ResourceLoader.exists(sprite_path):
+		var sf: SpriteFrames = load(sprite_path)
+		if sf and sf.has_animation("idle_south"):
+			character_portrait.texture = sf.get_frame_texture("idle_south", 0)
+
+func _on_progress_result(success: bool, data: Dictionary, _message: String) -> void:
+	if success:
+		GameManager.apply_progress(data)
+		_refresh_character_display()
+
+func _on_character_changed(success: bool, data: Dictionary, _message: String) -> void:
+	if success:
+		GameManager.apply_progress(data)
+		_refresh_character_display()
 
 func _on_play_pressed() -> void:
 	Audio.play("ui_click")

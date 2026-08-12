@@ -450,6 +450,15 @@ bağlıyor).
   kolonları eklendi (yerel `psql` ile — bu projede migration dosyası yerine
   doğrudan eklenen diğer tablo/kolonlarla aynı desen, prod'a deploy öncesi
   VPS'te de aynı `ALTER TABLE` çalıştırılmalı).
+- **Ana menüde seçili karakter göstergesi**: `MainMenu.tscn`'de "Oyna"
+  butonunun hemen üstünde küçük bir portre + isim satırı
+  (`SelectedCharacterRow`) — oyuncu run başlamadan kim olduğunu görür.
+  `main_menu.gd → _refresh_character_display()` `Upgrades.CHARACTERS`'tan
+  ismi, seçili karakterin `sprite_frames`'inden `idle_south`'un ilk
+  karesini (`SpriteFrames.get_frame_texture()`) portre olarak alır;
+  `BackendBridge.progress_result`/`character_select_result`/
+  `character_purchase_result` sinyallerine bağlı, karakter her
+  değiştiğinde otomatik güncellenir.
 
 **Test notu — iki gerçek bug bulundu ve düzeltildi bu özellik geliştirilirken**:
 1. `godot-game-v2/project.godot`'un `config/name`'i başta v1 ile AYNIYDI
