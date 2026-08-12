@@ -1,5 +1,9 @@
 # Kan Adası — Island Empire Mini Oyunu
 
+> **v1 — dondurulmuş taban sürüm.** Yeni geliştirme `godot-game-v2/` altında
+> devam ediyor (`../godot-game-v2/README.md`). Bu klasöre elle dokunma —
+> stabil bir referans/geri dönüş noktası olarak duruyor.
+
 Vampire Survivors tarzı, Godot 4.3 ile yazılmış bir "hayatta kal ve seviye
 atla" mini oyunu. Island Empire'ın ana web sitesine gömülü oynanabilir, aynı
 zamanda bağımsız olarak Android/iOS mağazalarına da yayınlanabilir.
