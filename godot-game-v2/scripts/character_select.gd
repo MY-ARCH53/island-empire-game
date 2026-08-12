@@ -29,9 +29,25 @@ func _refresh() -> void:
 	for char_id in Upgrades.CHARACTERS.keys():
 		_add_row(char_id)
 
+const CharacterPreviewScript := preload("res://scripts/character_preview.gd")
+
 func _add_row(char_id: String) -> void:
 	var char_data: Dictionary = Upgrades.CHARACTERS[char_id]
 	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+
+	var preview_box := Control.new()
+	preview_box.custom_minimum_size = Vector2(72, 72)
+	preview_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sprite_path: String = char_data.get("sprite_path", "")
+	if sprite_path != "" and ResourceLoader.exists(sprite_path):
+		var preview := AnimatedSprite2D.new()
+		preview.set_script(CharacterPreviewScript)
+		preview.sprite_frames = load(sprite_path)
+		preview.position = Vector2(36, 40)
+		preview.scale = Vector2.ONE * 1.4
+		preview_box.add_child(preview)
+	row.add_child(preview_box)
 
 	var label := Label.new()
 	var weapon_name: String = Upgrades.WEAPONS[char_data["starting_weapon"]]["name"]

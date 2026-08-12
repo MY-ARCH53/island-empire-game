@@ -22,6 +22,13 @@ const CHARACTERS = [
   { name: 'kan_lordu', out: 'kan_lordu' },
   { name: 'kabus', out: 'kabus' },
   { name: 'gulyabani', out: 'gulyabani' },
+  // Oynanabilir karakterler (bkz. scripts/autoload/upgrades.gd → CHARACTERS) —
+  // "koylu" ayrı bir sprite değil, protagonist'i yeniden kullanır.
+  { name: 'buyucu', out: 'char_buyucu' },
+  { name: 'kilic_ustasi', out: 'char_kilic_ustasi' },
+  { name: 'firtina_rahibesi', out: 'char_firtina_rahibesi' },
+  { name: 'vebali', out: 'char_vebali' },
+  { name: 'firtina_avcisi', out: 'char_firtina_avcisi' },
 ];
 
 const DIRS = ['south', 'east', 'north'];

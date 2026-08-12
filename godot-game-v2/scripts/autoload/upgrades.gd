@@ -9,6 +9,8 @@ extends Node
 # NOT: Bu pasif bonus, aynı istatistiğin silah evrimi sayacına (stat_levels)
 # KATKI YAPMAZ — evrim için oyuncu yine level-up menüsünden bilinçli olarak
 # 5 kez seçim yapmalı. Karakter sadece o build'i güçlendirir/teşvik eder.
+# sprite_path: player.gd _ready()'de $Visual.sprite_frames'e yüklenir — hem
+# Karakter Seç önizlemesinde hem gerçek oyunda kullanılır (bkz. tools/generate_spriteframes.js).
 const CHARACTERS := {
 	"koylu": {
 		"name": "Köylü",
@@ -18,6 +20,7 @@ const CHARACTERS := {
 		"passive_stat": "",
 		"passive_tiers": [],
 		"unlock_cost": 0,
+		"sprite_path": "res://assets/sprites/protagonist.tres",
 	},
 	"buyucu": {
 		"name": "Büyücü",
@@ -27,6 +30,7 @@ const CHARACTERS := {
 		"passive_stat": "damage",
 		"passive_tiers": [[5, 0.08], [10, 0.16], [15, 0.24], [20, 0.32], [25, 0.40]],
 		"unlock_cost": 80,
+		"sprite_path": "res://assets/sprites/char_buyucu.tres",
 	},
 	"kilic_ustasi": {
 		"name": "Kılıç Ustası",
@@ -36,6 +40,7 @@ const CHARACTERS := {
 		"passive_stat": "area",
 		"passive_tiers": [[5, 0.08], [10, 0.16], [15, 0.24], [20, 0.32], [25, 0.40]],
 		"unlock_cost": 80,
+		"sprite_path": "res://assets/sprites/char_kilic_ustasi.tres",
 	},
 	"firtina_rahibesi": {
 		"name": "Fırtına Rahibesi",
@@ -45,6 +50,7 @@ const CHARACTERS := {
 		"passive_stat": "attack_speed",
 		"passive_tiers": [[5, 0.06], [10, 0.12], [15, 0.18], [20, 0.24], [25, 0.30]],
 		"unlock_cost": 100,
+		"sprite_path": "res://assets/sprites/char_firtina_rahibesi.tres",
 	},
 	"vebali": {
 		"name": "Vebalı",
@@ -54,6 +60,7 @@ const CHARACTERS := {
 		"passive_stat": "xp_gain",
 		"passive_tiers": [[5, 0.10], [10, 0.20], [15, 0.30]],
 		"unlock_cost": 100,
+		"sprite_path": "res://assets/sprites/char_vebali.tres",
 	},
 	"firtina_avcisi": {
 		"name": "Fırtına Avcısı",
@@ -63,6 +70,7 @@ const CHARACTERS := {
 		"passive_stat": "pickup_radius",
 		"passive_tiers": [[1, 0.10], [5, 0.20], [10, 0.30], [15, 0.40]],
 		"unlock_cost": 120,
+		"sprite_path": "res://assets/sprites/char_firtina_avcisi.tres",
 	},
 }
 

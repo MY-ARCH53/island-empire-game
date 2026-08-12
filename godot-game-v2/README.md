@@ -469,6 +469,60 @@ bağlıyor).
    (şimdiye kadar "8" içeren bir fiyat hiç ekrana gelmemişti). Kapsam dışı
    bırakıldı, ayrı bir font/tipografi işi olarak not edildi.
 
+### Karakter görselleri — her karakterin kendi "tipi"
+
+Köylü dışındaki 5 karakterin her biri PixelLab `create_character` (standard
+mode, 4 yön, 48px, `basic shading`/`single color black outline`/`medium
+detail` — protagonist ile aynı varsayılan stil parametreleri) ile üretilmiş
+kendi görseline sahip: Büyücü (kukuletalı mor cübbeli büyücü), Kılıç Ustası
+(zırhlı, sırtında ikiz kılıçlı), Fırtına Rahibesi (fırtına enerjili rahibe),
+Vebalı (veba doktoru maskeli, yeşil sisli), Fırtına Avcısı (zincirli, boynuz
+başlıklı avcı). Köylü ayrı bir sprite değil — mevcut `protagonist.tres`'i
+yeniden kullanıyor (varsayılan/en ucuz karakter, yeni sanat gerektirmedi).
+
+- **Kapsam**: Görsel hem Karakter Seç ekranındaki önizlemede hem gerçek
+  oyunda (o karakterle oynarken haritadaki avatar) kullanılıyor — kullanıcı
+  bunu bilinçli olarak tercih etti (sadece önizleme değil).
+- **"Dönen" önizleme**: `scripts/character_preview.gd` — her karakter
+  satırındaki küçük görsel, güney→doğu→kuzey→(doğu'nun `flip_h` ile
+  aynalanmış hâli = batı) arasında 0.9 saniyede bir yön değiştirip kendi
+  etrafında döndüğü izlenimi veriyor. Ekstra animasyon üretimi gerektirmez,
+  zaten var olan `idle_*` karelerini döngüye sokuyor. `character_select.gd
+  → _add_row()` her satırda 72x72'lik bir `Control` içine bu script'li bir
+  `AnimatedSprite2D` yerleştiriyor (Node2D'yi Control tabanlı bir
+  container'da ortalamak için `position` doğrudan kutunun merkezine sabitleniyor).
+- **Üretim akışı** (`tools/generate_spriteframes.js`'e eklendi, aynı
+  protagonist/düşman deseni): `create_character` (temel 4 yön) →
+  `animate_character(template_animation_id="walk", directions=[south,east,north])`
+  (batı gerekmiyor, doğudan aynalanıyor, gereksiz üretim harcanmasın diye
+  `directions` parametresiyle sınırlandı) → PixelLab `/download` endpoint'i
+  ile `assets/characters/<isim>/character.zip` indirilip `extracted/`e
+  açıldı (`Idle/rotations/*.png` + `Idle/animations/walking/<yön>/*.png` —
+  tam olarak script'in beklediği yapı) → `node generate_spriteframes.js`
+  ile `assets/sprites/char_<isim>.tres` üretildi. Karakter verisine
+  (`upgrades.gd → CHARACTERS`) `sprite_path` alanı eklendi,
+  `player.gd → _ready()` artık `$Visual.sprite_frames`'i seçili karaktere
+  göre yüklüyor (`ResourceLoader.exists()` ile güvenli fallback —  sprite
+  henüz üretilmemiş bir karakter seçiliyse eski görsele düşer, çökmez).
+- **Dikkat — yeni PNG'ler eklendikten sonra Godot'un import cache'i
+  gerekiyor**: `node generate_spriteframes.js` sadece dosyaları `res://`
+  yapısına kopyalar, Godot'un onları `Texture2D` olarak tanıması için ayrı
+  bir import adımı şart. `run_project` (F5 benzeri) ile projeyi açmak
+  yetmeyebilir — script içindeki `load()` çağrıları sessizce boş/kırık
+  kaynak döndürüp önizlemede karakter görünmez hale gelir. Çözüm: headless
+  import'u elle çalıştır —
+  `Godot_v4.3-stable_win64_console.exe --headless --path . --import`
+  (yol `.mcp.json`'daki `GODOT_PATH`'te). Bunu her yeni sprite/texture
+  ekleyişinde tekrarla.
+- **PixelLab üretimi kararsız olabilir**: Aynı anda birden fazla
+  `create_character`/`animate_character` çağrısı "Generation failed due to
+  heavy load" ile başarısız olabiliyor (hesap başına ~8 eşzamanlı iş slotu
+  sınırı var). Çözüm: seri (paralel değil) çağır, başarısız olanları
+  `get_character()` ile kontrol edip tekrar dene — retry genelde çalışıyor.
+  `animate_character`'a `directions=["south","east","north"]` vermek
+  (varsayılan tüm yönler yerine) hem maliyeti hem başarısızlık yüzeyini
+  azaltıyor (batı zaten kullanılmıyor).
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`

@@ -43,6 +43,9 @@ func _ready() -> void:
 	add_to_group("player")
 	character_id = GameManager.selected_character if Upgrades.CHARACTERS.has(GameManager.selected_character) else "koylu"
 	var char_data: Dictionary = Upgrades.CHARACTERS[character_id]
+	var sprite_path: String = char_data.get("sprite_path", "")
+	if sprite_path != "" and ResourceLoader.exists(sprite_path):
+		$Visual.sprite_frames = load(sprite_path)
 	_apply_permanent_upgrades()
 	_apply_character_flat_bonuses(char_data)
 	max_health = base_max_health
