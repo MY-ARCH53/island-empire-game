@@ -167,6 +167,39 @@ class InternalController {
   }
   // POST /api/internal/pvp-kill  { killerUserId, victimUserId }
   // KO deseni: öldüren +50 NP kazanır, ölen 50 NP kaybeder (0'ın altına inmez).
+  // POST /api/internal/use-potion  { userId }
+  // Faz C — hangi envanter satırının kullanılacağını Godot sunucusu hiç
+  // bilmiyor/seçmiyor; backend en eski (FIFO) consumable satırını seçip
+  // siler. Bu, Godot tarafında bir envanter senkron sistemi icat etmekten
+  // kaçınıyor (bkz. plans/humble-chasing-galaxy.md "Faz C.3").
+  static async usePotion(req, res) {
+    try {
+      const userId = parseInt(req.body.userId, 10);
+      if (!Number.isFinite(userId)) {
+        return res.status(400).json({ success: false, message: 'Geçersiz userId' });
+      }
+      const potRes = await query(
+        `SELECT oi.id, d.base_stats, d.name FROM online_inventory oi
+         JOIN item_defs d ON d.id = oi.item_def_id
+         WHERE oi.user_id = $1 AND d.slot = 'consumable'
+         ORDER BY oi.acquired_at ASC LIMIT 1`,
+        [userId]
+      );
+      if (potRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Can iksirin yok' });
+      }
+      const item = potRes.rows[0];
+      await query('DELETE FROM online_inventory WHERE id = $1', [item.id]);
+      // Defense-in-depth: reward-kill'deki MAX_SILVER/XP_PER_KILL tavanlarıyla
+      // aynı ilke — tek bir hatalı item_defs satırı aşırı iyileşme yaratmasın.
+      const healAmount = Math.max(0, Math.min(500, Math.floor(Number(item.base_stats?.heal) || 0)));
+      res.json({ success: true, data: { healAmount, itemName: item.name } });
+    } catch (err) {
+      console.error('Internal usePotion error:', err.message);
+      res.status(500).json({ success: false, message: 'Hata olustu' });
+    }
+  }
+
   static async pvpKill(req, res) {
     try {
       const killerUserId = parseInt(req.body.killerUserId, 10);

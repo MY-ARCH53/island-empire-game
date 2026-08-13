@@ -151,6 +151,11 @@ func accept_party_invite() -> void:
 func leave_party() -> void:
 	pass
 
+# Faz C — can iksiri kullanma isteği, bkz. godot-server/scripts/main.gd.
+@rpc("any_peer", "reliable")
+func request_use_potion() -> void:
+	pass
+
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
 	if success:

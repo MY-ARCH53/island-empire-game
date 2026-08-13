@@ -8,5 +8,6 @@ router.use(internalAuth);
 router.post('/authenticate', InternalController.authenticate);
 router.post('/reward-kill', InternalController.rewardKill);
 router.post('/pvp-kill', InternalController.pvpKill);
+router.post('/use-potion', InternalController.usePotion);
 
 module.exports = router;

@@ -116,6 +116,9 @@ class OnlineController {
         return res.status(404).json({ success: false, message: 'Eşya envanterinde bulunamadı' });
       }
       const { slot } = itemRes.rows[0];
+      if (slot === 'consumable') {
+        return res.status(400).json({ success: false, message: 'Bu eşya kuşanılamaz.' });
+      }
 
       await query(
         `INSERT INTO online_equipment (user_id, slot, inventory_item_id)

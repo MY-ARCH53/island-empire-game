@@ -61,6 +61,11 @@ const ENEMY_BASE_STATS := {
 	"gulyabani": {"health": 95.0, "xp": 22, "silver": 18, "damage": 13.0, "speed": 50.0},
 }
 
+# Faz C — can iksiri (bkz. plans/humble-chasing-galaxy.md "Farm Derinliği").
+const POTION_DROP_CHANCE := 0.15
+const POTION_ITEM_ID := "minor_health_potion"
+const POTION_USE_COOLDOWN := 3.0
+
 const SLOTS := ["weapon", "armor", "shield"]
 const RARITY_ITEM_IDS := {
 	"common":    {"weapon": "wooden_sword",   "armor": "cloth_armor",  "shield": "wooden_shield"},
@@ -79,6 +84,7 @@ var _last_attack_time: Dictionary = {}  # peer_id -> float saniye
 var _enemy_counter: int = 0
 var _enemy_zone: Dictionary = {}      # enemy adı -> zone index (sunucu-only, replike edilmiyor)
 var _respawn_invuln_until: Dictionary = {}  # peer_id -> float saniye (Faz B)
+var _last_potion_use: Dictionary = {}       # peer_id -> float saniye (Faz C)
 
 # Faz 5 — parti sistemi (bu haritaya özgü, kalıcı değil — sadece bağlıyken
 # geçerli). party_id olarak partiyi kuran oyuncunun peer_id'si kullanılıyor.
@@ -175,6 +181,7 @@ func _on_peer_disconnected(id: int) -> void:
 	_peer_user.erase(id)
 	_last_attack_time.erase(id)
 	_respawn_invuln_until.erase(id)
+	_last_potion_use.erase(id)
 	if _party_of.has(id):
 		var party_id: int = _party_of[id]
 		_party_of.erase(id)
@@ -265,7 +272,7 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 	# görünüyordu, gerçek (170) değil.
 	var spawn_max_health: float = BASE_MAX_HEALTH + float(_peer_user[peer_id]["max_health_bonus"])
 	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"], "max_health": spawn_max_health})
-	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı)" % _peer_user[peer_id]["class_id"])
+	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı, H can iksiri)" % _peer_user[peer_id]["class_id"])
 
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
@@ -483,6 +490,11 @@ func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	_spawn_one_enemy(zone_index)
 
 func _roll_item_drop(zone_index: int) -> String:
+	# Faz C — can iksiri, bölgeden bağımsız düz bir oranla, eşya düşmesiyle
+	# KARŞILIKLI DIŞLAYICI (hangisi önce vurursa) — _send_reward'ın mevcut
+	# tek-itemDefId-per-kill sözleşmesi değişmiyor, backend'e sıfır değişiklik.
+	if randf() <= POTION_DROP_CHANCE:
+		return POTION_ITEM_ID
 	var zone: Dictionary = ZONES[zone_index]
 	if randf() > float(zone["drop_chance"]):
 		return ""
@@ -650,3 +662,57 @@ func _on_reward_response(_result: int, code: int, _headers: PackedStringArray, b
 func reward_notification(message: String) -> void:
 	status_label.text = message
 	print("REWARD_NOTIFICATION: ", message)
+
+# --- Faz C: can iksiri kullanma. Godot sunucusu HANGİ envanter satırının
+# kullanılacağını hiç bilmiyor — backend en eski (FIFO) consumable satırını
+# seçip siler (bkz. plans/humble-chasing-galaxy.md "Faz C.5"). ---
+
+@rpc("any_peer", "reliable")
+func request_use_potion() -> void:
+	if not _is_server:
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if not _peer_user.has(sender_id):
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_potion_use.get(sender_id, 0.0) < POTION_USE_COOLDOWN:
+		return
+	var player_name := str(sender_id)
+	if not has_node(player_name):
+		return
+	var player: Node2D = get_node(player_name)
+	if player.health >= player.max_health:
+		if multiplayer.get_peers().has(sender_id):
+			rpc_id(sender_id, "reward_notification", "Can zaten dolu.")
+		return
+	_last_potion_use[sender_id] = now
+	_send_use_potion(sender_id, int(_peer_user[sender_id]["user_id"]), player)
+
+func _send_use_potion(peer_id: int, user_id: int, player: Node2D) -> void:
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_use_potion_response.bind(http, peer_id, player))
+	var body := JSON.stringify({"userId": user_id})
+	var headers := [
+		"Content-Type: application/json",
+		"X-Internal-Secret: " + _internal_secret(),
+	]
+	var err := http.request(_node_api_base() + "/internal/use-potion", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		print("USE_POTION_REQUEST_FAILED peer=", peer_id, " err=", err)
+		http.queue_free()
+
+func _on_use_potion_response(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest, peer_id: int, player: Node2D) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK or code != 200:
+		if multiplayer.get_peers().has(peer_id):
+			rpc_id(peer_id, "reward_notification", "Can iksirin yok.")
+		return
+	var inner: Dictionary = json.get_data().get("data", {})
+	var heal: float = float(inner.get("healAmount", 0))
+	if is_instance_valid(player):
+		player.health = min(player.max_health, player.health + heal)
+		_broadcast_health(str(peer_id), player.health)
+	if multiplayer.get_peers().has(peer_id):
+		rpc_id(peer_id, "reward_notification", "Can iksiri kullandın! (+%d)" % int(heal))

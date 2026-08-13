@@ -20,4 +20,12 @@ INSERT INTO item_defs (id, name, slot, base_stats, rarity) VALUES
 ('legendary_shield','Kan Kalkanı', 'shield', '{"armor": 16, "max_health": 25}'::jsonb, 'legendary')
 ON CONFLICT (id) DO NOTHING;
 
+-- Can iksiri (Faz C — bkz. plans/humble-chasing-galaxy.md "Farm Derinliği").
+-- slot='consumable' — item_defs_slot_check bu değeri kabul edecek şekilde
+-- genişletilmeli (bkz. plan, weapon/armor/shield'den farklı olarak bu
+-- serbest bir alan DEĞİL, gerçek bir ALTER TABLE gerekiyor).
+INSERT INTO item_defs (id, name, slot, base_stats, rarity) VALUES
+('minor_health_potion', 'Küçük Can İksiri', 'consumable', '{"heal": 40}'::jsonb, 'common')
+ON CONFLICT (id) DO NOTHING;
+
 SELECT id, name, slot, rarity FROM item_defs ORDER BY slot, rarity;

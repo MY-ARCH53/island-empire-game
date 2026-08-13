@@ -81,6 +81,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_parent().rpc_id(1, "accept_party_invite")
 		KEY_L:
 			get_parent().rpc_id(1, "leave_party")
+		KEY_H:
+			get_parent().rpc_id(1, "request_use_potion")
 
 # En yakın düşmanı bulup sunucudan saldırı doğrulaması ister — hasarı
 # BURADA hesaplamıyoruz (bkz. online_farm_client.gd → request_attack).
