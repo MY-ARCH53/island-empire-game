@@ -65,3 +65,23 @@ offset_top = 10.0
 offset_right = -10.0
 offset_bottom = 50.0
 text = "Haritadan Çık (ESC)"
+
+[node name="PotionLabel" type="Label" parent="UI"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -60.0
+offset_right = 300.0
+offset_bottom = -36.0
+label_settings = SubResource("LabelSettings_zone")
+text = "İksir: —"
+
+[node name="AbilityLabel" type="Label" parent="UI"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -34.0
+offset_right = 400.0
+offset_bottom = -10.0
+label_settings = SubResource("LabelSettings_zone")
+text = "R: —"

@@ -32,16 +32,38 @@ const ZONE_DISPLAY := [
 const TOAST_HOLD_SEC := 3.0
 const TOAST_FADE_SEC := 1.0
 
+# İksir/yetenek HUD'u — godot-server/scripts/main.gd → ABILITIES'in isim/
+# cooldown kısmının bir aynası (ZONE_DISPLAY'deki desenin aynısı, salt
+# görüntüleme — gerçek kapı/cooldown her zaman sunucuda). İksir sayısı da
+# yeni bir RPC/DB alanı GEREKTİRMİYOR: mevcut reward_notification/
+# BackendBridge REST çağrılarından çıkarılıyor (bkz. _on_inventory_fetched,
+# reward_notification'daki metin ayrıştırması).
+const ABILITY_INFO := {
+	"koylu": {"name": "Sağlam Duruş", "cooldown": 20.0},
+	"buyucu": {"name": "Büyü Patlaması", "cooldown": 8.0},
+	"kilic_ustasi": {"name": "Kasırga Darbesi", "cooldown": 6.0},
+	"firtina_rahibesi": {"name": "Şifa Dalgası", "cooldown": 15.0},
+	"vebali": {"name": "Zehir Bulutu", "cooldown": 10.0},
+	"firtina_avcisi": {"name": "Şimşek Hamlesi", "cooldown": 7.0},
+}
+const ABILITY_UNLOCK_LEVEL := 10
+const POTION_NAME := "Küçük Can İksiri"
+
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var status_label: Label = $UI/StatusLabel
 @onready var zone_label: Label = $UI/ZoneLabel
 @onready var toast_label: Label = $UI/ToastLabel
 @onready var leave_button: Button = $UI/LeaveButton
+@onready var potion_label: Label = $UI/PotionLabel
+@onready var ability_label: Label = $UI/AbilityLabel
 @onready var camera: Camera2D = $Camera2D
 
 var _local_player_id: int = -1
 var _last_zone_name: String = ""
 var _toast_tween: Tween
+var _potion_count: int = 0
+var _character_level: int = 1
+var _ability_ready_at: float = 0.0
 
 func _server_host() -> String:
 	var override := OS.get_environment("FARM_SERVER_HOST")
@@ -64,6 +86,17 @@ func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	leave_button.pressed.connect(leave_map)
 	Audio.play_music("farm")
+	# BackendBridge.get_online_*() GameManager.jwt_token'ı okuyor — normal
+	# oyun akışında zaten set edilmiş oluyor (giriş ana menüde yapılıyor),
+	# burada sadece --token= ile başlatılan test istemcilerinde de REST
+	# çağrılarının çalışması için (WebSocket auth'ta zaten yapılan) aynı
+	# değeri GameManager'a da yazıyoruz — gerçek oyunda no-op.
+	GameManager.jwt_token = _resolve_jwt()
+	BackendBridge.online_character_result.connect(_on_character_fetched)
+	BackendBridge.online_inventory_result.connect(_on_inventory_fetched)
+	BackendBridge.get_online_character()
+	BackendBridge.get_online_inventory()
+	_update_potion_label()
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client("ws://%s:%d" % [_server_host(), PORT])
 	if err != OK:
@@ -88,6 +121,7 @@ func _process(_delta: float) -> void:
 	var me_pos: Vector2 = get_node(me_name).position
 	camera.position = me_pos
 	_update_zone_label(me_pos)
+	_update_ability_label()
 
 func _update_zone_label(pos: Vector2) -> void:
 	var dist := pos.length()
@@ -99,6 +133,60 @@ func _update_zone_label(pos: Vector2) -> void:
 	if zone_name != _last_zone_name:
 		_last_zone_name = zone_name
 		zone_label.text = "Bölge: %s" % zone_name
+
+func _update_potion_label() -> void:
+	potion_label.text = "İksir: %d  (H)" % _potion_count
+
+func _update_ability_label() -> void:
+	var me_name := str(_local_player_id)
+	if not has_node(me_name):
+		return
+	var class_id: String = get_node(me_name).class_id
+	if not ABILITY_INFO.has(class_id):
+		ability_label.text = ""
+		return
+	var info: Dictionary = ABILITY_INFO[class_id]
+	if _character_level < ABILITY_UNLOCK_LEVEL:
+		ability_label.text = "R: %s (Seviye %d'da açılır)" % [info["name"], ABILITY_UNLOCK_LEVEL]
+		return
+	var remaining: float = _ability_ready_at - (Time.get_ticks_msec() / 1000.0)
+	if remaining > 0.0:
+		ability_label.text = "R: %s (%.1fs)" % [info["name"], remaining]
+	else:
+		ability_label.text = "R: %s (Hazır)" % info["name"]
+
+# Karakter seviyesi/envanteri her REST çağrısını beklemeden en güncel
+# tutulsun diye — mevcut reward_notification/BackendBridge akışlarından
+# çıkarılıyor, yeni bir sunucu/DB alanı gerekmiyor (bkz. yukarıdaki not).
+func _on_character_fetched(success: bool, data: Variant, _message: String) -> void:
+	if success and data is Dictionary:
+		_character_level = int(data.get("level", 1))
+
+func _on_inventory_fetched(success: bool, data: Dictionary, _message: String) -> void:
+	if not success:
+		return
+	var items: Array = data.get("items", [])
+	var count := 0
+	for item in items:
+		if str(item.get("item_def_id", "")) == "minor_health_potion":
+			count += 1
+	_potion_count = count
+	_update_potion_label()
+
+# reward_notification'ın metni her zaman "... Seviye %d, ..." içeriyor
+# (bkz. godot-server/scripts/main.gd → _on_reward_response) — yeni bir
+# RPC alanı eklemeden karakter seviyesini canlı takip etmek için ayrıştırıyoruz.
+func _parse_level_from_message(message: String) -> int:
+	var idx := message.find("Seviye ")
+	if idx == -1:
+		return -1
+	var start := idx + "Seviye ".length()
+	var end := start
+	while end < message.length() and message[end].is_valid_int():
+		end += 1
+	if end == start:
+		return -1
+	return int(message.substr(start, end - start))
 
 func _on_connected_to_server() -> void:
 	_local_player_id = multiplayer.get_unique_id()
@@ -172,6 +260,15 @@ func auth_result(success: bool, message: String) -> void:
 @rpc("authority", "reliable")
 func reward_notification(message: String) -> void:
 	_show_toast(message)
+	var lvl := _parse_level_from_message(message)
+	if lvl != -1:
+		_character_level = lvl
+	if message.find("Düştü: " + POTION_NAME) != -1:
+		_potion_count += 1
+		_update_potion_label()
+	elif message.begins_with("Can iksiri kullandın!"):
+		_potion_count = max(0, _potion_count - 1)
+		_update_potion_label()
 	# Mesaj metni sunucuda zaten "SEVİYE ATLADIN!" ekliyor (bkz.
 	# godot-server/scripts/main.gd → _fetch_reward) — protokole yeni bir
 	# alan eklemeden, mevcut metinden ayırt ediyoruz.
@@ -231,6 +328,8 @@ func ability_cast_notification(caster_name: String, class_id: String) -> void:
 		var pos: Vector2 = get_node(caster_name).global_position
 		var color: Color = Color(1.0, 0.85, 0.3) if class_id == "buyucu" else Color(0.6, 0.8, 1.0)
 		Effects.spawn_burst(self, pos, color, 18, 170.0)
+	if caster_name == str(_local_player_id) and ABILITY_INFO.has(class_id):
+		_ability_ready_at = (Time.get_ticks_msec() / 1000.0) + float(ABILITY_INFO[class_id]["cooldown"])
 
 # position client-otoriter bir alan (movement zaten böyle çalışıyor) —
 # sunucu bizi doğrudan ışınlayamaz, "kendi pozisyonunu buna ayarla" der,
