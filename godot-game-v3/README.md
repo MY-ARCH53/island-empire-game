@@ -630,21 +630,42 @@ görünmemişti):
    (`"Main"`/`"PvpMain"`) — Godot'un yüksek seviye multiplayer API'si spawn
    bilgisini bu isme göre serialize ediyor.
 
-**Sunucu adresi**: şimdilik sadece `127.0.0.1` (`FARM_SERVER_HOST`/
-`PVP_SERVER_HOST` ortam değişkenleriyle override edilebilir). `godot-server`
-henüz bir VPS'e deploy EDİLMEDİ — bu yüzden bu özellik şu an sadece
-editörde/debug build'de, karşılık gelen `godot-server` süreci elle
-(`Godot.exe --headless --path . scenes/Main.tscn --server`) yerelde
-çalışırken oynanabilir. Prod'da gerçekten oynanabilir olması için ayrı bir
-deploy adımı gerekiyor (sıradaki altyapı işi, henüz planlanmadı).
+**Sunucu adresi**: `_server_host()` editörde/debug build'de `127.0.0.1`,
+gerçek (export edilmiş) build'de otomatik olarak prod'a — `islandsempire.com`
+— bağlanır (`backend_bridge.gd → _api_base()` ile birebir aynı desen).
+`FARM_SERVER_HOST`/`PVP_SERVER_HOST` ortam değişkenleriyle her zaman override
+edilebilir (test için, editörden prod'a bağlanmak isterse).
 
-**Doğrulama** (2026-08-13): `test_v2` hesabıyla GERÇEK `godot-game-v3`
-istemcisi (`OnlineFarmMap.tscn`/`OnlinePvpMap.tscn`, benim test script'lerim
-DEĞİL) hem farm hem PvP sunucusuna bağlandı, kimlik doğruladı, spawn oldu,
-saldırdı — farm'da düşman öldürüp ödül aldı (DB'de doğrulandı), PvP'de
-`godot-server`'ın kendi test istemcisiyle (test_v3) karşılıklı savaşıp NP
-kazandı/kaybetti (DB'de doğrulandı). Test sonrası hesaplar temiz duruma
-sıfırlandı.
+**Prod deploy — TAMAMLANDI (2026-08-13)**: `godot-server`, `islandsempire.com`
+VPS'ine (Hostinger, Ubuntu 22.04) deploy edildi. Godot 4.3.stable Linux
+headless binary `/opt/godot/`'a kuruldu, iki PM2 süreci olarak sürekli
+çalışıyor: `kanadasi-farm` (port 9050) ve `kanadasi-pvp` (port 9051) —
+`island-empire-backend` ile aynı VPS'te, `pm2 save` ile reboot'ta da
+otomatik başlayacak şekilde. Firewall'da (Hostinger paneli, Cloud Firewall)
+bu iki port herkese (`Any` kaynak) açık. Eksik olan `online_characters`/
+`item_defs`/`online_inventory`/`online_equipment` tabloları prod Postgres'e
+eklendi + tohumlandı (diğer online-mod tabloları — `resource_transactions`,
+`guilds`, `users.is_admin` vb. — zaten prod'da mevcuttu).
+
+**Doğrulama** (2026-08-13, iki aşamalı):
+1. Yerel: `test_v2` hesabıyla GERÇEK `godot-game-v3` istemcisi
+   (`OnlineFarmMap.tscn`/`OnlinePvpMap.tscn`, benim test script'lerim
+   DEĞİL) hem farm hem PvP sunucusuna bağlandı, kimlik doğruladı, spawn
+   oldu, saldırdı — farm'da düşman öldürüp ödül aldı (DB'de doğrulandı),
+   PvP'de `godot-server`'ın kendi test istemcisiyle (test_v3) karşılıklı
+   savaşıp NP kazandı/kaybetti (DB'de doğrulandı).
+2. Prod: gerçek VPS'te, gerçek internet üzerinden — geçici `deploytest_v2`/
+   `deploytest_v3` hesaplarıyla önce sunucu içinden (loopback) farm+PvP
+   test edildi, sonra bu makineden (Windows) `FARM_SERVER_HOST=
+   islandsempire.com` ile GERÇEK `OnlineFarmMap.tscn`/`OnlinePvpMap.tscn`
+   istemcileri dışarıdan bağlanıp kimlik doğruladı (VPS loglarında peer
+   connect + AUTH_OK doğrulandı). Test sonrası her iki hesap tamamen
+   silindi (cascade ile online_characters de temizlendi).
+
+**Bilinen sınırlama**: Bağlantı hâlâ düz `ws://` (TLS yok) — masaüstü/
+editör oynanabilirliği için sorun değil, ama web export'ta (tarayıcıda)
+`https://` sayfadan `ws://` bağlantısı mixed-content olarak engellenir;
+o zaman `wss://` + sertifika gerekir (ayrı, henüz yapılmamış bir iş).
 
 ## Denge sabitleri (tune edilebilir)
 

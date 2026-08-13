@@ -5,7 +5,8 @@ extends Node2D
 # sunucusuna bağlanıyor — ayrı port, ayrı dedicated süreç).
 
 const PORT := 9051
-const RECONNECT_HOST := "127.0.0.1"
+const LOCAL_HOST := "127.0.0.1"
+const PROD_HOST := "islandsempire.com"
 
 const OnlinePvpPlayerScene := preload("res://scenes/OnlinePvpPlayer.tscn")
 
@@ -17,7 +18,11 @@ var _local_player_id: int = -1
 
 func _server_host() -> String:
 	var override := OS.get_environment("PVP_SERVER_HOST")
-	return override if override != "" else RECONNECT_HOST
+	if override != "":
+		return override
+	if OS.has_feature("editor") or OS.is_debug_build():
+		return LOCAL_HOST
+	return PROD_HOST
 
 # Normalde GameManager.jwt_token kullanılır (gerçek oyuncu akışı). Sadece
 # otomatik test için: --token=<jwt> cmdline argümanı varsa onu kullan.

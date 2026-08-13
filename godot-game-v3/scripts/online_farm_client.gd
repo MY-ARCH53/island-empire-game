@@ -8,12 +8,14 @@ extends Node2D
 # istemcide de aynı şekilde tanımlı olmalı (sunucunun "şu id spawn oldu"
 # mesajını doğru sahneye çevirebilmek için).
 #
-# Sunucu adresi şimdilik SADECE localhost — godot-server henüz bir VPS'e
-# deploy edilmedi (bkz. plans/humble-chasing-galaxy.md, Faz 0). Prod'a
-# deploy edildiğinde _server_host() güncellenmeli.
+# Sunucu adresi: editörde/debug build'de localhost, gerçek (export edilmiş)
+# build'de prod VPS — `backend_bridge.gd → _api_base()` ile aynı desen.
+# `godot-server` 2026-08-13'te islandsempire.com'a deploy edildi (bkz.
+# plans/humble-chasing-galaxy.md).
 
 const PORT := 9050
-const RECONNECT_HOST := "127.0.0.1"
+const LOCAL_HOST := "127.0.0.1"
+const PROD_HOST := "islandsempire.com"
 
 const OnlineRemotePlayerScene := preload("res://scenes/OnlineRemotePlayer.tscn")
 
@@ -25,7 +27,11 @@ var _local_player_id: int = -1
 
 func _server_host() -> String:
 	var override := OS.get_environment("FARM_SERVER_HOST")
-	return override if override != "" else RECONNECT_HOST
+	if override != "":
+		return override
+	if OS.has_feature("editor") or OS.is_debug_build():
+		return LOCAL_HOST
+	return PROD_HOST
 
 # Normalde GameManager.jwt_token kullanılır (gerçek oyuncu akışı). Sadece
 # otomatik test için: --token=<jwt> cmdline argümanı varsa onu kullan

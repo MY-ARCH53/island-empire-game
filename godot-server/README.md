@@ -251,8 +251,36 @@ _on_reward_response` / `pvp_main.gd → _on_pvp_kill_response`).
   test için elle eklendi (`ALTER TABLE users ADD COLUMN IF NOT EXISTS
   is_admin BOOLEAN DEFAULT FALSE`) — prod'da muhtemelen zaten var.
 
+## Prod deploy (2026-08-13) — TAMAMLANDI
+
+`godot-server`, `island-empire-backend` ile aynı VPS'e (`islandsempire.com`,
+Hostinger, Ubuntu 22.04) deploy edildi:
+
+- Godot 4.3.stable Linux headless binary: `/opt/godot/Godot_v4.3-stable_linux.x86_64`
+  (`/usr/local/bin/godot` sembolik linki ile), resmi godotengine GitHub
+  release'inden indirildi — yereldeki Windows sürümüyle birebir aynı versiyon.
+- İki PM2 süreci, `island-empire-backend`'in yanında sürekli çalışıyor:
+  `kanadasi-farm` (port 9050, `scenes/Main.tscn --server`) ve `kanadasi-pvp`
+  (port 9051, `scenes/PvpMain.tscn --server`) — `INTERNAL_SERVER_SECRET`
+  ortam değişkeniyle başlatıldı, `pm2 save` ile reboot'ta otomatik dönüyor.
+- Firewall (Hostinger Cloud Firewall paneli): 9050/9051 TCP, kaynak `Any`
+  — gerçek oyuncular her yerden bağlanabilsin diye (SSH/22 ise sadece
+  deploy makinesinin IP'sine kısıtlı tutuldu).
+- Eksik online-mod tabloları (`online_characters`, `item_defs`,
+  `online_inventory`, `online_equipment`) prod Postgres'e eklendi +
+  tohumlandı — diğerleri (`resource_transactions`, `guilds`,
+  `users.is_admin`) zaten prod'da mevcuttu.
+- `godot-game-v3`'teki istemci script'leri (`_server_host()`) artık
+  editör/debug build'de localhost, gerçek build'de otomatik olarak
+  `islandsempire.com`'a bağlanıyor.
+- **Doğrulama**: hem sunucu içinden (loopback) hem DIŞARIDAN (gerçek
+  internet üzerinden, bu makineden) geçici test hesaplarıyla farm+PvP
+  uçtan uca test edildi, sonra hesaplar tamamen silindi. Detaylar
+  `godot-game-v3/README.md` → "gerçek multiplayer haritalarına giriş"
+  bölümünde.
+
 ## Sıradaki adım
 
-Plan'ın 6 fazı da tamamlandı. Kalan tek şey **prod deploy'u** — `godot-server`
-henüz bir VPS'e deploy edilmedi (bkz. `godot-game-v3/README.md`
-"oynanabilirlik" bölümü), bu ayrı bir altyapı işi, henüz planlanmadı.
+Plan'ın 6 fazı ve prod deploy'u da tamamlandı. Bilinen tek sınırlama:
+bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı desteği istenirse
+`wss://` + sertifika ayrı bir iş olarak gerekecek.
