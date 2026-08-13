@@ -1506,6 +1506,32 @@ class AdminController {
           WHERE b.battle_type = 'pirate'
             AND b.created_at >= CURRENT_DATE
           GROUP BY b.attacker_id
+        ),
+        -- Faz 6 — "Kan Adası: Online" (godot-server üzerinden gelen farm/PvP
+        -- öldürmeleri) aynı şüphe analizine dahil edildi. Kaynak veri:
+        -- backend/src/controllers/internal.controller.js → logKillTransaction.
+        online_kill_stats AS (
+          SELECT
+            rt.user_id,
+            COUNT(*)::int AS online_kills_today,
+            CASE WHEN COUNT(*) > 1
+              THEN ROUND(
+                EXTRACT(EPOCH FROM (MAX(rt.created_at) - MIN(rt.created_at)))
+                / NULLIF(COUNT(*) - 1, 0)
+              )
+              ELSE NULL
+            END AS online_avg_interval_sec
+          FROM resource_transactions rt
+          WHERE rt.source IN ('online_farm_kill', 'online_pvp_kill')
+            AND rt.created_at >= CURRENT_DATE
+          GROUP BY rt.user_id
+        ),
+        online_flag_stats AS (
+          SELECT rt.user_id, COUNT(*)::int AS online_flags_today
+          FROM resource_transactions rt
+          WHERE rt.source = 'online_anticheat_flag'
+            AND rt.created_at >= CURRENT_DATE
+          GROUP BY rt.user_id
         )
         SELECT
           u.id,
@@ -1519,22 +1545,34 @@ class AdminController {
           ast.last_attack_at,
           COALESCE(bs.pirate_battles_today, 0)          AS pirate_battles_today,
           COALESCE(bs.gold_earned_today, 0)             AS gold_earned_today,
+          COALESCE(oks.online_kills_today, 0)           AS online_kills_today,
+          oks.online_avg_interval_sec,
+          COALESCE(ofs.online_flags_today, 0)           AS online_flags_today,
           -- Şüphe skoru: düşük aralık + yüksek saldırı + yüksek reset
           (
             CASE WHEN COALESCE(ast.avg_interval_sec, 999) < 5  THEN 40 ELSE 0 END +
             CASE WHEN COALESCE(ast.avg_interval_sec, 999) < 10 THEN 20 ELSE 0 END +
             CASE WHEN COALESCE(ast.attacks_today, 0) > 30       THEN 20 ELSE 0 END +
             CASE WHEN COALESCE(u.daily_ad_resets, 0) >= 3       THEN 10 ELSE 0 END +
-            CASE WHEN COALESCE(bs.gold_earned_today, 0) > 500000 THEN 10 ELSE 0 END
+            CASE WHEN COALESCE(bs.gold_earned_today, 0) > 500000 THEN 10 ELSE 0 END +
+            CASE WHEN COALESCE(oks.online_avg_interval_sec, 999) < 1 THEN 40 ELSE 0 END +
+            CASE WHEN COALESCE(oks.online_avg_interval_sec, 999) < 2 THEN 20 ELSE 0 END +
+            CASE WHEN COALESCE(oks.online_kills_today, 0) > 200      THEN 20 ELSE 0 END +
+            CASE WHEN COALESCE(ofs.online_flags_today, 0) > 0        THEN 30 ELSE 0 END
           )                                             AS suspicion_score
         FROM users u
-        LEFT JOIN attack_stats ast ON ast.user_id = u.id
-        LEFT JOIN battle_stats bs  ON bs.user_id  = u.id
+        LEFT JOIN attack_stats ast      ON ast.user_id = u.id
+        LEFT JOIN battle_stats bs       ON bs.user_id  = u.id
+        LEFT JOIN online_kill_stats oks ON oks.user_id = u.id
+        LEFT JOIN online_flag_stats ofs ON ofs.user_id = u.id
         WHERE (u.is_bot = FALSE OR u.is_bot IS NULL)
           AND (
             COALESCE(ast.attacks_today, 0) > 15
             OR COALESCE(ast.avg_interval_sec, 999) < 10
             OR COALESCE(u.daily_ad_resets, 0) >= 2
+            OR COALESCE(oks.online_kills_today, 0) > 100
+            OR COALESCE(oks.online_avg_interval_sec, 999) < 2
+            OR COALESCE(ofs.online_flags_today, 0) > 0
           )
         ORDER BY suspicion_score DESC, pirate_battles_today DESC
         LIMIT 100

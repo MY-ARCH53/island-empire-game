@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://tjllst7ln30y"]
+[gd_scene load_steps=5 format=3 uid="uid://tjllst7ln30y"]
 
 [ext_resource type="Script" path="res://scripts/main_menu.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/shop_screen.gd" id="2"]
@@ -48,8 +48,8 @@ autowrap_mode = 3
 
 [node name="SelectedCharacterRow" type="HBoxContainer" parent="Center/VBox"]
 layout_mode = 2
-alignment = 1
 theme_override_constants/separation = 8
+alignment = 1
 
 [node name="Portrait" type="TextureRect" parent="Center/VBox/SelectedCharacterRow"]
 custom_minimum_size = Vector2(48, 48)
@@ -208,8 +208,8 @@ horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="ClassSelectBox" type="VBoxContainer" parent="OnlineHub/Center/Panel/VBox"]
-layout_mode = 2
 visible = false
+layout_mode = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="OnlineHub/Center/Panel/VBox/ClassSelectBox"]
 custom_minimum_size = Vector2(0, 340)
@@ -220,8 +220,8 @@ custom_minimum_size = Vector2(560, 0)
 layout_mode = 2
 
 [node name="CharacterBox" type="VBoxContainer" parent="OnlineHub/Center/Panel/VBox"]
-layout_mode = 2
 visible = false
+layout_mode = 2
 
 [node name="InfoLabel" type="Label" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
 layout_mode = 2
@@ -230,9 +230,9 @@ autowrap_mode = 3
 
 [node name="EquippedLabel" type="Label" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 14
 horizontal_alignment = 1
 autowrap_mode = 3
-theme_override_font_sizes/font_size = 14
 
 [node name="MapButtonsRow" type="HBoxContainer" parent="OnlineHub/Center/Panel/VBox/CharacterBox"]
 layout_mode = 2

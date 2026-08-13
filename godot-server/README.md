@@ -1,4 +1,4 @@
-# Kan Adası: Online — Sunucu (Faz 0 + Faz 2 + Faz 3 + Faz 4 + Faz 5)
+# Kan Adası: Online — Sunucu (Faz 0 + Faz 2 + Faz 3 + Faz 4 + Faz 5 + Faz 6)
 
 Bu, "Kan Adası: Online" çok oyunculu genişlemesinin (bkz. plan:
 `C:\Users\musta\.claude\plans\humble-chasing-galaxy.md`) **headless Godot
@@ -205,6 +205,54 @@ oradan ayrıca uçtan uca test edilmedi — mekanizma (rpc_id stub
 gereksinimi) playability geçişinde zaten kanıtlanmıştı, risk düşük
 görüldü.
 
+## Anti-hile sağlamlaştırma (Faz 6, planın son fazı)
+
+Bu faz tamamen backend tarafında — godot-server/godot-game-v3'te hiçbir
+değişiklik gerekmedi (yanıt kodu 200 olmayan her `HTTPRequest` çağrısı
+zaten sessizce "başarısız" olarak ele alınıyordu, bkz. `main.gd →
+_on_reward_response` / `pvp_main.gd → _on_pvp_kill_response`).
+
+- **Hız tabanı** (`backend/src/controllers/internal.controller.js`):
+  Godot sunucusu kendi tarafında zaten `ATTACK_COOLDOWN` (0.6s)
+  uyguluyor; `MIN_KILL_INTERVAL_MS = 300` bağımsız, İKİNCİ bir taban —
+  süreç bazlı bellek içi bir `Map` (`_lastKillAt`) ile, aynı kullanıcı
+  için 300ms'den kısa aralıklı `reward-kill`/`pvp-kill` çağrıları
+  `429` ile reddedilir. Tek başına yeterli değil (restart'ta sıfırlanır),
+  mevcut `MAX_SILVER_PER_KILL`/`MAX_XP_PER_KILL` tavanlarıyla birlikte
+  çalışan bir savunma katmanı.
+- **Denetim kaydı**: Her başarılı `reward-kill` (`source='online_farm_kill'`)
+  ve `pvp-kill` (`source='online_pvp_kill'`, hem katil hem kurban için ayrı
+  satır) artık `resource_transactions` tablosuna yazılıyor — mevcut
+  minigame/production loglama deseniyle birebir aynı
+  (`INSERT ... .catch(() => {})`, ana akışı asla bloklamıyor). Reddedilen
+  (çok hızlı) denemeler de `source='online_anticheat_flag'` ile loglanıyor.
+- **Şüpheli Oyuncular paneli genişletildi**: `admin.controller.js →
+  getSuspiciousPlayers` (Admin2 → "🚨 Şüpheli Oyuncular" sekmesi) artık
+  online farm/PvP aktivitesini de aynı şüphe skoruna dahil ediyor —
+  düşük ortalama öldürme aralığı (<1s / <2s), günde >200 öldürme, veya
+  herhangi bir anti-hile bayrağı, ana oyunun mevcut saldırı-hızı
+  sezgileriyle aynı ağırlıklandırma felsefesiyle skora ekleniyor.
+  Frontend (`Admin2Page.tsx`) tabloya "Online Öldürme"/"Online Ort.
+  Aralık"/"Anti-Hile Bayrağı" kolonlarını ekledi.
+- **Doğrulama**: Hız tabanı + loglama curl ile uçtan uca doğrulandı
+  (art arda `reward-kill`/`pvp-kill` çağrıları, ikincisi `429` ile
+  reddedildi, `resource_transactions`'da hem başarı hem `flag` satırları
+  doğru içerikle görüldü). Yeni SQL fragmanı (`online_kill_stats`/
+  `online_flag_stats` CTE'leri) izole olarak test edildi ve doğru sonuç
+  verdi (2 öldürme, ~1s ortalama aralık, 1 bayrak — beklenenle birebir
+  eşleşti). **Not**: `getSuspiciousPlayers` endpoint'inin TAMAMI yerel
+  ortamda uçtan uca çalıştırılamadı — `pirate_attacks` tablosu (ana
+  oyunun saldırı-hızı analizi için kullanılan, bu Faz'dan tamamen
+  bağımsız, önceden var olan bir bağımlılık) bu yerel Postgres'te yok
+  (muhtemelen sadece prod'da var, `resource_transactions`/
+  `minigame_progress` gibi elle eklenen diğer tablolarla aynı durum).
+  Bu, benim değişikliğimin bir sonucu değil — mevcut bir yerel-ortam
+  eksikliği. `is_admin` sütunu da `users` tablosunda yerel olarak eksikti,
+  test için elle eklendi (`ALTER TABLE users ADD COLUMN IF NOT EXISTS
+  is_admin BOOLEAN DEFAULT FALSE`) — prod'da muhtemelen zaten var.
+
 ## Sıradaki adım
 
-Faz 6 — anti-hile sağlamlaştırma (bkz. plan).
+Plan'ın 6 fazı da tamamlandı. Kalan tek şey **prod deploy'u** — `godot-server`
+henüz bir VPS'e deploy edilmedi (bkz. `godot-game-v3/README.md`
+"oynanabilirlik" bölümü), bu ayrı bir altyapı işi, henüz planlanmadı.

@@ -574,7 +574,7 @@ export default function Admin2Page() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
             <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: '10px 16px', fontSize: 12, color: '#fca5a5', flex: 1 }}>
-              🚨 Bu tablo <strong>bugünkü veriye</strong> dayanır. Şüphe skoru: düşük saldırı aralığı + yüksek saldırı sayısı + yüksek reklam reset. <strong>Kırmızı (&gt;60)</strong> = bot ihtimali yüksek.
+              🚨 Bu tablo <strong>bugünkü veriye</strong> dayanır (ana oyun saldırıları + Kan Adası: Online farm/PvP öldürmeleri). Şüphe skoru: düşük saldırı/öldürme aralığı + yüksek sayı + yüksek reklam reset + anti-hile bayrağı. <strong>Kırmızı (&gt;60)</strong> = bot ihtimali yüksek.
             </div>
             <button onClick={() => { setSuspicious([]); fetchSuspicious(); }} disabled={suspiciousLoading}
               style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#334155', color: '#e2e8f0', cursor: 'pointer', fontSize: 13 }}>
@@ -596,7 +596,8 @@ export default function Admin2Page() {
                   <tr style={{ background: '#1e293b' }}>
                     {[
                       'Şüphe Skoru', 'Kullanıcı', 'Bugün Saldırı', 'Ort. Aralık (sn)',
-                      'İlk Saldırı', 'Son Saldırı', 'Reklam Reset', 'Kazanılan Altın', 'Son Görülen'
+                      'İlk Saldırı', 'Son Saldırı', 'Reklam Reset', 'Kazanılan Altın',
+                      'Online Öldürme', 'Online Ort. Aralık (sn)', 'Anti-Hile Bayrağı', 'Son Görülen'
                     ].map(h => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: '#94a3b8', whiteSpace: 'nowrap', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.4px', borderBottom: '1px solid #334155' }}>{h}</th>
                     ))}
@@ -647,6 +648,25 @@ export default function Admin2Page() {
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'right', color: '#fbbf24', fontVariantNumeric: 'tabular-nums' }}>
                           {fmt(p.gold_earned_today)}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 'bold', color: p.online_kills_today > 200 ? '#ef4444' : '#94a3b8' }}>
+                          {p.online_kills_today || 0}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 'bold', color: p.online_avg_interval_sec == null ? '#64748b' : p.online_avg_interval_sec < 1 ? '#ef4444' : p.online_avg_interval_sec < 2 ? '#f59e0b' : '#34d399' }}>
+                          {p.online_avg_interval_sec != null ? (
+                            <span title={p.online_avg_interval_sec < 1 ? '⚠️ Bot şüphesi: Kan Adası: Online\'da çok hızlı öldürme' : ''}>
+                              {p.online_avg_interval_sec < 1 ? '🤖 ' : ''}{p.online_avg_interval_sec}s
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          <span style={{
+                            background: p.online_flags_today > 0 ? '#ef444422' : '#1e293b',
+                            color: p.online_flags_today > 0 ? '#ef4444' : '#94a3b8',
+                            borderRadius: 4, padding: '2px 8px', fontWeight: p.online_flags_today > 0 ? 'bold' : 'normal',
+                          }}>
+                            {p.online_flags_today || 0}
+                          </span>
                         </td>
                         <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap', fontSize: 11 }}>{ago(p.last_seen)}</td>
                       </tr>

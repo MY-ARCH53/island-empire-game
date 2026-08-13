@@ -13,6 +13,35 @@ const MAX_XP_PER_KILL = 200;
 const PVP_NP_GAIN = 50;
 const PVP_NP_LOSS = 50;
 
+// Faz 6 — anti-hile sağlamlaştırma. Godot sunucusu kendi tarafında zaten
+// ATTACK_COOLDOWN (0.6s) uyguluyor; bu, ağ jitter'ı için pay bırakan ama
+// yine de fiziksel olarak imkansız bir hızı yakalayan İKİNCİ, bağımsız bir
+// taban — tek bir ele geçirilmiş/hatalı godot-server süreci reward-kill'i
+// spam edemesin diye (bkz. dosya başı: internal endpoint'lere bile tam
+// güvenilmiyor). Süreç bazlı bellek içi — restart'ta sıfırlanır, tek
+// başına yeterli değil, MAX_SILVER/XP_PER_KILL tavanlarıyla birlikte çalışır.
+const MIN_KILL_INTERVAL_MS = 300;
+const _lastKillAt = new Map(); // userId -> ms epoch
+
+// Şüpheli davranışı loglar — Admin2 → "Şüpheli Oyuncular" panelinin
+// (admin.controller.js → getSuspiciousPlayers) okuduğu resource_transactions
+// tablosuna yazılır, mevcut minigame/production loglama deseniyle aynı.
+async function logKillTransaction(userId, resourceType, amount, source, meta) {
+  await query(
+    `INSERT INTO resource_transactions (user_id, resource_type, amount, source, meta)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, resourceType, amount, source, JSON.stringify(meta)]
+  ).catch(() => {});
+}
+
+// true dönerse çağrı çok hızlı geldi demektir (reddedilmeli + loglanmalı).
+function isTooFast(userId) {
+  const now = Date.now();
+  const last = _lastKillAt.get(userId);
+  _lastKillAt.set(userId, now);
+  return last != null && (now - last) < MIN_KILL_INTERVAL_MS;
+}
+
 function xpNeededForLevel(level) {
   return 50 + level * 30;
 }
@@ -70,6 +99,13 @@ class InternalController {
         return res.status(400).json({ success: false, message: 'Geçersiz userId' });
       }
 
+      if (isTooFast(userId)) {
+        await logKillTransaction(userId, 'flag', 0, 'online_anticheat_flag', {
+          reason: 'reward_kill_too_fast', minIntervalMs: MIN_KILL_INTERVAL_MS,
+        });
+        return res.status(429).json({ success: false, message: 'Çok hızlı öldürme isteği' });
+      }
+
       const charRes = await query(
         'SELECT level, xp, silver FROM online_characters WHERE user_id = $1',
         [userId]
@@ -107,6 +143,10 @@ class InternalController {
         }
       }
 
+      await logKillTransaction(userId, 'silver', silver, 'online_farm_kill', {
+        xp, itemDefId: droppedItem ? droppedItem.id : null, leveledUp,
+      });
+
       res.json({
         success: true,
         data: {
@@ -133,6 +173,13 @@ class InternalController {
       }
       if (killerUserId === victimUserId) {
         return res.status(400).json({ success: false, message: 'Kendi kendini öldüremezsin' });
+      }
+
+      if (isTooFast(killerUserId)) {
+        await logKillTransaction(killerUserId, 'flag', 0, 'online_anticheat_flag', {
+          reason: 'pvp_kill_too_fast', minIntervalMs: MIN_KILL_INTERVAL_MS, victimUserId,
+        });
+        return res.status(429).json({ success: false, message: 'Çok hızlı öldürme isteği' });
       }
 
       // Faz 5 — aynı klan üyeleri birbirinden NP çalamaz (godot-server zaten
@@ -162,6 +209,9 @@ class InternalController {
 
       await query('UPDATE online_characters SET np = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2', [newKillerNp, killerUserId]);
       await query('UPDATE online_characters SET np = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2', [newVictimNp, victimUserId]);
+
+      await logKillTransaction(killerUserId, 'np', PVP_NP_GAIN, 'online_pvp_kill', { victimUserId, role: 'killer' });
+      await logKillTransaction(victimUserId, 'np', -PVP_NP_LOSS, 'online_pvp_kill', { killerUserId, role: 'victim' });
 
       res.json({
         success: true,
