@@ -26,14 +26,33 @@ var health: float
 var _spawn_position: Vector2
 var _last_contact_time: float = -999.0
 
+# Faz D — vebali'nin "Zehir Bulutu" yeteneği (bkz. main.gd → _ability_vebali).
+var _poison_ticks_left: int = 0
+var _poison_tick_damage: float = 0.0
+var _poison_source_peer_id: int = -1
+var _poison_timer: float = 0.0
+
 func _ready() -> void:
 	health = max_health
 	_spawn_position = position
 	var visual: ColorRect = $Visual
 	visual.color = Color(0.75, 0.25, 0.2, 1.0)
 
-func _process(_delta: float) -> void:
+func apply_poison(ticks: int, tick_damage: float, source_peer_id: int) -> void:
+	_poison_ticks_left = ticks
+	_poison_tick_damage = tick_damage
+	_poison_source_peer_id = source_peer_id
+	_poison_timer = 0.0
+
+func _process(delta: float) -> void:
 	$Label.text = enemy_type.capitalize() + (" [ELİT]" if is_elite else "")
+	if not is_multiplayer_authority() or health <= 0.0 or _poison_ticks_left <= 0:
+		return
+	_poison_timer += delta
+	if _poison_timer >= 1.0:
+		_poison_timer = 0.0
+		_poison_ticks_left -= 1
+		take_damage(_poison_tick_damage, _poison_source_peer_id)
 
 # Düşmanlar spawner.spawn()/add_child() ile eklenirken hiç
 # set_multiplayer_authority() çağrılmıyor, o yüzden varsayılan otorite peer 1

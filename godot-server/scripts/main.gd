@@ -76,6 +76,10 @@ const ABILITY_POWER_MULT_BY_TIER := [1.0, 1.3, 1.6, 2.0]
 const ABILITIES := {
 	"koylu":  {"cooldown": 20.0, "name": "Sağlam Duruş",   "base_armor": 15.0, "duration": 6.0},
 	"buyucu": {"cooldown": 8.0,  "name": "Büyü Patlaması", "base_damage": 25.0, "radius": 100.0},
+	"kilic_ustasi": {"cooldown": 6.0, "name": "Kasırga Darbesi", "base_damage": 30.0, "radius": 70.0},
+	"firtina_rahibesi": {"cooldown": 15.0, "name": "Şifa Dalgası", "base_heal": 30.0, "radius": 150.0},
+	"vebali": {"cooldown": 10.0, "name": "Zehir Bulutu", "base_damage": 8.0, "tick_damage": 4.0, "ticks": 5, "radius": 90.0},
+	"firtina_avcisi": {"cooldown": 7.0, "name": "Şimşek Hamlesi", "base_damage": 20.0, "chain_radius": 80.0, "chain_mult": 0.5},
 }
 
 const SLOTS := ["weapon", "armor", "shield"]
@@ -517,16 +521,30 @@ func request_use_ability() -> void:
 			_ability_koylu(sender_id, cfg, power_mult)
 		"buyucu":
 			_ability_buyucu(sender_id, cfg, power_mult)
+		"kilic_ustasi":
+			_ability_kilic_ustasi(sender_id, cfg, power_mult)
+		"firtina_rahibesi":
+			_ability_firtina_rahibesi(sender_id, cfg, power_mult)
+		"vebali":
+			_ability_vebali(sender_id, cfg, power_mult)
+		"firtina_avcisi":
+			_ability_firtina_avcisi(sender_id, cfg, power_mult, tier_index)
 
-# Büyü Patlaması — çevredeki tüm düşmanlara alan hasarı. Mevcut
-# take_damage/died altyapısını bedava kullanıyor (ödül/drop zaten oradan
-# akıyor).
-func _ability_buyucu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+# Çevredeki tüm düşmanlara alan hasarı — buyucu ve kilic_ustasi'nin ikisi
+# de aynı şekli kullanıyor (sadece sayılar farklı), tek yardımcıda
+# birleştirildi. Mevcut take_damage/died altyapısını bedava kullanıyor
+# (ödül/drop zaten oradan akıyor).
+func _ability_aoe_damage(sender_id: int, dmg: float, radius: float) -> void:
 	var caster: Node2D = get_node(str(sender_id))
-	var dmg: float = float(cfg["base_damage"]) * power_mult
 	for child in get_children():
-		if child.name.begins_with("enemy_") and caster.position.distance_to(child.position) <= float(cfg["radius"]):
+		if child.name.begins_with("enemy_") and caster.position.distance_to(child.position) <= radius:
 			child.take_damage(dmg, sender_id)
+
+func _ability_buyucu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]) * power_mult, float(cfg["radius"]))
+
+func _ability_kilic_ustasi(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]) * power_mult, float(cfg["radius"]))
 
 # Sağlam Duruş — geçici zırh bonusu (bkz. _on_enemy_attacked_player'daki
 # hasar formülüne entegrasyon).
@@ -536,6 +554,83 @@ func _ability_koylu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
 		"amount": float(cfg["base_armor"]) * power_mult,
 		"expires_at": now + float(cfg["duration"]),
 	}
+
+# Şifa Dalgası — kendini + (partideyse) yarıçaptaki parti üyelerini
+# iyileştirir. Mevcut _party_members() (şimdiye kadar sadece ödül
+# paylaşımı için kullanılıyordu) ilk kez oyuncunun anlık hissedeceği bir
+# şeye dönüşüyor.
+func _ability_firtina_rahibesi(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var heal: float = float(cfg["base_heal"]) * power_mult
+	var radius: float = float(cfg["radius"])
+	var targets: Array = [sender_id]
+	if _party_of.has(sender_id):
+		for pid in _party_members(_party_of[sender_id]):
+			if pid != sender_id:
+				targets.append(pid)
+	for pid in targets:
+		var pname := str(pid)
+		if not has_node(pname):
+			continue
+		var p: Node2D = get_node(pname)
+		if pid != sender_id and p.position.distance_to(caster.position) > radius:
+			continue
+		p.health = min(p.max_health, p.health + heal)
+		_broadcast_health(pname, p.health)
+
+# Zehir Bulutu — anlık ilk hasar + yarıçaptaki tüm düşmanlara zamana
+# yayılı ek hasar (DOT). Tik sayacı farm_enemy.gd → apply_poison()'da,
+# take_damage'ı tekrar tekrar çağırıyor (ödül/ölüm zaten o yoldan akıyor).
+func _ability_vebali(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var initial_dmg: float = float(cfg["base_damage"]) * power_mult
+	var tick_dmg: float = float(cfg["tick_damage"]) * power_mult
+	var radius: float = float(cfg["radius"])
+	for child in get_children():
+		if child.name.begins_with("enemy_") and caster.position.distance_to(child.position) <= radius:
+			child.take_damage(initial_dmg, sender_id)
+			if child.has_method("apply_poison"):
+				child.apply_poison(int(cfg["ticks"]), tick_dmg, sender_id)
+
+# Şimşek Hamlesi — en yakın düşmana ışınlanıp vurur. position client-
+# otoriter olduğundan (bkz. respawn_teleport'taki aynı gotcha, Faz B)
+# sunucu burada caster.position'ı DOĞRUDAN değiştirse bile gerçek
+# istemciye yansımaz — ability_teleport RPC'siyle istemciye "kendi
+# pozisyonunu buna ayarla" deniyor. Zincir (2. hedefe %50 hasar) SADECE
+# tier≥1 (Seviye 20+) açılıyor — güç artışı değil, YETENEK ŞEKLİ değişimi.
+func _ability_firtina_avcisi(sender_id: int, cfg: Dictionary, power_mult: float, tier_index: int) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var nearest: Node2D = null
+	var nearest_dist := INF
+	for child in get_children():
+		if child.name.begins_with("enemy_"):
+			var d: float = caster.position.distance_to(child.position)
+			if d < nearest_dist:
+				nearest_dist = d
+				nearest = child
+	if nearest == null:
+		return
+	var dir: Vector2 = (caster.position - nearest.position).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	var new_pos: Vector2 = nearest.position + dir * ATTACK_RANGE
+	caster.position = new_pos
+	if multiplayer.get_peers().has(sender_id):
+		rpc_id(sender_id, "ability_teleport", new_pos)
+	var dmg: float = float(cfg["base_damage"]) * power_mult
+	nearest.take_damage(dmg, sender_id)
+	if tier_index >= 1:
+		var chain_radius: float = float(cfg["chain_radius"])
+		var chain_dmg: float = dmg * float(cfg["chain_mult"])
+		for child in get_children():
+			if child.name.begins_with("enemy_") and child != nearest and nearest.position.distance_to(child.position) <= chain_radius:
+				child.take_damage(chain_dmg, sender_id)
+
+@rpc("authority", "reliable")
+func ability_teleport(new_position: Vector2) -> void:
+	var me_name := str(_local_player_id)
+	if has_node(me_name):
+		get_node(me_name).position = new_position
 
 @rpc("authority", "reliable")
 func ability_cast_notification(caster_name: String, class_id: String) -> void:

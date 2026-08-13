@@ -242,6 +242,14 @@ func respawn_teleport(new_position: Vector2) -> void:
 	if has_node(me_name):
 		get_node(me_name).position = new_position
 
+# Faz D — Şimşek Hamlesi'nin ışınlanma kısmı, respawn_teleport'la aynı
+# client-otoriter position gotcha'sı (bkz. main.gd → _ability_firtina_avcisi).
+@rpc("authority", "reliable")
+func ability_teleport(new_position: Vector2) -> void:
+	var me_name := str(_local_player_id)
+	if has_node(me_name):
+		get_node(me_name).position = new_position
+
 # Tek bir StatusLabel'ı sürekli üst üste yazan mesajlarla doldurmak yerine
 # (parti daveti gibi önemli bir mesaj, hemen ardından gelen bir ödül
 # bildirimiyle fark edilmeden silinebiliyordu) — solup giden ayrı bir
