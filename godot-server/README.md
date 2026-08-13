@@ -319,9 +319,61 @@ ile doğrudan test edildi. Ekran görüntüsüyle Tier4'teki elit
 sprite+tonun (kırmızımsı) doğru render olduğu, kamera düzeltmesinin
 çalıştığı görsel olarak onaylandı.
 
+## Farm Derinliği: can barları + mob hasarı + iksir + sınıf yetenekleri (2026-08-13)
+
+Knight Online'dan ilham alan, farm haritasını "çok ilkel" olmaktan
+çıkaran 5 fazlı bir genişleme (bkz. `plans/humble-chasing-galaxy.md`).
+Hepsi gerçek istemci testleriyle doğrulandı, henüz VPS'e deploy
+edilmedi (bkz. `project_pending_work` hafıza notu).
+
+- **Faz A — mob can barları**: `Label` düğümü vardı ama `.text` hiç set
+  edilmiyordu (ölü kod). Artık isim + `[ELİT]` etiketi + `HealthBar`
+  (`ProgressBar`) gösteriliyor.
+- **Faz B — düşman hasarı + oyuncu canı**: düşmanlar artık en yakın
+  oyuncuyu kovalayıp (`AGGRO_RANGE=220`, `LEASH_RANGE=300`) temas
+  hasarı veriyor (`CONTACT_RANGE=40`, `CONTACT_COOLDOWN=1.2s`, bölge/tipe
+  göre ölçekli `damage_mult`). Farm modunda ilk kez oyuncu canı var
+  (`BASE_MAX_HEALTH=120`) — PvP'deki ephemeral/RPC-broadcast deseni
+  birebir kopyalandı (health hiç replike edilmiyor, DB'ye hiç
+  yazılmıyor). Ölümde ceza yok, sadece başlangıç bölgesine ışınlanma +
+  2sn dokunulmazlık. **İki gerçek bug bulunup düzeltildi**: (1)
+  `int(target.name)` StringName→int hatası verip sinyal hiç ateşlemiyordu;
+  (2) `position` client-otoriter olduğundan sunucu oyuncuyu doğrudan
+  ışınlayamıyordu (`respawn_teleport` RPC'siyle çözüldü — aynı gotcha
+  yeteneklerin ışınlanma kısmında da tekrar çıktı, `ability_teleport`
+  RPC'siyle çözüldü). Ayrıca `max_health_bonus`'un sadece sunucunun kendi
+  kopyasına yazılıp gerçek istemciye hiç ulaşmadığı bulundu — **PvP'de de
+  aynı bug vardı**, orada da düzeltildi.
+- **Faz C — can iksiri**: %15 şansla (eşya düşmesiyle karşılıklı
+  dışlayıcı) "Küçük Can İksiri" düşüyor, H tuşuyla kullanılıyor. Backend
+  en eski envanter satırını FIFO seçip siliyor. `item_defs.slot`'un
+  CHECK constraint'i `consumable` kabul edecek şekilde genişletildi
+  (yerel DB'ye uygulandı — bu, `rarity` gibi serbest bir alan DEĞİLDİ,
+  gerçek bir `ALTER TABLE` gerekti).
+- **Faz D — sınıfa özgü yetenekler**: R tuşuyla kullanılan, her 10
+  seviyede güçlenen (4 kademe, seviye 40 tavan) 6 farklı aktif yetenek —
+  köylü (geçici zırh), büyücü/kılıç ustası (alan hasarı), fırtına
+  rahibesi (kendini+parti iyileştirme, mevcut parti altyapısının ilk
+  anlık kullanımı), vebalı (ilk hasar + 5 tikli zehir DOT'u, yeni
+  per-enemy state), fırtına avcısı (ışınlanma+vuruş, seviye 20+'da
+  zincirleme). v1'de sadece farm, PvP'ye eklenmedi (yetenekler
+  farm_enemy/parti altyapısını kullanıyor, PvP'nin kendi NP bahis modeli
+  var). **Bulunan bug**: seviye, sadece bağlantı anında set ediliyordu,
+  oturum içi seviye atlamalar hiç yansımıyordu — düzeltildi, gerçek bir
+  grind testiyle (curl ile backend'i doğrudan çağırmak yetmiyor, sunucu
+  o çağrıdan habersiz kalıyor) kanıtlandı.
+
+**Doğrulama**: her fazda gerçek istemci + ekran görüntüsü/log ile test
+edildi. Hasar/heal sayıları formülle birebir eşleşti (ör. kilic_ustasi
+-39 = 30×1.3, avcı -26 = 20×1.3, koylu zırhıyla hasar 11.7→1.0). Zırhlı/
+zırhsız karşılaştırmalı test armor_bonus'un doğru uygulandığını kanıtladı.
+
 ## Sıradaki adım
 
-Plan'ın 6 fazı, prod deploy'u ve bölgeli farm haritası tamamlandı.
-Bilinen tek sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/
-tarayıcı desteği istenirse `wss://` + sertifika ayrı bir iş olarak
-gerekecek.
+Plan'ın 6 fazı, prod deploy'u, bölgeli farm haritası VE Farm Derinliği
+genişlemesi tamamlandı. Farm Derinliği henüz VPS'e deploy edilmedi —
+deploy edilirken standart akışa ek olarak `item_defs_slot_check`
+constraint'inin prod Postgres'te de güncellenmesi gerekiyor (bkz.
+`backend/scripts/seed_online_items.sql`). Bilinen tek sınırlama:
+bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı desteği
+istenirse `wss://` + sertifika ayrı bir iş olarak gerekecek.
