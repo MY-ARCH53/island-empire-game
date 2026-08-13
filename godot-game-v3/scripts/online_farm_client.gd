@@ -63,6 +63,7 @@ func _resolve_jwt() -> String:
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	leave_button.pressed.connect(leave_map)
+	Audio.play_music("farm")
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client("ws://%s:%d" % [_server_host(), PORT])
 	if err != OK:
@@ -109,6 +110,7 @@ func _on_connection_failed() -> void:
 
 func _on_server_disconnected() -> void:
 	status_label.text = "Sunucu bağlantısı koptu."
+	Audio.stop_music()
 
 func _spawn_player(data: Dictionary) -> Node2D:
 	var id: int = int(data["id"])
@@ -158,14 +160,26 @@ func auth_result(success: bool, message: String) -> void:
 @rpc("authority", "reliable")
 func reward_notification(message: String) -> void:
 	_show_toast(message)
+	# Mesaj metni sunucuda zaten "SEVİYE ATLADIN!" ekliyor (bkz.
+	# godot-server/scripts/main.gd → _fetch_reward) — protokole yeni bir
+	# alan eklemeden, mevcut metinden ayırt ediyoruz.
+	if message.find("SEVİYE ATLADIN") != -1:
+		Audio.play("levelup")
+		var me_name := str(_local_player_id)
+		if has_node(me_name):
+			Effects.spawn_burst(self, get_node(me_name).position, Color(1.0, 0.9, 0.4), 22, 190.0)
+	else:
+		Audio.play("pickup", -6.0)
 
 @rpc("authority", "reliable")
 func party_invite_received(inviter_class: String) -> void:
 	_show_toast("%s seni partiye davet etti — kabul için O'ya bas." % inviter_class)
+	Audio.play("ui_click", -6.0)
 
 @rpc("authority", "reliable")
 func party_update(text: String) -> void:
 	_show_toast(text)
+	Audio.play("ui_click", -8.0)
 
 @rpc("authority", "reliable")
 func party_error(message: String) -> void:
@@ -185,6 +199,7 @@ func _show_toast(text: String) -> void:
 	_toast_tween.tween_property(toast_label, "modulate:a", 0.0, TOAST_FADE_SEC)
 
 func leave_map() -> void:
+	Audio.stop_music()
 	if multiplayer.multiplayer_peer:
 		multiplayer.multiplayer_peer.close()
 	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")

@@ -755,6 +755,73 @@ doğrulandı. `godot-server`'ın kendi görselleri (placeholder) bu işin
 kapsamı DIŞINDA bırakıldı — sadece gerçek oyuncu istemcisi (`godot-game-v3`)
 cilalandı.
 
+## Online mod ses + görsel efekt geçişi (2026-08-13)
+
+Tek oyunculu roguelite'ta zaten hazır bir SFX/parçacık altyapısı vardı
+(`Audio`/`Effects` autoload'ları, `scripts/enemy.gd`/`player.gd`'de
+vuruş/ölüm/seviye atlama için kullanılıyordu) ama online mod (farm+PvP)
+bundan hiç faydalanmıyordu — hem ses hem "vuruş hissi" tamamen sessizdi.
+Kapsam kasıtlı olarak SADECE online moda sınırlandı (tek oyunculu oyun
+zaten olgun/dengeli, dokunulmadı):
+
+- **Mevcut SFX'in yeniden kullanımı** — yeni ses dosyası gerekmeden
+  `Audio.play("hit"/"enemy_death"/"pickup"/"levelup"/"player_hurt"/
+  "ui_click")` online moda bağlandı: farm'da düşman vuruşu/ölümü/ödül
+  bildirimi, PvP'de vuruş/ölüm/kendi canın azalması/kılıç sallama.
+- **Kamera sarsıntısı** — `scripts/camera_shake.gd` (tek oyunculuda
+  zaten vardı) hem `OnlineFarmMap.tscn` hem `OnlinePvpMap.tscn`'in
+  `Camera2D`'sine eklendi; PvP'de kendi canın azaldığında hasar
+  miktarıyla orantılı sarsılıyor (`player.gd`'deki aynı formül).
+  Farm'da oyuncular hasar almadığı için (kasıtlı, mevcut tasarım)
+  kullanılmıyor.
+- **Uçan hasar sayıları (YENİ)** — tek oyunculuda bile hiç yoktu.
+  `Effects.spawn_floating_text(parent, pos, text, color)` eklendi
+  (Label + Tween, sanat varlığı gerektirmiyor) — farm'da düşman
+  vuruşunda "-12" gibi, PvP'de her iki oyuncunun da vuruşunda "-20"
+  gibi beliriyor.
+- **Arka plan müziği (YENİ)** — daha önce hiç yoktu (tek oyunculu dahil).
+  `tools/generate_music.js`, harici bağımlılık olmadan (orijinal
+  `sfx_*.wav`'ları üreten script bu repoda artık yok, aynı ruhla
+  yeniden yazıldı) iki döngülü ambians parçası üretiyor:
+  `audio/music_farm.wav` (sakin, La minör, 24sn) ve `audio/music_pvp.wav`
+  (gergin, Mi minör + uzak savaş davulu, 16sn). **Matematiksel olarak
+  kusursuz döngü** tekniği kullanıldı — her osilatörün frekansı
+  `snapFreq()` ile döngü süresinin (T) tam katı bir periyoda sahip
+  olacak şekilde yuvarlanıyor (`f*T` tam sayı → `sin(2π f (t+T)) ≡
+  sin(2π f t)`), yani crossfade'e gerek kalmadan döngü noktasında hiçbir
+  faz/genlik sıçraması olmuyor. `Audio.play_music("farm"/"pvp")` /
+  `Audio.stop_music()` haritaya giriş/çıkışta çağrılıyor (1sn fade-out).
+  **Not**: bu parçaların gerçek ses kalitesini bir insan kulağıyla
+  değerlendiremedim (metin tabanlı bir ortamda çalışıyorum) — kod doğru
+  ve hatasız çalışıyor, ama kullanıcı geri bildirimi burada özellikle
+  değerli.
+- **Bulunan ve düzeltilen kritik bug**: `Effects.spawn_burst()` ve
+  `spawn_floating_text()` doğrudan `parent.add_child()` çağırıyordu —
+  online moddaki bir düşmanın TAM ÖLÜM ANINDA (`_exit_tree()` içinde,
+  `MultiplayerSpawner`'ın düğümü despawn ettiği kare) bu çağrı sessizce
+  başarısız oluyordu (`"Parent node is busy setting up children"`),
+  çünkü ebeveyn tam o anda kendi çocuk listesini yeniden düzenliyordu.
+  Gerçek istemci testinde (ölüm parçacığı görünmüyordu) yakalandı,
+  her iki fonksiyon da `call_deferred()` ile ertelenmiş `add_child`'a
+  taşınarak düzeltildi (tek oyunculu kullanımları da dahil, genel
+  olarak daha güvenli hale geldi — davranış görsel olarak aynı, sadece
+  bir kare gecikmeli).
+- **Gözlemlenen ama bu işin kapsamı DIŞINDA bırakılan anomali**: test
+  sırasında aynı Tier1 bat türü için ödül bildiriminde bir seferinde
+  "Tecrübe 0", başka bir düşmanda beklenenin 2 katı gümüş/xp görüldü —
+  bu online ödül hesaplama tarafında (backend `internal.controller.js`
+  veya `godot-server/scripts/main.gd`) önceden var olan, bu değişiklikle
+  ilgisiz bir tutarsızlık olabilir, ayrıca incelenmedi.
+
+**Doğrulama**: gerçek istemcilerle (headless olmayan) hem farm hem PvP
+haritasında canlı vuruş/ölüm sekansı çalıştırılıp ekran görüntüsüyle
+doğrulandı — farm'da "-12" uçan hasar sayısı + ölüm anında mor parçacık
+patlaması (bug düzeltmesinden SONRA) net görüldü; PvP'de "-20" uçan
+hasar sayısı + can barının 100→80→60 düşüşü görüldü. Ses/müzik playback
+hatasız çalıştı (konsol loglarında hiç hata yok) ama içerik kalitesi
+işitsel olarak doğrulanamadı (yukarıdaki not). Test hesapları ve geçici
+ekran görüntüleri temizlendi.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`

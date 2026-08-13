@@ -40,6 +40,7 @@ func _resolve_jwt() -> String:
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	leave_button.pressed.connect(leave_map)
+	Audio.play_music("pvp")
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client("ws://%s:%d" % [_server_host(), PORT])
 	if err != OK:
@@ -70,6 +71,7 @@ func _on_connection_failed() -> void:
 
 func _on_server_disconnected() -> void:
 	status_label.text = "Sunucu bağlantısı koptu."
+	Audio.stop_music()
 
 func _spawn_player(data: Dictionary) -> Node2D:
 	var id: int = int(data["id"])
@@ -101,8 +103,24 @@ func auth_result(success: bool, message: String) -> void:
 
 @rpc("authority", "reliable")
 func health_update(player_name: String, new_health: float) -> void:
-	if has_node(player_name):
-		get_node(player_name).health = new_health
+	if not has_node(player_name):
+		return
+	var node = get_node(player_name)
+	var old_health: float = node.health
+	node.health = new_health
+	var dmg: float = old_health - new_health
+	if dmg <= 0.0:
+		return
+	node.flash_hit()
+	Effects.spawn_floating_text(self, node.global_position, "-%d" % int(round(dmg)), Color(1.0, 0.35, 0.35))
+	if new_health <= 0.0:
+		Audio.play("enemy_death", -6.0, randf_range(0.9, 1.1))
+		Effects.spawn_burst(self, node.global_position, Color(0.9, 0.15, 0.15), 20, 220.0)
+	else:
+		Audio.play("hit", -10.0, randf_range(0.85, 1.15))
+	if player_name == str(_local_player_id):
+		Audio.play("player_hurt", -4.0, randf_range(0.9, 1.05))
+		camera.shake(clampf(dmg * 0.15, 2.0, 10.0))
 
 @rpc("authority", "reliable")
 func pvp_kill_notification(message: String) -> void:
@@ -119,6 +137,7 @@ func _show_toast(text: String) -> void:
 	_toast_tween.tween_property(toast_label, "modulate:a", 0.0, TOAST_FADE_SEC)
 
 func leave_map() -> void:
+	Audio.stop_music()
 	if multiplayer.multiplayer_peer:
 		multiplayer.multiplayer_peer.close()
 	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")

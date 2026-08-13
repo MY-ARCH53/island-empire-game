@@ -34,6 +34,14 @@ func _update_label() -> void:
 	$HealthBar.max_value = max_health
 	$HealthBar.value = health
 
+# Sunucu-otoriter hasar anında online_pvp_client.gd → health_update()
+# tarafından çağrılıyor (bkz. enemy.gd → _flash_hit(), aynı desen).
+func flash_hit() -> void:
+	var target: Color = SELF_TINT if is_multiplayer_authority() else ENEMY_TINT
+	$Visual.modulate = Color(1.8, 1.4, 1.4, 1.0)
+	var tween := create_tween()
+	tween.tween_property($Visual, "modulate", target, 0.15)
+
 func _process(_delta: float) -> void:
 	_update_label()
 	if not is_multiplayer_authority():
@@ -67,6 +75,7 @@ func _unhandled_input(event: InputEvent) -> void:
 # En yakın DİĞER oyuncuyu bulup sunucudan PvP saldırı doğrulaması ister —
 # hasarı burada hesaplamıyoruz (bkz. online_pvp_client.gd → request_pvp_attack).
 func _try_attack() -> void:
+	Audio.play("ui_click", -14.0, 1.35) # kılıç sallama hissi — vuruş onayı health_update'te
 	var main := get_parent()
 	var nearest: Node2D = null
 	var nearest_dist := INF
