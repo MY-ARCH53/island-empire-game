@@ -60,6 +60,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_parent().rpc_id(1, "leave_party")
 		KEY_H:
 			get_parent().rpc_id(1, "request_use_potion")
+		KEY_R:
+			get_parent().rpc_id(1, "request_use_ability")
 
 # En yakın düşmanı bulup sunucudan saldırı doğrulaması ister — hasarı
 # BURADA hesaplamıyoruz, sadece "şuna saldırmak istiyorum" diyoruz

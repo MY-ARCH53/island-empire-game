@@ -156,6 +156,11 @@ func leave_party() -> void:
 func request_use_potion() -> void:
 	pass
 
+# Faz D — sınıfa özgü yetenek kullanma isteği, bkz. godot-server/scripts/main.gd.
+@rpc("any_peer", "reliable")
+func request_use_ability() -> void:
+	pass
+
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
 	if success:
@@ -216,6 +221,16 @@ func health_update(player_name: String, new_health: float) -> void:
 func farm_death_notification(message: String) -> void:
 	_show_toast(message)
 	Audio.play("game_over", -6.0)
+
+# Faz D — hasar/heal zaten health_update ile gidiyor, bu sadece "biri
+# yetenek kullandı" anının görsel/sesli geri bildirimi.
+@rpc("authority", "reliable")
+func ability_cast_notification(caster_name: String, class_id: String) -> void:
+	Audio.play("boss_slam", -8.0)
+	if has_node(caster_name):
+		var pos: Vector2 = get_node(caster_name).global_position
+		var color: Color = Color(1.0, 0.85, 0.3) if class_id == "buyucu" else Color(0.6, 0.8, 1.0)
+		Effects.spawn_burst(self, pos, color, 18, 170.0)
 
 # position client-otoriter bir alan (movement zaten böyle çalışıyor) —
 # sunucu bizi doğrudan ışınlayamaz, "kendi pozisyonunu buna ayarla" der,

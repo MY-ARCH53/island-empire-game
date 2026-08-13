@@ -66,6 +66,18 @@ const POTION_DROP_CHANCE := 0.15
 const POTION_ITEM_ID := "minor_health_potion"
 const POTION_USE_COOLDOWN := 3.0
 
+# Faz D — sınıfa özgü yetenekler, her 10 seviyede bir güçleniyor (4 kademe,
+# seviye 40'ta tavan — KO'nun 60+ seviye ölçeğini birebir almak yerine bu
+# projenin çok daha küçük ölçeğine göre sonlu bir ufuk). v1'de SADECE farm,
+# PvP'ye eklenmedi (bkz. plan — yetenekler farm_enemy/parti altyapısını
+# kullanıyor, PvP'nin kendi ayarlanmış NP bahis modeli var).
+const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
+const ABILITY_POWER_MULT_BY_TIER := [1.0, 1.3, 1.6, 2.0]
+const ABILITIES := {
+	"koylu":  {"cooldown": 20.0, "name": "Sağlam Duruş",   "base_armor": 15.0, "duration": 6.0},
+	"buyucu": {"cooldown": 8.0,  "name": "Büyü Patlaması", "base_damage": 25.0, "radius": 100.0},
+}
+
 const SLOTS := ["weapon", "armor", "shield"]
 const RARITY_ITEM_IDS := {
 	"common":    {"weapon": "wooden_sword",   "armor": "cloth_armor",  "shield": "wooden_shield"},
@@ -85,6 +97,8 @@ var _enemy_counter: int = 0
 var _enemy_zone: Dictionary = {}      # enemy adı -> zone index (sunucu-only, replike edilmiyor)
 var _respawn_invuln_until: Dictionary = {}  # peer_id -> float saniye (Faz B)
 var _last_potion_use: Dictionary = {}       # peer_id -> float saniye (Faz C)
+var _last_ability_time: Dictionary = {}     # peer_id -> float saniye (Faz D)
+var _ability_armor_bonus: Dictionary = {}   # peer_id -> {"amount": float, "expires_at": float} (koylu)
 
 # Faz 5 — parti sistemi (bu haritaya özgü, kalıcı değil — sadece bağlıyken
 # geçerli). party_id olarak partiyi kuran oyuncunun peer_id'si kullanılıyor.
@@ -182,6 +196,8 @@ func _on_peer_disconnected(id: int) -> void:
 	_last_attack_time.erase(id)
 	_respawn_invuln_until.erase(id)
 	_last_potion_use.erase(id)
+	_last_ability_time.erase(id)
+	_ability_armor_bonus.erase(id)
 	if _party_of.has(id):
 		var party_id: int = _party_of[id]
 		_party_of.erase(id)
@@ -272,7 +288,7 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 	# görünüyordu, gerçek (170) değil.
 	var spawn_max_health: float = BASE_MAX_HEALTH + float(_peer_user[peer_id]["max_health_bonus"])
 	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"], "max_health": spawn_max_health})
-	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı, H can iksiri)" % _peer_user[peer_id]["class_id"])
+	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı, H can iksiri, R yetenek)" % _peer_user[peer_id]["class_id"])
 
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
@@ -411,6 +427,10 @@ func _on_enemy_attacked_player(victim_peer_id: int, raw_damage: float) -> void:
 		return
 	var victim: Node2D = get_node(victim_name)
 	var armor_bonus: float = float(_peer_user[victim_peer_id].get("armor_bonus", 0))
+	# Faz D — koylu'nun "Sağlam Duruş" yeteneği süresi dolmadıysa ek zırh.
+	var ability_buff: Dictionary = _ability_armor_bonus.get(victim_peer_id, {})
+	if not ability_buff.is_empty() and now < float(ability_buff.get("expires_at", 0.0)):
+		armor_bonus += float(ability_buff.get("amount", 0.0))
 	var damage: float = max(MIN_DAMAGE, raw_damage - armor_bonus)
 	victim.health -= damage
 	_broadcast_health(victim_name, victim.health)
@@ -458,6 +478,68 @@ func respawn_teleport(new_position: Vector2) -> void:
 @rpc("authority", "reliable")
 func farm_death_notification(message: String) -> void:
 	status_label.text = message
+
+# --- Faz D: sınıfa özgü yetenekler. İstemci "yeteneğimi kullanmak
+# istiyorum" der, sunucu seviye kapısını/cooldown'ı doğrulayıp etkiyi
+# SUNUCUDA uygular (mevcut request_attack/request_use_potion'la aynı
+# "istemci niyet bildirir, sunucu hesaplar" ilkesi). ---
+
+@rpc("any_peer", "reliable")
+func request_use_ability() -> void:
+	if not _is_server:
+		return
+	var sender_id := multiplayer.get_remote_sender_id()
+	if not _peer_user.has(sender_id):
+		return
+	var level: int = int(_peer_user[sender_id]["level"])
+	var tier_index := -1
+	for i in range(ABILITY_UNLOCK_LEVELS.size()):
+		if level >= ABILITY_UNLOCK_LEVELS[i]:
+			tier_index = i
+	if tier_index == -1:
+		rpc_id(sender_id, "reward_notification", "Bu yetenek Seviye 10'da açılıyor.")
+		return
+	var class_id: String = str(_peer_user[sender_id]["class_id"])
+	if not ABILITIES.has(class_id):
+		return
+	var cfg: Dictionary = ABILITIES[class_id]
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_ability_time.get(sender_id, 0.0) < float(cfg["cooldown"]):
+		return
+	if not has_node(str(sender_id)):
+		return
+	_last_ability_time[sender_id] = now
+	var power_mult: float = ABILITY_POWER_MULT_BY_TIER[tier_index]
+	for peer_id in multiplayer.get_peers():
+		rpc_id(peer_id, "ability_cast_notification", str(sender_id), class_id)
+	match class_id:
+		"koylu":
+			_ability_koylu(sender_id, cfg, power_mult)
+		"buyucu":
+			_ability_buyucu(sender_id, cfg, power_mult)
+
+# Büyü Patlaması — çevredeki tüm düşmanlara alan hasarı. Mevcut
+# take_damage/died altyapısını bedava kullanıyor (ödül/drop zaten oradan
+# akıyor).
+func _ability_buyucu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var dmg: float = float(cfg["base_damage"]) * power_mult
+	for child in get_children():
+		if child.name.begins_with("enemy_") and caster.position.distance_to(child.position) <= float(cfg["radius"]):
+			child.take_damage(dmg, sender_id)
+
+# Sağlam Duruş — geçici zırh bonusu (bkz. _on_enemy_attacked_player'daki
+# hasar formülüne entegrasyon).
+func _ability_koylu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	_ability_armor_bonus[sender_id] = {
+		"amount": float(cfg["base_armor"]) * power_mult,
+		"expires_at": now + float(cfg["duration"]),
+	}
+
+@rpc("authority", "reliable")
+func ability_cast_notification(caster_name: String, class_id: String) -> void:
+	print("ABILITY_CAST caster=", caster_name, " class=", class_id)
 
 func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	if not _is_server:
@@ -646,6 +728,13 @@ func _on_reward_response(_result: int, code: int, _headers: PackedStringArray, b
 		return
 	var data = json.get_data()
 	var inner: Dictionary = data.get("data", {})
+	# Faz D — _peer_user[peer_id]["level"] sadece bağlantı anında (auth
+	# response) set ediliyordu, oturum içinde seviye atladıkça hiç
+	# güncellenmiyordu. Seviye kapılı yetenek sistemi (request_use_ability)
+	# bu değeri canlı okuduğu için, her ödül yanıtında (leveledUp şartından
+	# BAĞIMSIZ) güncelliyoruz.
+	if _peer_user.has(peer_id):
+		_peer_user[peer_id]["level"] = int(inner.get("level", _peer_user[peer_id]["level"]))
 	var msg := "Düşman öldürüldü! Seviye %d, Gümüş %d, Tecrübe %d" % [
 		int(inner.get("level", 1)), int(inner.get("silver", 0)), int(inner.get("xp", 0)),
 	]
