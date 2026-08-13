@@ -16,8 +16,10 @@ var health: float
 
 func _ready() -> void:
 	health = max_health
-	var visual: ColorRect = $Visual
-	visual.color = Color(0.75, 0.25, 0.2, 1.0)
+	var sprite_path: String = Upgrades.ENEMIES.get(enemy_type, {}).get("sprite", "")
+	if sprite_path != "" and ResourceLoader.exists(sprite_path):
+		$Visual.sprite_frames = load(sprite_path)
+		$Visual.play("idle_south")
 
 func take_damage(amount: float, attacker_peer_id: int) -> void:
 	health -= amount

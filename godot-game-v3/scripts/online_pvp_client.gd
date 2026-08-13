@@ -57,9 +57,11 @@ func _on_connection_failed() -> void:
 func _on_server_disconnected() -> void:
 	status_label.text = "Sunucu bağlantısı koptu."
 
-func _spawn_player(id: int) -> Node2D:
+func _spawn_player(data: Dictionary) -> Node2D:
+	var id: int = int(data["id"])
 	var player: Node2D = OnlinePvpPlayerScene.instantiate()
 	player.name = str(id)
+	player.class_id = str(data.get("class_id", "koylu"))
 	player.set_multiplayer_authority(id)
 	player.position = Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
 	return player

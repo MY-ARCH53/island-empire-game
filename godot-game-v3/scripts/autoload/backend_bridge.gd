@@ -26,6 +26,11 @@ const API_BASE_PROD := "https://api.islandsempire.com/api"
 const API_BASE_LOCAL := "http://localhost:3000/api"
 
 func _api_base() -> String:
+	# Sadece manuel test için: API_BASE_HOST ortam değişkeni varsa onu kullan
+	# (örn. editörden prod'a karşı test etmek için, --token= deseniyle aynı ruh).
+	var override := OS.get_environment("API_BASE_HOST")
+	if override != "":
+		return override
 	if OS.has_feature("web"):
 		var origin = JavaScriptBridge.eval("window.location.origin", true)
 		if typeof(origin) == TYPE_STRING and (origin.begins_with("http://localhost") or origin.begins_with("http://127.0.0.1")):

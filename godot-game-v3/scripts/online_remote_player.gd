@@ -9,13 +9,18 @@ extends Node2D
 const SPEED := 220.0
 const ATTACK_SEARCH_RADIUS := 300.0
 
+# Sunucu, spawn anında _spawn_player'da bu değeri set ediyor (bkz.
+# online_farm_client.gd) — _ready() çalışmadan ÖNCE atanmış oluyor.
+var class_id: String = "koylu"
+
+var _last_position: Vector2 = Vector2.ZERO
+
 func _ready() -> void:
-	var visual: ColorRect = $Visual
-	if is_multiplayer_authority():
-		visual.color = Color(0.25, 0.85, 0.35, 1.0)
-	else:
-		visual.color = Color(0.85, 0.25, 0.25, 1.0)
+	var sprite_path: String = Upgrades.CHARACTERS.get(class_id, {}).get("sprite_path", "")
+	if sprite_path != "" and ResourceLoader.exists(sprite_path):
+		$Visual.sprite_frames = load(sprite_path)
 	$Label.text = name
+	_last_position = position
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
@@ -32,6 +37,17 @@ func _physics_process(delta: float) -> void:
 	if dir.length() > 0.0:
 		dir = dir.normalized()
 	position += dir * SPEED * delta
+	$Visual.update_facing(dir, dir.length() > 0.05)
+
+# Yetkisi olmayan (uzak) oyuncular için: pozisyon MultiplayerSynchronizer ile
+# geliyor, girişimiz yok — bir önceki kareyle kıyaslayıp yön/hareket tahmin
+# ediyoruz (yaygın bir "uzak varlık animasyonu" tekniği).
+func _process(_delta: float) -> void:
+	if is_multiplayer_authority():
+		return
+	var movement := position - _last_position
+	_last_position = position
+	$Visual.update_facing(movement, movement.length() > 0.5)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_multiplayer_authority():

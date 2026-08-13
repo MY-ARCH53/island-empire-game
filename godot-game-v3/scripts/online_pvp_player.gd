@@ -8,23 +8,36 @@ extends Node2D
 
 const SPEED := 220.0
 const ATTACK_SEARCH_RADIUS := 300.0
+# Gerçek karakter sprite'ı kullanıldığından renkle ayırt edemiyoruz artık —
+# kendi karakterimizi hafif altın bir modulate ile, rakipleri hafif kırmızı
+# bir tonla vurguluyoruz (PvP'de "bu kim" netliği hâlâ önemli).
+const SELF_TINT := Color(1.15, 1.1, 0.85, 1.0)
+const ENEMY_TINT := Color(1.1, 0.85, 0.85, 1.0)
 
+# Sunucu, spawn anında _spawn_player'da bu değeri set ediyor.
+var class_id: String = "koylu"
 var health: float = 100.0
 var max_health: float = 100.0
 
+var _last_position: Vector2 = Vector2.ZERO
+
 func _ready() -> void:
-	var visual: ColorRect = $Visual
-	if is_multiplayer_authority():
-		visual.color = Color(0.25, 0.55, 0.95, 1.0)
-	else:
-		visual.color = Color(0.95, 0.55, 0.15, 1.0)
+	var sprite_path: String = Upgrades.CHARACTERS.get(class_id, {}).get("sprite_path", "")
+	if sprite_path != "" and ResourceLoader.exists(sprite_path):
+		$Visual.sprite_frames = load(sprite_path)
+	$Visual.modulate = SELF_TINT if is_multiplayer_authority() else ENEMY_TINT
 	_update_label()
+	_last_position = position
 
 func _update_label() -> void:
 	$Label.text = "%s (%d/%d)" % [name, int(health), int(max_health)]
 
 func _process(_delta: float) -> void:
 	_update_label()
+	if not is_multiplayer_authority():
+		var movement := position - _last_position
+		_last_position = position
+		$Visual.update_facing(movement, movement.length() > 0.5)
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
@@ -41,6 +54,7 @@ func _physics_process(delta: float) -> void:
 	if dir.length() > 0.0:
 		dir = dir.normalized()
 	position += dir * SPEED * delta
+	$Visual.update_facing(dir, dir.length() > 0.05)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_multiplayer_authority():

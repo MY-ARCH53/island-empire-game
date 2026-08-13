@@ -119,7 +119,8 @@ func _on_peer_disconnected(id: int) -> void:
 	if has_node(node_name):
 		get_node(node_name).queue_free()
 
-func _spawn_player(id: int) -> Node2D:
+func _spawn_player(data: Dictionary) -> Node2D:
+	var id: int = int(data["id"])
 	var player_scene: PackedScene = load("res://scenes/RemotePlayer.tscn")
 	var player: Node2D = player_scene.instantiate()
 	player.name = str(id)
@@ -181,7 +182,7 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 		"damage_bonus": float(equipped.get("damageBonus", 0)),
 	}
 	print("AUTH_OK peer=", peer_id, " user_id=", _peer_user[peer_id]["user_id"], " class=", _peer_user[peer_id]["class_id"])
-	spawner.spawn(peer_id)
+	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"]})
 	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı)" % _peer_user[peer_id]["class_id"])
 
 @rpc("authority", "reliable")
