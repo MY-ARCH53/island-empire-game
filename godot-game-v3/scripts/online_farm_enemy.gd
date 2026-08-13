@@ -39,6 +39,10 @@ func take_damage(amount: float, attacker_peer_id: int) -> void:
 # geri bildirimini (ses+parçacık+uçan hasar sayısı) burada, replike
 # edilen değerdeki DÜŞÜŞÜ izleyerek üretiyoruz.
 func _process(_delta: float) -> void:
+	var display_name: String = Upgrades.ENEMIES.get(enemy_type, {}).get("name", enemy_type)
+	$Label.text = display_name + (" [ELİT]" if is_elite else "")
+	$HealthBar.max_value = max_health
+	$HealthBar.value = health
 	if _last_synced_health < 0.0:
 		_last_synced_health = health
 		return

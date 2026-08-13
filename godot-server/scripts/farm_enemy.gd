@@ -20,6 +20,9 @@ func _ready() -> void:
 	var visual: ColorRect = $Visual
 	visual.color = Color(0.75, 0.25, 0.2, 1.0)
 
+func _process(_delta: float) -> void:
+	$Label.text = enemy_type.capitalize() + (" [ELİT]" if is_elite else "")
+
 # Sadece sunucuda çağrılır (main.gd'deki saldırı çözümlemesinden).
 func take_damage(amount: float, attacker_peer_id: int) -> void:
 	health -= amount
