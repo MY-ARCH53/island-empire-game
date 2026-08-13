@@ -9,12 +9,17 @@ const LOCAL_HOST := "127.0.0.1"
 const PROD_HOST := "islandsempire.com"
 
 const OnlinePvpPlayerScene := preload("res://scenes/OnlinePvpPlayer.tscn")
+const TOAST_HOLD_SEC := 3.0
+const TOAST_FADE_SEC := 1.0
 
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var status_label: Label = $UI/StatusLabel
+@onready var toast_label: Label = $UI/ToastLabel
 @onready var leave_button: Button = $UI/LeaveButton
+@onready var camera: Camera2D = $Camera2D
 
 var _local_player_id: int = -1
+var _toast_tween: Tween
 
 func _server_host() -> String:
 	var override := OS.get_environment("PVP_SERVER_HOST")
@@ -45,6 +50,15 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	status_label.text = "Bağlanıyor..."
+
+# Farm haritasındaki aynı kamera gotcha'sı (bkz. online_farm_client.gd) —
+# burada etki daha küçük (PvP alanı zoneli değil) ama aynı sebepten (Camera2D
+# harita kök düğümüne bağlı, dinamik spawn olan oyuncuya asla bağlanamıyor)
+# tutarlılık için aynı düzeltme uygulandı.
+func _process(_delta: float) -> void:
+	var me_name := str(_local_player_id)
+	if has_node(me_name):
+		camera.position = get_node(me_name).position
 
 func _on_connected_to_server() -> void:
 	_local_player_id = multiplayer.get_unique_id()
@@ -79,7 +93,11 @@ func request_pvp_attack(_target_name: String) -> void:
 
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
-	status_label.text = message
+	if success:
+		status_label.text = ""
+		_show_toast(message)
+	else:
+		status_label.text = message
 
 @rpc("authority", "reliable")
 func health_update(player_name: String, new_health: float) -> void:
@@ -88,7 +106,17 @@ func health_update(player_name: String, new_health: float) -> void:
 
 @rpc("authority", "reliable")
 func pvp_kill_notification(message: String) -> void:
-	status_label.text = message
+	_show_toast(message)
+
+# bkz. online_farm_client.gd → _show_toast() (aynı desen).
+func _show_toast(text: String) -> void:
+	toast_label.text = text
+	if _toast_tween:
+		_toast_tween.kill()
+	toast_label.modulate.a = 1.0
+	_toast_tween = create_tween()
+	_toast_tween.tween_interval(TOAST_HOLD_SEC)
+	_toast_tween.tween_property(toast_label, "modulate:a", 0.0, TOAST_FADE_SEC)
 
 func leave_map() -> void:
 	if multiplayer.multiplayer_peer:

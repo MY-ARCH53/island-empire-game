@@ -19,12 +19,29 @@ const PROD_HOST := "islandsempire.com"
 
 const OnlineRemotePlayerScene := preload("res://scenes/OnlineRemotePlayer.tscn")
 
+# Bölgeli farm haritası (bkz. plans/humble-chasing-galaxy.md "Bölgeli
+# farm haritası") — sadece görüntüleme için, godot-server/scripts/main.gd
+# → ZONES'un yarıçap/isim kısmının bir aynası (oynanış mantığı yok,
+# sadece "hangi bölgedeyim" göstergesi için).
+const ZONE_DISPLAY := [
+	{"max_r": 350.0,  "name": "Tier 1 — Sakin Bölge"},
+	{"max_r": 700.0,  "name": "Tier 2 — Orta Bölge"},
+	{"max_r": 1050.0, "name": "Tier 3 — Tehlikeli Bölge"},
+	{"max_r": INF,    "name": "Tier 4 — Elit Bölge"},
+]
+const TOAST_HOLD_SEC := 3.0
+const TOAST_FADE_SEC := 1.0
+
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var status_label: Label = $UI/StatusLabel
+@onready var zone_label: Label = $UI/ZoneLabel
+@onready var toast_label: Label = $UI/ToastLabel
 @onready var leave_button: Button = $UI/LeaveButton
 @onready var camera: Camera2D = $Camera2D
 
 var _local_player_id: int = -1
+var _last_zone_name: String = ""
+var _toast_tween: Tween
 
 func _server_host() -> String:
 	var override := OS.get_environment("FARM_SERVER_HOST")
@@ -65,8 +82,22 @@ func _ready() -> void:
 # o yüzden her karede pozisyonunu elle senkronize ediyoruz.
 func _process(_delta: float) -> void:
 	var me_name := str(_local_player_id)
-	if has_node(me_name):
-		camera.position = get_node(me_name).position
+	if not has_node(me_name):
+		return
+	var me_pos: Vector2 = get_node(me_name).position
+	camera.position = me_pos
+	_update_zone_label(me_pos)
+
+func _update_zone_label(pos: Vector2) -> void:
+	var dist := pos.length()
+	var zone_name := ""
+	for zone in ZONE_DISPLAY:
+		if dist <= zone["max_r"]:
+			zone_name = zone["name"]
+			break
+	if zone_name != _last_zone_name:
+		_last_zone_name = zone_name
+		zone_label.text = "Bölge: %s" % zone_name
 
 func _on_connected_to_server() -> void:
 	_local_player_id = multiplayer.get_unique_id()
@@ -118,23 +149,40 @@ func leave_party() -> void:
 
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
-	status_label.text = message
+	if success:
+		status_label.text = ""
+		_show_toast(message)
+	else:
+		status_label.text = message
 
 @rpc("authority", "reliable")
 func reward_notification(message: String) -> void:
-	status_label.text = message
+	_show_toast(message)
 
 @rpc("authority", "reliable")
 func party_invite_received(inviter_class: String) -> void:
-	status_label.text = "%s seni partiye davet etti — kabul için O'ya bas." % inviter_class
+	_show_toast("%s seni partiye davet etti — kabul için O'ya bas." % inviter_class)
 
 @rpc("authority", "reliable")
 func party_update(text: String) -> void:
-	status_label.text = text
+	_show_toast(text)
 
 @rpc("authority", "reliable")
 func party_error(message: String) -> void:
-	status_label.text = message
+	_show_toast(message)
+
+# Tek bir StatusLabel'ı sürekli üst üste yazan mesajlarla doldurmak yerine
+# (parti daveti gibi önemli bir mesaj, hemen ardından gelen bir ödül
+# bildirimiyle fark edilmeden silinebiliyordu) — solup giden ayrı bir
+# "toast" etiketi: 3sn tam görünür, 1sn içinde solar.
+func _show_toast(text: String) -> void:
+	toast_label.text = text
+	if _toast_tween:
+		_toast_tween.kill()
+	toast_label.modulate.a = 1.0
+	_toast_tween = create_tween()
+	_toast_tween.tween_interval(TOAST_HOLD_SEC)
+	_toast_tween.tween_property(toast_label, "modulate:a", 0.0, TOAST_FADE_SEC)
 
 func leave_map() -> void:
 	if multiplayer.multiplayer_peer:

@@ -717,6 +717,44 @@ spawn olduğundan doğrudan child yapılamıyor, elle senkronize ediliyor).
 Bu, gerçek ekran görüntüsü doğrulaması sırasında yakalandı — kod
 mantıken doğru görünüyordu ama görsel test olmasa fark edilmezdi.
 
+## Online HUD cilası: bölge göstergesi + toast bildirimler + can barı (2026-08-13)
+
+Bölgeli farm haritası içerik olarak zenginleşince arayüzün sadeliği
+belirginleşti — tek bir `StatusLabel`, hem bağlantı durumunu hem parti
+davetini hem ödül bildirimini üst üste yazıyordu (önemli bir mesaj bir
+sonraki bildirimle fark edilmeden siliniyordu). Üç parça eklendi:
+
+- **`ZoneLabel`** (sadece farm haritası, `OnlineFarmMap.tscn`) — kalıcı,
+  solmayan bir "Bölge: Tier X — ..." göstergesi. `online_farm_client.gd`
+  → `ZONE_DISPLAY` const'ı (godot-server'daki `ZONES`'un yarıçap/isim
+  aynası, sadece görüntüleme — oynanış mantığı yok), `_process()` içinde
+  her karede oyuncunun merkeze uzaklığından hesaplanıyor.
+- **`ToastLabel`** (hem farm hem PvP haritası) — `Tween` tabanlı, 3sn tam
+  görünür + 1sn içinde solan bağımsız bir bildirim etiketi
+  (`_show_toast()`). Bağlantı/kimlik doğrulama mesajı, ödül bildirimi,
+  parti daveti/güncelleme/hata, PvP öldürme bildirimi artık `StatusLabel`
+  yerine buraya yönleniyor — `StatusLabel` artık SADECE bağlantı
+  yaşam döngüsü metni (bağlanıyor/koptu/hata) için kullanılıyor.
+- **`HealthBar`** (`ProgressBar`, sadece `OnlinePvpPlayer.tscn`) — daha
+  önce can sadece `Label` metninde ("isim (can/maxcan)") görünüyordu,
+  şimdi görsel bir bar da var. `online_pvp_player.gd → _update_label()`
+  her karede `$HealthBar.max_value`/`value`'yu `max_health`/`health`'e
+  senkronize ediyor (aynı sunucu-otoriter `health_update` RPC'sinden
+  besleniyor, yeni bir veri yolu yok).
+- Ayrıca `online_pvp_client.gd`'ye de farm'daki kamera-takip düzeltmesi
+  tutarlılık için eklendi (PvP'de etki daha küçüktü ama aynı gotcha
+  geçerliydi — bkz. yukarıdaki "Bölgeli farm haritası" bölümü).
+
+**Doğrulama**: gerçek (headless olmayan) iki istemciyle yerel sunucuya
+bağlanıp ekran görüntüsü alındı — farm'da hoş geldin toast'ı + Tier1
+bölge etiketi birlikte doğru render edildi, ~5sn sonra alınan ikinci
+görüntüde toast tamamen solmuş, bölge etiketi kalıcı kaldığı doğrulandı.
+PvP'de iki gerçek hesapla (biri saldırgan, biri hedef) can 100→40'a
+düşürülüp `HealthBar`'ın gerçek zamanlı güncellendiği görsel olarak
+doğrulandı. `godot-server`'ın kendi görselleri (placeholder) bu işin
+kapsamı DIŞINDA bırakıldı — sadece gerçek oyuncu istemcisi (`godot-game-v3`)
+cilalandı.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`

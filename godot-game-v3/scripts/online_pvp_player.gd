@@ -31,6 +31,8 @@ func _ready() -> void:
 
 func _update_label() -> void:
 	$Label.text = "%s (%d/%d)" % [name, int(health), int(max_health)]
+	$HealthBar.max_value = max_health
+	$HealthBar.value = health
 
 func _process(_delta: float) -> void:
 	_update_label()
