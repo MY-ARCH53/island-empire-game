@@ -667,6 +667,37 @@ editör oynanabilirliği için sorun değil, ama web export'ta (tarayıcıda)
 `https://` sayfadan `ws://` bağlantısı mixed-content olarak engellenir;
 o zaman `wss://` + sertifika gerekir (ayrı, henüz yapılmamış bir iş).
 
+## Gerçek karakter/düşman görselleri (2026-08-13)
+
+Farm ve PvP haritalarındaki oyuncular/düşmanlar artık renkli
+kare/dikdörtgen DEĞİL — roguelite'taki gibi gerçek PixelLab sprite'ları
+kullanıyor (`Upgrades.CHARACTERS[class_id].sprite_path`,
+`Upgrades.ENEMIES["bat"].sprite`), yönlü idle/walk animasyonuyla
+(`scripts/directional_sprite.gd` — roguelite'ta zaten var olan script
+aynen yeniden kullanıldı, yeni bir tane yazılmadı).
+
+- **Spawn veri formatı değişti**: `spawner.spawn(peer_id)` → `spawner.spawn(
+  {id, class_id})`, sunucu artık spawn anında sınıf bilgisini de gönderiyor
+  (`godot-server/scripts/main.gd`/`pvp_main.gd` + buradaki
+  `online_farm_client.gd`/`online_pvp_client.gd`'nin `_spawn_player`'ı
+  `Dictionary` alacak şekilde güncellendi).
+- **Uzak oyuncu animasyonu**: yetkisi olmayan (uzak) oyuncularda girişimiz
+  yok — bir önceki kareyle pozisyon farkına bakıp yön/hareket tahmin
+  ediyoruz (`online_remote_player.gd`/`online_pvp_player.gd → _process()`).
+- **PvP'de "bu kim" netliği**: artık renkle değil, hafif bir `modulate`
+  tonuyla — kendi karakterin altın, rakibinki kırmızımsı ton.
+- **`godot-server`'ın KENDİ görselleri hâlâ basit** (kasıtlı, bkz.
+  `godot-server/README.md`) — bu değişiklik SADECE `godot-game-v3`'te
+  (gerçek oyuncunun gördüğü taraf). `godot-server`'ı doğrudan test
+  script'i olarak çalıştırdığımda hâlâ renkli kareler görürüm, bu normal.
+- **Doğrulama**: gerçek ekran görüntüleriyle (headless değil, gerçek
+  pencere + `get_viewport().get_texture()`) hem farm'da (karakter +
+  5 yarasa doğru render) hem PvP'de (iki farklı sınıfın karşılıklı doğru
+  render olduğu, can barlarıyla) görsel olarak doğrulandı. Prod'a deploy
+  edilip (`kanadasi-farm`/`kanadasi-pvp` PM2 restart) yeni spawn formatının
+  gerçek Linux sunucusunda da hatasız çalıştığı geçici bir test hesabıyla
+  onaylandı.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`

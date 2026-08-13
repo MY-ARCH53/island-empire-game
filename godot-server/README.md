@@ -15,14 +15,21 @@ gerçek hesap (`test_v2`, `test_v3`) aynı anda bağlanıp birbirini öldürdü,
 NP kazanım/kayıp matematiği Postgres'te satır satır doğrulandı (bkz.
 "PvP haritası" bölümü).
 
-## Görseller kasıtlı olarak basit
+## Görseller kasıtlı olarak basit (SADECE bu projede — bkz. not)
 
-Oyuncular ve düşmanlar şu an renkli kareler — gerçek karakter sprite'ları
-(`godot-game-v3/assets/sprites/char_*`) DEĞİL. Bu bilinçli bir kapsam
+Bu projedeki (`godot-server`) oyuncular ve düşmanlar hâlâ renkli
+kareler — gerçek karakter sprite'ları DEĞİL. Bu bilinçli bir kapsam
 kararı: önce ağ/oynanış mekaniğinin (kimlik doğrulama, senkronizasyon,
 saldırı doğrulama, ödül yazımı) doğru çalıştığını kanıtlamak, görsel
 entegrasyonu ayrı bir geçişe bırakmak (tıpkı projenin en başında
 `simple_shape.gd` ile başlayıp sonra gerçek PixelLab sanatına geçmesi gibi).
+
+**Not (2026-08-13)**: Gerçek oyuncunun kullandığı taraf (`godot-game-v3`)
+artık gerçek karakter/düşman sprite'ları kullanıyor — bkz.
+`godot-game-v3/README.md` → "Gerçek karakter/düşman görselleri" bölümü.
+`godot-server`'ın kendi görselleri kasıtlı olarak basit kaldı çünkü bu
+proje sadece dedicated sunucu + benim test client'ım için var, gerçek
+oyuncular hiç görmüyor.
 
 ## Nasıl çalışır
 
