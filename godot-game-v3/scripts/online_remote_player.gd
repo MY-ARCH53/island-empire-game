@@ -13,14 +13,31 @@ const ATTACK_SEARCH_RADIUS := 300.0
 # online_farm_client.gd) — _ready() çalışmadan ÖNCE atanmış oluyor.
 var class_id: String = "koylu"
 
+# Faz B — sunucu her değişiklikte online_farm_client.gd → health_update
+# RPC'siyle yazıyor (PvP'deki aynı desen, bkz. online_pvp_player.gd).
+var health: float = 120.0
+var max_health: float = 120.0
+
 var _last_position: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	var sprite_path: String = Upgrades.CHARACTERS.get(class_id, {}).get("sprite_path", "")
 	if sprite_path != "" and ResourceLoader.exists(sprite_path):
 		$Visual.sprite_frames = load(sprite_path)
-	$Label.text = name
+	_update_label()
 	_last_position = position
+
+func _update_label() -> void:
+	$Label.text = "%s (%d/%d)" % [name, int(health), int(max_health)]
+	$HealthBar.max_value = max_health
+	$HealthBar.value = health
+
+# Sunucu-otoriter hasar anında online_farm_client.gd → health_update()
+# tarafından çağrılıyor (bkz. online_pvp_player.gd → flash_hit(), aynı desen).
+func flash_hit() -> void:
+	$Visual.modulate = Color(1.8, 1.4, 1.4, 1.0)
+	var tween := create_tween()
+	tween.tween_property($Visual, "modulate", Color(1, 1, 1), 0.15)
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
@@ -43,6 +60,7 @@ func _physics_process(delta: float) -> void:
 # geliyor, girişimiz yok — bir önceki kareyle kıyaslayıp yön/hareket tahmin
 # ediyoruz (yaygın bir "uzak varlık animasyonu" tekniği).
 func _process(_delta: float) -> void:
+	_update_label()
 	if is_multiplayer_authority():
 		return
 	var movement := position - _last_position

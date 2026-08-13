@@ -109,9 +109,7 @@ func _spawn_player(data: Dictionary) -> Node2D:
 	player.name = str(id)
 	player.set_multiplayer_authority(id)
 	player.position = Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
-	# Faz 4 — kuşanılan zırh/kalkanın can bonusu (bkz. backend/src/utils/onlineStats.js).
-	var max_health_bonus: float = float(_peer_user.get(id, {}).get("max_health_bonus", 0))
-	player.max_health = BASE_MAX_HEALTH + max_health_bonus
+	player.max_health = float(data.get("max_health", BASE_MAX_HEALTH))
 	player.health = player.max_health
 	return player
 
@@ -173,7 +171,12 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 		"guild_id": (int(guild["guildId"]) if guild != null else -1),
 	}
 	print("AUTH_OK peer=", peer_id, " user_id=", _peer_user[peer_id]["user_id"], " class=", _peer_user[peer_id]["class_id"])
-	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"]})
+	# max_health'i spawn verisine ekliyoruz — sadece sunucunun kendi
+	# instantiate ettiği kopyaya (_spawn_player) yazmak yetmez, GERÇEK
+	# istemciye hiç ulaşmaz (bkz. main.gd'de aynı bug'ın Faz B'de
+	# bulunup düzeltilmesi — burada da aynı desen kopyalanmıştı).
+	var spawn_max_health: float = BASE_MAX_HEALTH + float(_peer_user[peer_id]["max_health_bonus"])
+	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"], "max_health": spawn_max_health})
 	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı — PvP alanı!)" % _peer_user[peer_id]["class_id"])
 
 @rpc("authority", "reliable")

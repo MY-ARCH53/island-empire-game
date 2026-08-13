@@ -9,13 +9,24 @@ extends Node2D
 const SPEED := 220.0
 const ATTACK_SEARCH_RADIUS := 300.0
 
+# Faz B — sunucu her değişiklikte main.gd → health_update RPC'siyle
+# yazıyor (bkz. pvp_player.gd'deki birebir aynı desen).
+var health: float = 120.0
+var max_health: float = 120.0
+
 func _ready() -> void:
 	var visual: ColorRect = $Visual
 	if is_multiplayer_authority():
 		visual.color = Color(0.25, 0.85, 0.35, 1.0)
 	else:
 		visual.color = Color(0.85, 0.25, 0.25, 1.0)
-	$Label.text = name
+	_update_label()
+
+func _update_label() -> void:
+	$Label.text = "%s (%d/%d)" % [name, int(health), int(max_health)]
+
+func _process(_delta: float) -> void:
+	_update_label()
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():

@@ -80,6 +80,8 @@ func _spawn_player(data: Dictionary) -> Node2D:
 	player.class_id = str(data.get("class_id", "koylu"))
 	player.set_multiplayer_authority(id)
 	player.position = Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
+	player.max_health = float(data.get("max_health", 100.0))
+	player.health = player.max_health
 	return player
 
 # submit_auth/request_pvp_attack'ın GÖVDESİ sadece sunucuda çalışır (bkz.

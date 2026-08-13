@@ -119,6 +119,8 @@ func _spawn_player(data: Dictionary) -> Node2D:
 	player.class_id = str(data.get("class_id", "koylu"))
 	player.set_multiplayer_authority(id)
 	player.position = Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
+	player.max_health = float(data.get("max_health", 120.0))
+	player.health = player.max_health
 	return player
 
 # submit_auth/request_attack'ın GÖVDESİ sadece sunucuda çalışır (bkz.
@@ -184,6 +186,41 @@ func party_update(text: String) -> void:
 @rpc("authority", "reliable")
 func party_error(message: String) -> void:
 	_show_toast(message)
+
+# Faz B — düşman temas hasarı → oyuncu canı. PvP'nin health_update
+# handler'ından neredeyse birebir kopya (bkz. online_pvp_client.gd) —
+# flash/uçan hasar sayısı/kamera sarsıntısı/ses hepsi aynı desen.
+@rpc("authority", "reliable")
+func health_update(player_name: String, new_health: float) -> void:
+	if not has_node(player_name):
+		return
+	var node = get_node(player_name)
+	var old_health: float = node.health
+	node.health = new_health
+	var dmg: float = old_health - new_health
+	if dmg <= 0.0:
+		return
+	node.flash_hit()
+	Effects.spawn_floating_text(self, node.global_position, "-%d" % int(round(dmg)), Color(1.0, 0.35, 0.35))
+	Audio.play("hit", -10.0, randf_range(0.85, 1.15))
+	if player_name == str(_local_player_id):
+		Audio.play("player_hurt", -4.0, randf_range(0.9, 1.05))
+		camera.shake(clampf(dmg * 0.15, 2.0, 10.0))
+
+@rpc("authority", "reliable")
+func farm_death_notification(message: String) -> void:
+	_show_toast(message)
+	Audio.play("game_over", -6.0)
+
+# position client-otoriter bir alan (movement zaten böyle çalışıyor) —
+# sunucu bizi doğrudan ışınlayamaz, "kendi pozisyonunu buna ayarla" der,
+# biz kendi otoriter alanımızı değiştiririz (bkz. main.gd → _on_player_died
+# notu, gerçek testte yakalanan bir bug'ın düzeltmesi).
+@rpc("authority", "reliable")
+func respawn_teleport(new_position: Vector2) -> void:
+	var me_name := str(_local_player_id)
+	if has_node(me_name):
+		get_node(me_name).position = new_position
 
 # Tek bir StatusLabel'ı sürekli üst üste yazan mesajlarla doldurmak yerine
 # (parti daveti gibi önemli bir mesaj, hemen ardından gelen bir ödül

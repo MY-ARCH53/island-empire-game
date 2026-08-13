@@ -12,6 +12,14 @@ const ATTACK_COOLDOWN := 0.6
 const ATTACK_DAMAGE := 12.0
 const RESPAWN_DELAY := 4.0
 
+# Faz B — oyuncu canı (bkz. plans/humble-chasing-galaxy.md "Farm Derinliği").
+# PvP'deki 100'den kasıtlı yüksek — farm daha bağışlayıcı hissettirmeli.
+# Can DB'ye hiç yazılmıyor, PvP'deki gibi tamamen geçici/sunucu-otoriter
+# (bkz. _broadcast_health notu) — bu proje boyunca kanıtlanmış desen.
+const BASE_MAX_HEALTH := 120.0
+const MIN_DAMAGE := 1.0
+const RESPAWN_INVULN_SEC := 2.0
+
 const FarmEnemyScene := preload("res://scenes/FarmEnemy.tscn")
 
 # Bölgeli zorluk sistemi (ek özellik, 2026-08-13 — bkz.
@@ -24,29 +32,33 @@ const FarmEnemyScene := preload("res://scenes/FarmEnemy.tscn")
 const ZONES := [
 	{"name": "tier1", "min_r": 0.0,    "max_r": 350.0,  "pool": ["bat"],
 	 "difficulty_mult": 1.0, "reward_mult": 1.0, "elite": false, "enemy_count": 4,
-	 "drop_chance": 0.30, "rarity_weights": {"common": 1.0}},
+	 "drop_chance": 0.30, "rarity_weights": {"common": 1.0}, "damage_mult": 1.0},
 	{"name": "tier2", "min_r": 350.0,  "max_r": 700.0,  "pool": ["skeleton", "ghost"],
 	 "difficulty_mult": 1.8, "reward_mult": 2.0, "elite": false, "enemy_count": 12,
-	 "drop_chance": 0.35, "rarity_weights": {"common": 0.65, "rare": 0.35}},
+	 "drop_chance": 0.35, "rarity_weights": {"common": 0.65, "rare": 0.35}, "damage_mult": 1.3},
 	{"name": "tier3", "min_r": 700.0,  "max_r": 1050.0, "pool": ["brute", "gulyabani"],
 	 "difficulty_mult": 3.0, "reward_mult": 3.5, "elite": false, "enemy_count": 20,
-	 "drop_chance": 0.40, "rarity_weights": {"common": 0.30, "rare": 0.50, "epic": 0.20}},
+	 "drop_chance": 0.40, "rarity_weights": {"common": 0.30, "rare": 0.50, "epic": 0.20}, "damage_mult": 1.7},
 	{"name": "tier4", "min_r": 1050.0, "max_r": 1400.0, "pool": ["brute", "gulyabani"],
 	 "difficulty_mult": 4.5, "reward_mult": 5.0, "elite": true, "enemy_count": 28,
-	 "drop_chance": 0.50, "rarity_weights": {"common": 0.10, "rare": 0.30, "epic": 0.40, "legendary": 0.20}},
+	 "drop_chance": 0.50, "rarity_weights": {"common": 0.10, "rare": 0.30, "epic": 0.40, "legendary": 0.20}, "damage_mult": 2.2},
 ]
 const ELITE_HEALTH_MULT := 1.3
 const ELITE_REWARD_MULT := 1.5
+# ELITE_HEALTH_MULT'tan (1.3) kasıtlı çok daha yumuşak — can seviyeyle değil
+# sadece eşyayla büyüyor, hasar da can gibi ölçeklense Tier4 hayatta
+# kalınamaz olurdu (bkz. plan "Faz B.2").
+const ELITE_DAMAGE_MULT := 1.15
 
 # Farm-özel taban istatistikler — roguelite'ın Upgrades.ENEMIES'inden
 # BİREBİR kopyalanmadı (o dict tek-oyunculu DPS/tempo için dengelenmiş,
 # burada ATTACK_DAMAGE=12/ATTACK_COOLDOWN=0.6 farklı bir PvE döngüsü).
 const ENEMY_BASE_STATS := {
-	"bat":       {"health": 30.0, "xp": 8,  "silver": 5},
-	"skeleton":  {"health": 55.0, "xp": 14, "silver": 10},
-	"ghost":     {"health": 42.0, "xp": 12, "silver": 9},
-	"brute":     {"health": 140.0, "xp": 30, "silver": 24},
-	"gulyabani": {"health": 95.0, "xp": 22, "silver": 18},
+	"bat":       {"health": 30.0, "xp": 8,  "silver": 5,  "damage": 5.0,  "speed": 90.0},
+	"skeleton":  {"health": 55.0, "xp": 14, "silver": 10, "damage": 9.0,  "speed": 55.0},
+	"ghost":     {"health": 42.0, "xp": 12, "silver": 9,  "damage": 7.0,  "speed": 100.0},
+	"brute":     {"health": 140.0, "xp": 30, "silver": 24, "damage": 18.0, "speed": 45.0},
+	"gulyabani": {"health": 95.0, "xp": 22, "silver": 18, "damage": 13.0, "speed": 50.0},
 }
 
 const SLOTS := ["weapon", "armor", "shield"]
@@ -66,6 +78,7 @@ var _peer_user: Dictionary = {}       # peer_id -> {user_id, class_id, level}
 var _last_attack_time: Dictionary = {}  # peer_id -> float saniye
 var _enemy_counter: int = 0
 var _enemy_zone: Dictionary = {}      # enemy adı -> zone index (sunucu-only, replike edilmiyor)
+var _respawn_invuln_until: Dictionary = {}  # peer_id -> float saniye (Faz B)
 
 # Faz 5 — parti sistemi (bu haritaya özgü, kalıcı değil — sadece bağlıyken
 # geçerli). party_id olarak partiyi kuran oyuncunun peer_id'si kullanılıyor.
@@ -161,6 +174,7 @@ func _on_peer_disconnected(id: int) -> void:
 	print("PEER_DISCONNECTED id=", id)
 	_peer_user.erase(id)
 	_last_attack_time.erase(id)
+	_respawn_invuln_until.erase(id)
 	if _party_of.has(id):
 		var party_id: int = _party_of[id]
 		_party_of.erase(id)
@@ -180,6 +194,8 @@ func _spawn_player(data: Dictionary) -> Node2D:
 	player.name = str(id)
 	player.set_multiplayer_authority(id)
 	player.position = Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
+	player.max_health = float(data.get("max_health", BASE_MAX_HEALTH))
+	player.health = player.max_health
 	return player
 
 # --- Kimlik doğrulama: istemci JWT'sini sunucuya gönderir, sunucu Node
@@ -234,9 +250,21 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 		"level": int(character.get("level", 1)),
 		# Faz 4 — kuşanılan silahın hasar bonusu (bkz. backend/src/utils/onlineStats.js).
 		"damage_bonus": float(equipped.get("damageBonus", 0)),
+		# Faz B — PvP zaten üçünü de önbelliğe alıyordu, farm sadece
+		# damage_bonus'u alıyordu; artık armor/max_health bonusları da
+		# okunuyor (backend'de zaten dönüyordu, sadece kullanılmıyordu).
+		"armor_bonus": float(equipped.get("armorBonus", 0)),
+		"max_health_bonus": float(equipped.get("maxHealthBonus", 0)),
 	}
 	print("AUTH_OK peer=", peer_id, " user_id=", _peer_user[peer_id]["user_id"], " class=", _peer_user[peer_id]["class_id"])
-	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"]})
+	# max_health'i spawn verisine ekliyoruz — sadece sunucunun kendi
+	# instantiate ettiği kopyaya (_spawn_player) yazmak yetmez, o değer
+	# GERÇEK istemciye hiç ulaşmaz (istemci kendi ayrı _spawn_player'ında
+	# aynı sahneyi kendi başına instantiate ediyor). Gerçek testte
+	# yakalandı: zırhlı bir test hesabında can barı üst sınırı hep 120
+	# görünüyordu, gerçek (170) değil.
+	var spawn_max_health: float = BASE_MAX_HEALTH + float(_peer_user[peer_id]["max_health_bonus"])
+	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"], "max_health": spawn_max_health})
 	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı)" % _peer_user[peer_id]["class_id"])
 
 @rpc("authority", "reliable")
@@ -341,6 +369,7 @@ func _spawn_one_enemy(zone_index: int) -> void:
 	var is_elite: bool = zone["elite"]
 	var health_mult: float = zone["difficulty_mult"] * (ELITE_HEALTH_MULT if is_elite else 1.0)
 	var reward_mult: float = zone["reward_mult"] * (ELITE_REWARD_MULT if is_elite else 1.0)
+	var damage_mult: float = float(zone["damage_mult"]) * (ELITE_DAMAGE_MULT if is_elite else 1.0)
 
 	var enemy: Node2D = FarmEnemyScene.instantiate()
 	enemy.name = "enemy_%d" % _enemy_counter
@@ -350,10 +379,78 @@ func _spawn_one_enemy(zone_index: int) -> void:
 	enemy.silver_reward = int(round(base_stats["silver"] * reward_mult))
 	enemy.enemy_type = enemy_type
 	enemy.is_elite = is_elite
+	enemy.contact_damage = float(base_stats["damage"]) * damage_mult
+	enemy.move_speed = float(base_stats["speed"])
 	enemy.position = _random_zone_position(zone)
+	enemy._spawn_position = enemy.position
 	enemy.died.connect(_on_enemy_died.bind(enemy))
+	enemy.attacked_player.connect(_on_enemy_attacked_player)
 	_enemy_zone[enemy.name] = zone_index
 	add_child(enemy)
+
+# --- Faz B: düşman temas hasarı → oyuncu canı. PvP'nin _broadcast_health/
+# health_update deseninin birebir aynısı — health SceneReplicationConfig'e
+# hiç eklenmiyor, sunucu her değişiklikte açıkça RPC ile yayınlıyor (Faz 3'te
+# PvP'de bulunan gerçek bir bug'ın tekrarlanmaması için). ---
+
+func _on_enemy_attacked_player(victim_peer_id: int, raw_damage: float) -> void:
+	if not _is_server or not _peer_user.has(victim_peer_id):
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now < _respawn_invuln_until.get(victim_peer_id, 0.0):
+		return
+	var victim_name := str(victim_peer_id)
+	if not has_node(victim_name):
+		return
+	var victim: Node2D = get_node(victim_name)
+	var armor_bonus: float = float(_peer_user[victim_peer_id].get("armor_bonus", 0))
+	var damage: float = max(MIN_DAMAGE, raw_damage - armor_bonus)
+	victim.health -= damage
+	_broadcast_health(victim_name, victim.health)
+	if victim.health <= 0.0:
+		_on_player_died(victim_peer_id, victim)
+
+func _broadcast_health(player_name: String, new_health: float) -> void:
+	for peer_id in multiplayer.get_peers():
+		rpc_id(peer_id, "health_update", player_name, new_health)
+
+@rpc("authority", "reliable")
+func health_update(player_name: String, new_health: float) -> void:
+	if has_node(player_name):
+		get_node(player_name).health = new_health
+
+# Ölüm/respawn tasarım kararı (bkz. plan): gümüş/xp/seviyeye HİÇ dokunulmuyor
+# (backend'e hiç istek gitmiyor) — tek bedel başlangıç bölgesine ışınlanmak +
+# kısa bir dokunulmazlık. Farm, PvP'nin NP bahsinden bilinçli olarak farklı,
+# düşük gerilimli bir aktivite olmalı.
+func _on_player_died(peer_id: int, player: Node2D) -> void:
+	player.health = player.max_health
+	var new_pos := Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
+	# position, oyuncunun kendi eşine ait client-otoriter bir alan
+	# (set_multiplayer_authority(peer_id), bkz. _spawn_player) — sunucu
+	# burada player.position'ı DOĞRUDAN değiştirse bile bu değişiklik asla
+	# gerçek istemciye ya da diğer eşlere yayılmaz (MultiplayerSynchronizer
+	# SADECE otorite sahibi eşten dışarı yayın yapar). Gerçek testte
+	# yakalandı: ölüm bildirimi/can sıfırlama çalışıyordu ama oyuncu
+	# ekranda hiç ışınlanmıyordu. Çözüm: istemciye "kendi pozisyonunu şuna
+	# ayarla" diyen açık bir RPC — istemci kendi otoriter alanını
+	# değiştirince normal hareket gibi doğru şekilde replike oluyor.
+	player.position = new_pos
+	_respawn_invuln_until[peer_id] = (Time.get_ticks_msec() / 1000.0) + RESPAWN_INVULN_SEC
+	_broadcast_health(str(peer_id), player.health)
+	if multiplayer.get_peers().has(peer_id):
+		rpc_id(peer_id, "respawn_teleport", new_pos)
+		rpc_id(peer_id, "farm_death_notification", "Öldün! Başlangıç bölgesine döndün.")
+
+@rpc("authority", "reliable")
+func respawn_teleport(new_position: Vector2) -> void:
+	var me_name := str(_local_player_id)
+	if has_node(me_name):
+		get_node(me_name).position = new_position
+
+@rpc("authority", "reliable")
+func farm_death_notification(message: String) -> void:
+	status_label.text = message
 
 func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	if not _is_server:
