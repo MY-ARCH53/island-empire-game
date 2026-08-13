@@ -10,4 +10,14 @@ INSERT INTO item_defs (id, name, slot, base_stats, rarity) VALUES
 ('aegis_shield',  'Aegis Kalkanı',    'shield', '{"armor": 10, "max_health": 15}'::jsonb, 'epic')
 ON CONFLICT (id) DO NOTHING;
 
+-- Bölgeli farm haritası (Tier4/elit bölge drop'u) — 2026-08-13, bkz.
+-- plans/humble-chasing-galaxy.md "Bölgeli farm haritası". epic'in
+-- ~%55-65 üstü, mevcut enchant sisteminin (%15/seviye) üzerine gerçek
+-- bir sıçrama hissettirsin diye.
+INSERT INTO item_defs (id, name, slot, base_stats, rarity) VALUES
+('legendary_sword', 'Kan Kılıcı',  'weapon', '{"damage": 22}'::jsonb,                 'legendary'),
+('legendary_armor', 'Kan Zırhı',   'armor',  '{"armor": 16, "max_health": 80}'::jsonb, 'legendary'),
+('legendary_shield','Kan Kalkanı', 'shield', '{"armor": 16, "max_health": 25}'::jsonb, 'legendary')
+ON CONFLICT (id) DO NOTHING;
+
 SELECT id, name, slot, rarity FROM item_defs ORDER BY slot, rarity;

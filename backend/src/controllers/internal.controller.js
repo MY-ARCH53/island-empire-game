@@ -7,8 +7,11 @@ const { getEquippedStats, getGuildInfo } = require('../utils/onlineStats');
 // Godot sunucusu güvenilir sayılır (internal.middleware.js ile korunuyor)
 // ama yine de savunma amaçlı üst sınırlar uygulanıyor — tek bir hatalı/
 // ele geçirilmiş sunucu çağrısı ekonomiyi bozmasın diye.
-const MAX_SILVER_PER_KILL = 200;
-const MAX_XP_PER_KILL = 200;
+// Bölgeli farm haritası (Tier4/elit) en yüksek tek-öldürme ödülü ~225xp/
+// ~180 gümüş — 200/200 tavanına çok yakın/üstündeydi, ~1.8x pay için
+// 400/400'e çıkarıldı (bkz. plans/humble-chasing-galaxy.md).
+const MAX_SILVER_PER_KILL = 400;
+const MAX_XP_PER_KILL = 400;
 // Knight Online'daki gerçek desen: solo PvP kill +50 NP, ölüm -50 NP.
 const PVP_NP_GAIN = 50;
 const PVP_NP_LOSS = 50;

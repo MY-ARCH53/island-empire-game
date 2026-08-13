@@ -698,6 +698,25 @@ aynen yeniden kullanıldı, yeni bir tane yazılmadı).
   gerçek Linux sunucusunda da hatasız çalıştığı geçici bir test hesabıyla
   onaylandı.
 
+## Bölgeli farm haritası + kamera düzeltmesi (2026-08-13)
+
+Farm haritası artık 4 iç içe halka bölgeye ayrılmış, çok daha büyük bir
+dünya (0-1400 birim yarıçap) — detaylı tasarım `godot-server/README.md` →
+"Bölgeli farm haritası" bölümünde (spawn/ödül mantığının hepsi sunucu
+tarafında, burada sadece görüntüleme değişti: `online_farm_enemy.gd`
+artık `is_elite` alanına göre Tier4 düşmanlarına kırmızımsı bir
+`modulate` tonu uyguluyor).
+
+**Bulunan ve düzeltilen kritik bug**: `OnlineFarmMap.tscn`'in
+`Camera2D`'si harita kök düğümüne bağlıydı ve hiçbir zaman oyuncuyu takip
+etmiyordu — eski küçük haritada fark edilmemişti, ama dünya
+büyüyünce Tier2-4 (düşmanların %94'ü) oyuncuya tamamen görünmez kalırdı.
+`online_farm_client.gd`'ye eklenen bir `_process()` artık her karede
+kamerayı yerel oyuncunun pozisyonuna eşitliyor (oyuncu düğümü dinamik
+spawn olduğundan doğrudan child yapılamıyor, elle senkronize ediliyor).
+Bu, gerçek ekran görüntüsü doğrulaması sırasında yakalandı — kod
+mantıken doğru görünüyordu ama görsel test olmasa fark edilmezdi.
+
 ## Denge sabitleri (tune edilebilir)
 
 - Silah/düşman/yükseltme verileri: `scripts/autoload/upgrades.gd`

@@ -22,6 +22,7 @@ const OnlineRemotePlayerScene := preload("res://scenes/OnlineRemotePlayer.tscn")
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var status_label: Label = $UI/StatusLabel
 @onready var leave_button: Button = $UI/LeaveButton
+@onready var camera: Camera2D = $Camera2D
 
 var _local_player_id: int = -1
 
@@ -55,6 +56,17 @@ func _ready() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	status_label.text = "Bağlanıyor..."
+
+# Kamera, `Camera2D` haritanın kök düğümüne bağlı olduğu için varsayılan
+# olarak (0,0)'da sabit duruyordu — bölgeli sistem öncesi küçük harita
+# için sorun değildi, ama artık dünya 1400 yarıçapa kadar genişlediğinden
+# (bkz. ZONES) oyuncuyu takip etmezse Tier2-4'teki her şey görünmez
+# kalırdı. Oyuncu düğümü çocuk olarak eklenemiyor (dinamik spawn oluyor),
+# o yüzden her karede pozisyonunu elle senkronize ediyoruz.
+func _process(_delta: float) -> void:
+	var me_name := str(_local_player_id)
+	if has_node(me_name):
+		camera.position = get_node(me_name).position
 
 func _on_connected_to_server() -> void:
 	_local_player_id = multiplayer.get_unique_id()

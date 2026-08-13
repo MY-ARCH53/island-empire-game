@@ -10,20 +10,62 @@ const HOST := "127.0.0.1"
 const ATTACK_RANGE := 60.0
 const ATTACK_COOLDOWN := 0.6
 const ATTACK_DAMAGE := 12.0
-const ENEMY_COUNT := 5
 const RESPAWN_DELAY := 4.0
-const COMMON_DROPS := ["wooden_sword", "cloth_armor", "wooden_shield"]
-const DROP_CHANCE := 0.35
 
 const FarmEnemyScene := preload("res://scenes/FarmEnemy.tscn")
 
+# Bölgeli zorluk sistemi (ek özellik, 2026-08-13 — bkz.
+# plans/humble-chasing-galaxy.md "Bölgeli farm haritası"). 4 iç içe halka,
+# merkeze göre eşit 350 birim genişlikte. Düşman sayısı halkaların gerçek
+# alan oranından (1:3:5:7) geliyor, rastgele değil. `pool`'daki tipler
+# ENEMY_BASE_STATS'tan taban istatistiği alır, sonra difficulty_mult
+# (can) / reward_mult (xp+gümüş) ile çarpılır; `elite=true` olan bölgede
+# ayrıca ELITE_HEALTH_MULT/ELITE_REWARD_MULT uygulanır.
+const ZONES := [
+	{"name": "tier1", "min_r": 0.0,    "max_r": 350.0,  "pool": ["bat"],
+	 "difficulty_mult": 1.0, "reward_mult": 1.0, "elite": false, "enemy_count": 4,
+	 "drop_chance": 0.30, "rarity_weights": {"common": 1.0}},
+	{"name": "tier2", "min_r": 350.0,  "max_r": 700.0,  "pool": ["skeleton", "ghost"],
+	 "difficulty_mult": 1.8, "reward_mult": 2.0, "elite": false, "enemy_count": 12,
+	 "drop_chance": 0.35, "rarity_weights": {"common": 0.65, "rare": 0.35}},
+	{"name": "tier3", "min_r": 700.0,  "max_r": 1050.0, "pool": ["brute", "gulyabani"],
+	 "difficulty_mult": 3.0, "reward_mult": 3.5, "elite": false, "enemy_count": 20,
+	 "drop_chance": 0.40, "rarity_weights": {"common": 0.30, "rare": 0.50, "epic": 0.20}},
+	{"name": "tier4", "min_r": 1050.0, "max_r": 1400.0, "pool": ["brute", "gulyabani"],
+	 "difficulty_mult": 4.5, "reward_mult": 5.0, "elite": true, "enemy_count": 28,
+	 "drop_chance": 0.50, "rarity_weights": {"common": 0.10, "rare": 0.30, "epic": 0.40, "legendary": 0.20}},
+]
+const ELITE_HEALTH_MULT := 1.3
+const ELITE_REWARD_MULT := 1.5
+
+# Farm-özel taban istatistikler — roguelite'ın Upgrades.ENEMIES'inden
+# BİREBİR kopyalanmadı (o dict tek-oyunculu DPS/tempo için dengelenmiş,
+# burada ATTACK_DAMAGE=12/ATTACK_COOLDOWN=0.6 farklı bir PvE döngüsü).
+const ENEMY_BASE_STATS := {
+	"bat":       {"health": 30.0, "xp": 8,  "silver": 5},
+	"skeleton":  {"health": 55.0, "xp": 14, "silver": 10},
+	"ghost":     {"health": 42.0, "xp": 12, "silver": 9},
+	"brute":     {"health": 140.0, "xp": 30, "silver": 24},
+	"gulyabani": {"health": 95.0, "xp": 22, "silver": 18},
+}
+
+const SLOTS := ["weapon", "armor", "shield"]
+const RARITY_ITEM_IDS := {
+	"common":    {"weapon": "wooden_sword",   "armor": "cloth_armor",  "shield": "wooden_shield"},
+	"rare":      {"weapon": "iron_sword",     "armor": "chain_armor",  "shield": "iron_shield"},
+	"epic":      {"weapon": "cursed_blade",   "armor": "plate_armor",  "shield": "aegis_shield"},
+	"legendary": {"weapon": "legendary_sword", "armor": "legendary_armor", "shield": "legendary_shield"},
+}
+
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var status_label: Label = $UI/StatusLabel
+@onready var camera: Camera2D = $Camera2D
 
 var _is_server: bool = false
 var _peer_user: Dictionary = {}       # peer_id -> {user_id, class_id, level}
 var _last_attack_time: Dictionary = {}  # peer_id -> float saniye
 var _enemy_counter: int = 0
+var _enemy_zone: Dictionary = {}      # enemy adı -> zone index (sunucu-only, replike edilmiyor)
 
 # Faz 5 — parti sistemi (bu haritaya özgü, kalıcı değil — sadece bağlıyken
 # geçerli). party_id olarak partiyi kuran oyuncunun peer_id'si kullanılıyor.
@@ -85,6 +127,18 @@ func _start_client() -> void:
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	status_label.text = "Bağlanıyor..."
+
+# Kamera Camera2D, harita kök düğümüne bağlı olduğu için varsayılan
+# olarak (0,0)'da sabit duruyordu — bölgeli sistem (bkz. ZONES) dünyayı
+# 1400 yarıçapa kadar genişletti, kamerayı istemci tarafında elle takip
+# ettirmezsek Tier2-4 hiç görünmez. Sunucu tarafında etkisiz (headless,
+# hiçbir şey render edilmiyor), sadece --auto-attack test client'ları için.
+func _process(_delta: float) -> void:
+	if _is_server:
+		return
+	var me_name := str(_local_player_id)
+	if has_node(me_name):
+		camera.position = get_node(me_name).position
 
 func _on_connected_to_server() -> void:
 	_local_player_id = multiplayer.get_unique_id()
@@ -201,7 +255,22 @@ func _run_auto_attack_test() -> void:
 			if _try_invite_nearest_player():
 				break
 			await get_tree().create_timer(0.3).timeout
-	for i in range(12):
+	# GEÇİCİ test yardımcısı: --test-zone=N ile oyuncuyu doğrudan o
+	# bölgenin ortasına ışınlar (bölgeli sistem doğrulaması için).
+	var test_zone := _get_cmdline_value("--test-zone=")
+	if test_zone != "":
+		var zi := int(test_zone)
+		var me_name0 := str(_local_player_id)
+		if has_node(me_name0) and zi >= 0 and zi < ZONES.size():
+			var me0: Node2D = get_node(me_name0)
+			var zone: Dictionary = ZONES[zi]
+			var mid_r: float = (float(zone["min_r"]) + float(zone["max_r"])) / 2.0
+			me0.position = Vector2(mid_r, 0.0)
+			print("ZONE_WARP zone=", zone["name"], " pos=", me0.position)
+	# Bölgeli harita eskisinden çok daha büyük (bkz. ZONES) — yürüme
+	# bütçesi buna göre artırıldı (70 tur × 90 birim/tur), yoksa test
+	# oyuncunun spawn noktasından en yakın düşmana yetişemeyebilir.
+	for i in range(70):
 		var me_name := str(_local_player_id)
 		if has_node(me_name):
 			var me: Node2D = get_node(me_name)
@@ -215,7 +284,7 @@ func _run_auto_attack_test() -> void:
 						nearest = child
 			if nearest:
 				if nearest_dist > ATTACK_RANGE:
-					me.position = me.position.move_toward(nearest.position, ATTACK_RANGE * 0.6)
+					me.position = me.position.move_toward(nearest.position, 90.0)
 				else:
 					rpc_id(1, "request_attack", nearest.name)
 		await get_tree().create_timer(0.5).timeout
@@ -247,15 +316,43 @@ func _try_invite_nearest_player() -> bool:
 # spawnable_scenes listesi sayesinde istemcilere otomatik replike olur). ---
 
 func _spawn_initial_enemies() -> void:
-	for i in range(ENEMY_COUNT):
-		_spawn_one_enemy()
+	for zone_index in range(ZONES.size()):
+		for i in range(ZONES[zone_index]["enemy_count"]):
+			_spawn_one_enemy(zone_index)
+		print("ZONE_SPAWNED zone=", ZONES[zone_index]["name"], " count=", ZONES[zone_index]["enemy_count"])
+	print("TOTAL_ENEMIES_SPAWNED=", _enemy_counter)
 
-func _spawn_one_enemy() -> void:
+# Annulus (halka) içinde alan-tekdüze rastgele konum — game.gd'deki
+# _random_field_position()'daki aynı sqrt(randf_range(min_r², max_r²))
+# tekniği (roguelite'tan, farklı bir Godot projesinden — kod paylaşılmıyor,
+# sadece teknik yeniden kullanılıyor).
+func _random_zone_position(zone: Dictionary) -> Vector2:
+	var angle := randf_range(0.0, TAU)
+	var min_r: float = zone["min_r"]
+	var max_r: float = zone["max_r"]
+	var dist := sqrt(randf_range(min_r * min_r, max_r * max_r))
+	return Vector2(cos(angle), sin(angle)) * dist
+
+func _spawn_one_enemy(zone_index: int) -> void:
+	var zone: Dictionary = ZONES[zone_index]
+	var pool: Array = zone["pool"]
+	var enemy_type: String = pool[randi() % pool.size()]
+	var base_stats: Dictionary = ENEMY_BASE_STATS[enemy_type]
+	var is_elite: bool = zone["elite"]
+	var health_mult: float = zone["difficulty_mult"] * (ELITE_HEALTH_MULT if is_elite else 1.0)
+	var reward_mult: float = zone["reward_mult"] * (ELITE_REWARD_MULT if is_elite else 1.0)
+
 	var enemy: Node2D = FarmEnemyScene.instantiate()
 	enemy.name = "enemy_%d" % _enemy_counter
 	_enemy_counter += 1
-	enemy.position = Vector2(randf_range(-250.0, 250.0), randf_range(-250.0, 250.0))
+	enemy.max_health = base_stats["health"] * health_mult
+	enemy.xp_reward = int(round(base_stats["xp"] * reward_mult))
+	enemy.silver_reward = int(round(base_stats["silver"] * reward_mult))
+	enemy.enemy_type = enemy_type
+	enemy.is_elite = is_elite
+	enemy.position = _random_zone_position(zone)
 	enemy.died.connect(_on_enemy_died.bind(enemy))
+	_enemy_zone[enemy.name] = zone_index
 	add_child(enemy)
 
 func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
@@ -265,7 +362,9 @@ func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	var user_id: int = int(user_info.get("user_id", -1))
 	var xp_reward: int = enemy.xp_reward
 	var silver_reward: int = enemy.silver_reward
-	var drop_id := _roll_item_drop()
+	var zone_index: int = _enemy_zone.get(enemy.name, 0)
+	var drop_id := _roll_item_drop(zone_index)
+	_enemy_zone.erase(enemy.name)
 	enemy.queue_free()
 	if user_id != -1:
 		if _party_of.has(killer_peer_id):
@@ -284,12 +383,24 @@ func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 		else:
 			_send_reward(killer_peer_id, user_id, silver_reward, xp_reward, drop_id)
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
-	_spawn_one_enemy()
+	_spawn_one_enemy(zone_index)
 
-func _roll_item_drop() -> String:
-	if randf() > DROP_CHANCE:
+func _roll_item_drop(zone_index: int) -> String:
+	var zone: Dictionary = ZONES[zone_index]
+	if randf() > float(zone["drop_chance"]):
 		return ""
-	return COMMON_DROPS[randi() % COMMON_DROPS.size()]
+	var rarity := _roll_rarity(zone["rarity_weights"])
+	var slot: String = SLOTS[randi() % SLOTS.size()]
+	return RARITY_ITEM_IDS[rarity][slot]
+
+func _roll_rarity(weights: Dictionary) -> String:
+	var roll := randf()
+	var cumulative := 0.0
+	for rarity in weights.keys():
+		cumulative += float(weights[rarity])
+		if roll <= cumulative:
+			return rarity
+	return weights.keys()[0]
 
 # --- Saldırı: istemci "bu düşmana vurmak istiyorum" der, sunucu menzil/
 # bekleme süresini doğrulayıp hasarı SUNUCUDA uygular. ---

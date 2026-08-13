@@ -11,6 +11,7 @@ signal died(killer_peer_id: int)
 @export var xp_reward: int = 8
 @export var silver_reward: int = 5
 @export var enemy_type: String = "bat"
+@export var is_elite: bool = false
 
 var health: float
 

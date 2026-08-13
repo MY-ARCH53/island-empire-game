@@ -286,8 +286,42 @@ Hostinger, Ubuntu 22.04) deploy edildi:
   `godot-game-v3/README.md` → "gerçek multiplayer haritalarına giriş"
   bölümünde.
 
+## Bölgeli farm haritası (2026-08-13)
+
+Plan bitip prod'a deploy edildikten sonra kullanıcı geliştirmeye devam
+etti: mevcut farm haritası (yeni bir ikinci harita DEĞİL) 4 iç içe halka
+bölgeye ayrılarak büyütüldü — merkeze göre 0-350/350-700/700-1050/
+1050-1400 birim, her biri farklı düşman havuzu + can/ödül çarpanı
+(`main.gd → ZONES`). Tier4 "elit" düşmanlar (mevcut brute/gulyabani
+sprite'ları, yeni sanat yok) ek can/ödül bonusu + kırmızımsı bir
+`modulate` tonuyla ayırt ediliyor. Toplam 64 düşman (4/12/20/28,
+halkaların gerçek alan oranından — 1:3:5:7). Item düşme tablosu artık
+bölgeye bağlı, yeni bir "legendary" nadirlik eklendi (Tier4'e özel,
+epic'in ~%55-65 üstü). Detaylı tasarım + sayı gerekçeleri:
+`plans/humble-chasing-galaxy.md` → "Bölgeli farm haritası" bölümü.
+
+**Kritik keşif — kamera oyuncuyu hiç takip etmiyordu**: `Camera2D` harita
+kök düğümüne bağlı, varsayılan olarak (0,0)'da sabit duruyormuş — eski
+küçük haritada (~250 birim) sorun değildi ama 1400 birime genişleyince
+Tier2-4 (düşmanların %94'ü) gerçek oyuncuya tamamen görünmez kalırdı.
+Görsel doğrulama sırasında (ekran görüntüsüyle) yakalanıp `main.gd`'nin
+kendi `_process()`'ine + `godot-game-v3/scripts/online_farm_client.gd`'ye
+"her karede kamerayı yerel oyuncunun pozisyonuna eşitle" mantığı
+eklenerek düzeltildi (oyuncu düğümü dinamik spawn olduğundan Camera2D'yi
+ona child yapamıyoruz, elle senkronize ediyoruz).
+
+**Doğrulama**: Her 4 bölgeden gerçek öldürmelerle (Tier1/2/3 canlı test,
+Tier4 spawn-anı istatistik kontrolü — can/ödül çok yüksek olduğu için
+tam öldürme test penceresini aşıyor) can/ödül matematiği birebir
+doğrulandı (`ENEMY_BASE_STATS × zone çarpanı × elit çarpanı`). Yeni
+"legendary" item'ın gerçekten kazanılabildiği `/api/internal/reward-kill`
+ile doğrudan test edildi. Ekran görüntüsüyle Tier4'teki elit
+sprite+tonun (kırmızımsı) doğru render olduğu, kamera düzeltmesinin
+çalıştığı görsel olarak onaylandı.
+
 ## Sıradaki adım
 
-Plan'ın 6 fazı ve prod deploy'u da tamamlandı. Bilinen tek sınırlama:
-bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı desteği istenirse
-`wss://` + sertifika ayrı bir iş olarak gerekecek.
+Plan'ın 6 fazı, prod deploy'u ve bölgeli farm haritası tamamlandı.
+Bilinen tek sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/
+tarayıcı desteği istenirse `wss://` + sertifika ayrı bir iş olarak
+gerekecek.
