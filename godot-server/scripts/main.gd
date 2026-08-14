@@ -81,26 +81,32 @@ const ABILITIES := {
 	"koylu": [
 		{"cooldown": 20.0, "name": "Sağlam Duruş", "base_armor": 15.0, "duration": 6.0},
 		{"cooldown": 12.0, "name": "Toparlanma", "base_heal": 35.0},
+		{"cooldown": 25.0, "name": "Kalkan Duvarı", "base_armor": 20.0, "duration": 8.0, "radius": 150.0},
 	],
 	"buyucu": [
 		{"cooldown": 8.0, "name": "Büyü Patlaması", "base_damage": 25.0, "radius": 100.0},
 		{"cooldown": 10.0, "name": "Alev Zinciri", "base_damage": 40.0, "search_radius": 250.0, "chain_radius": 80.0, "chain_mult": 0.6},
+		{"cooldown": 20.0, "name": "Manastik Kalkan", "base_armor": 20.0, "base_damage_bonus": 15.0, "duration": 10.0},
 	],
 	"kilic_ustasi": [
 		{"cooldown": 6.0, "name": "Kasırga Darbesi", "base_damage": 30.0, "radius": 70.0},
 		{"cooldown": 15.0, "name": "Kan Öfkesi", "base_damage_bonus": 18.0, "duration": 8.0},
+		{"cooldown": 9.0, "name": "Yıkım Vuruşu", "base_damage": 45.0},
 	],
 	"firtina_rahibesi": [
 		{"cooldown": 15.0, "name": "Şifa Dalgası", "base_heal": 30.0, "radius": 150.0},
 		{"cooldown": 15.0, "name": "Kutsal Kalkan", "base_armor": 15.0, "duration": 6.0, "radius": 150.0},
+		{"cooldown": 10.0, "name": "Nova Patlaması", "base_damage": 20.0, "radius": 90.0},
 	],
 	"vebali": [
 		{"cooldown": 10.0, "name": "Zehir Bulutu", "base_damage": 8.0, "tick_damage": 4.0, "ticks": 5, "radius": 90.0},
 		{"cooldown": 15.0, "name": "Veba Gücü", "base_damage_bonus": 15.0, "duration": 10.0},
+		{"cooldown": 12.0, "name": "Ölüm Dokunuşu", "base_damage": 15.0, "tick_damage": 5.0, "ticks": 6},
 	],
 	"firtina_avcisi": [
 		{"cooldown": 7.0, "name": "Şimşek Hamlesi", "base_damage": 20.0},
 		{"cooldown": 9.0, "name": "Çift Şimşek", "base_damage": 25.0, "chain_radius": 80.0, "chain_mult": 0.5},
+		{"cooldown": 16.0, "name": "Fırtına Kalkanı", "base_armor": 18.0, "duration": 7.0},
 	],
 }
 
@@ -738,6 +744,85 @@ func _ability_firtina_avcisi_t2(sender_id: int, cfg: Dictionary) -> void:
 	for child in get_children():
 		if child.name.begins_with("enemy_") and child != nearest and nearest.position.distance_to(child.position) <= chain_radius:
 			child.take_damage(chain_dmg, sender_id)
+
+# --- Faz E3 (Lv30 yetenekleri) ---
+
+# Kalkan Duvarı — Kutsal Kalkan'ın (T2) birebir aynı parti-zırh deseni,
+# sadece sayılar farklı.
+func _ability_koylu_t3(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var now := Time.get_ticks_msec() / 1000.0
+	var amount: float = float(cfg["base_armor"])
+	var duration: float = float(cfg["duration"])
+	var radius: float = float(cfg["radius"])
+	var targets: Array = [sender_id]
+	if _party_of.has(sender_id):
+		for pid in _party_members(_party_of[sender_id]):
+			if pid != sender_id:
+				targets.append(pid)
+	for pid in targets:
+		var pname := str(pid)
+		if not has_node(pname):
+			continue
+		if pid != sender_id and get_node(pname).position.distance_to(caster.position) > radius:
+			continue
+		_ability_armor_bonus[pid] = {"amount": amount, "expires_at": now + duration}
+
+# Manastik Kalkan — zırh (Sağlam Duruş'un aynısı) + hasar bonusu (Kan
+# Öfkesi'nin aynısı) tek yetenekte birleştirildi.
+func _ability_buyucu_t3(sender_id: int, cfg: Dictionary) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	var expires_at := now + float(cfg["duration"])
+	_ability_armor_bonus[sender_id] = {"amount": float(cfg["base_armor"]), "expires_at": expires_at}
+	_ability_damage_bonus[sender_id] = {"amount": float(cfg["base_damage_bonus"]), "expires_at": expires_at}
+
+# Yıkım Vuruşu — Şimşek Hamlesi'nin (T1) ışınlanma+tekli-vuruş deseninin
+# birebir aynısı, zincirsiz, sadece hasar sayısı farklı.
+func _ability_kilic_ustasi_t3(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var nearest := _find_nearest_enemy_to(caster.position)
+	if nearest == null:
+		return
+	var dir: Vector2 = (caster.position - nearest.position).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	var new_pos: Vector2 = nearest.position + dir * ATTACK_RANGE
+	caster.position = new_pos
+	if multiplayer.get_peers().has(sender_id):
+		rpc_id(sender_id, "ability_teleport", new_pos)
+	nearest.take_damage(float(cfg["base_damage"]), sender_id)
+
+# Nova Patlaması — büyücü/kılıç ustasının _ability_aoe_damage'ıyla aynı
+# yardımcıyı kullanıyor.
+func _ability_firtina_rahibesi_t3(sender_id: int, cfg: Dictionary) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]), float(cfg["radius"]))
+
+# Ölüm Dokunuşu — Şimşek Hamlesi'nin ışınlanma+vuruş deseni + Zehir
+# Bulutu'nun (T1) apply_poison DOT'u, aynı hedefe birleştirildi.
+func _ability_vebali_t3(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var nearest := _find_nearest_enemy_to(caster.position)
+	if nearest == null:
+		return
+	var dir: Vector2 = (caster.position - nearest.position).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	var new_pos: Vector2 = nearest.position + dir * ATTACK_RANGE
+	caster.position = new_pos
+	if multiplayer.get_peers().has(sender_id):
+		rpc_id(sender_id, "ability_teleport", new_pos)
+	nearest.take_damage(float(cfg["base_damage"]), sender_id)
+	if nearest.has_method("apply_poison"):
+		nearest.apply_poison(int(cfg["ticks"]), float(cfg["tick_damage"]), sender_id)
+
+# Fırtına Kalkanı — Sağlam Duruş'un (koylu T1) kendine-zırh deseninin
+# birebir aynısı, sadece sayılar farklı.
+func _ability_firtina_avcisi_t3(sender_id: int, cfg: Dictionary) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	_ability_armor_bonus[sender_id] = {
+		"amount": float(cfg["base_armor"]),
+		"expires_at": now + float(cfg["duration"]),
+	}
 
 @rpc("authority", "reliable")
 func ability_teleport(new_position: Vector2) -> void:
