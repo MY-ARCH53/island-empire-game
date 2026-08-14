@@ -62,7 +62,7 @@ const ZONES := [
 	{"name": "tier2", "min_r": 750.0,  "max_r": 1400.0, "pool": ["skeleton", "ghost"],
 	 "difficulty_mult": 1.8, "reward_mult": 2.0, "elite": false, "enemy_count": 15,
 	 "drop_chance": 0.35, "rarity_weights": {"common": 0.65, "rare": 0.35}, "damage_mult": 1.3},
-	{"name": "tier3", "min_r": 1400.0, "max_r": 2100.0, "pool": ["brute", "gulyabani"],
+	{"name": "tier3", "min_r": 1400.0, "max_r": 2100.0, "pool": ["brute", "gulyabani", "yaban_kurdu"],
 	 "difficulty_mult": 3.0, "reward_mult": 3.5, "elite": false, "enemy_count": 26,
 	 "drop_chance": 0.40, "rarity_weights": {"common": 0.30, "rare": 0.50, "epic": 0.20}, "damage_mult": 1.7},
 	{"name": "tier4", "min_r": 2100.0, "max_r": 2800.0, "pool": ["brute", "gulyabani"],
@@ -98,6 +98,10 @@ const ENEMY_BASE_STATS := {
 	# kullanılmıyordu. "silver" roguelite dict'inde yok, brute/gulyabani'nin
 	# xp/silver oranı (~0.8) korunarak eklendi.
 	"kan_lordu": {"health": 1400.0, "xp": 150, "silver": 120, "damage": 22.0, "speed": 55.0},
+	# Faz F4 — Verimli Vadi'ye özgü yeni mob (PixelLab ile üretildi). brute/
+	# gulyabani arası bir güç seviyesinde, xp/silver oranı ikisiyle tutarlı
+	# (~0.22/~0.18), daha hızlı ("sürü halinde saldıran kurt" teması).
+	"yaban_kurdu": {"health": 70.0, "xp": 15, "silver": 13, "damage": 14.0, "speed": 75.0},
 }
 
 # Faz F7 — Kan Lordu'nun İni: normal ZONES akışından ayrı, tekil bir boss

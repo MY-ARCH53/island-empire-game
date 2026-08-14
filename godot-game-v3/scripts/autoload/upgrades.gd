@@ -172,6 +172,13 @@ const ENEMIES := {
 	"kabus":     {"name": "Kabus",     "health": 9.0,   "speed": 145.0, "damage": 5.0,  "xp": 4,  "color": Color(0.25, 0.15, 0.35), "radius": 9.0,  "sprite": "res://assets/sprites/kabus.tres"},
 	"gulyabani": {"name": "Gulyabani", "health": 40.0,  "speed": 55.0,  "damage": 12.0, "xp": 9,  "color": Color(0.4, 0.45, 0.3),   "radius": 14.0, "sprite": "res://assets/sprites/gulyabani.tres"},
 	"kan_lordu": {"name": "Kan Lordu", "health": 1400.0, "speed": 55.0, "damage": 22.0, "xp": 150, "color": Color(0.5, 0.05, 0.1), "radius": 34.0, "sprite": "res://assets/sprites/kan_lordu.tres", "is_boss": true},
+	# Faz F4 (online mod, "Büyük Harita Genişlemesi") — SADECE online farm
+	# haritasında kullanılıyor, roguelite'ın enemy_pool listesine EKLENMEDİ
+	# (kabus/gulyabani/kan_lordu'nun burada zaten tanımlı ama roguelite'ta
+	# spawn edilmeyen deseniyle tutarlı — health/speed/damage/xp burada
+	# roguelite dengesi için, online farm KENDİ ayrı ENEMY_BASE_STATS'ını
+	# kullanıyor, bu alanları okumuyor).
+	"yaban_kurdu": {"name": "Yaban Kurdu", "health": 55.0, "speed": 85.0, "damage": 14.0, "xp": 10, "color": Color(0.5, 0.5, 0.5), "radius": 15.0, "sprite": "res://assets/sprites/yaban_kurdu.tres"},
 }
 
 func random_weapon_or_upgrade_choices(owned_weapons: Dictionary, count: int = 3) -> Array:
