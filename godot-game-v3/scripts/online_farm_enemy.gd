@@ -16,6 +16,7 @@ signal died(killer_peer_id: int)
 var health: float
 var _last_synced_health: float = -1.0
 var _elite_tint: Color = Color(1, 1, 1, 1)
+var _last_position: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	health = max_health
@@ -23,6 +24,7 @@ func _ready() -> void:
 	if sprite_path != "" and ResourceLoader.exists(sprite_path):
 		$Visual.sprite_frames = load(sprite_path)
 		$Visual.play("idle_south")
+	_last_position = position
 	if is_elite:
 		# Bölgeli zorluk sistemi (Tier4) — yeni sanat üretmeden mevcut
 		# sprite'a kırmızımsı bir "elit" tonu (bkz. plans/humble-chasing-galaxy.md).
@@ -43,6 +45,12 @@ func _process(_delta: float) -> void:
 	$Label.text = display_name + (" [ELİT]" if is_elite else "")
 	$HealthBar.max_value = max_health
 	$HealthBar.value = health
+	# Pozisyon sunucudan MultiplayerSynchronizer ile geliyor (bize ait
+	# kontrol yok) — online_remote_player.gd'nin uzak oyuncular için
+	# kullandığı aynı teknik: kareler arası fark yön/yürüme durumunu verir.
+	var movement: Vector2 = position - _last_position
+	_last_position = position
+	$Visual.update_facing(movement, movement.length() > 0.5)
 	if _last_synced_health < 0.0:
 		_last_synced_health = health
 		return

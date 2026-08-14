@@ -44,6 +44,19 @@ function findAnimDir(charDir) {
   return entries.length ? path.join(animsRoot, entries[0]) : null;
 }
 
+// findAnimDir() ilk bulduğu klasörü alıp "walk" diye etiketliyor — bu
+// yüzden ikinci bir animasyon türü (attack) eklemek için isme göre arayan
+// ayrı bir fonksiyon gerekiyor. Tüm saldırı animasyonları PixelLab'da
+// bilinçli olarak İngilizce "Attack" ismiyle üretiliyor, böylece burada
+// tek bir sabit isim aranması yeterli oluyor.
+function findNamedAnimDir(charDir, folderName) {
+  const animsRoot = path.join(charDir, 'extracted/Idle/animations');
+  if (!fs.existsSync(animsRoot)) return null;
+  const entries = fs.readdirSync(animsRoot);
+  const match = entries.find(e => e.toLowerCase() === folderName.toLowerCase());
+  return match ? path.join(animsRoot, match) : null;
+}
+
 function copyFile(src, dst) {
   fs.mkdirSync(path.dirname(dst), { recursive: true });
   fs.copyFileSync(src, dst);
@@ -87,15 +100,34 @@ function generateForCharacter({ name, out }) {
     }
   }
 
-  const allAnims = [...idleAnims, ...walkAnims];
+  const attackAnims = [];
+  const attackDir = findNamedAnimDir(charDir, 'Attack');
+  if (attackDir) {
+    for (const dir of DIRS) {
+      const frameDir = path.join(attackDir, dir);
+      if (!fs.existsSync(frameDir)) continue;
+      const frames = fs.readdirSync(frameDir).filter(f => f.endsWith('.png')).sort();
+      const dstFrames = [];
+      frames.forEach((f, i) => {
+        const dstFile = `attack_${dir}_${String(i).padStart(2, '0')}.png`;
+        copyFile(path.join(frameDir, f), path.join(dstDir, dstFile));
+        dstFrames.push(dstFile);
+      });
+      if (dstFrames.length) {
+        attackAnims.push({ name: `attack_${dir}`, frames: dstFrames, loop: false, speed: 16 });
+      }
+    }
+  }
+
+  const allAnims = [...idleAnims, ...walkAnims, ...attackAnims];
   if (!allAnims.length) {
     console.log(`[atla] ${name}: hiç animasyon/rotasyon bulunamadı`);
     return null;
   }
 
   writeSpriteFrames(out, allAnims);
-  console.log(`[ok] ${name}: ${idleAnims.length} idle + ${walkAnims.length} walk animasyonu -> ${out}.tres`);
-  return { idleCount: idleAnims.length, walkCount: walkAnims.length };
+  console.log(`[ok] ${name}: ${idleAnims.length} idle + ${walkAnims.length} walk + ${attackAnims.length} attack animasyonu -> ${out}.tres`);
+  return { idleCount: idleAnims.length, walkCount: walkAnims.length, attackCount: attackAnims.length };
 }
 
 function writeSpriteFrames(out, anims) {
