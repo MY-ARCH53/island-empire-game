@@ -34,19 +34,23 @@ const TOAST_FADE_SEC := 1.0
 
 # İksir/yetenek HUD'u — godot-server/scripts/main.gd → ABILITIES'in isim/
 # cooldown kısmının bir aynası (ZONE_DISPLAY'deki desenin aynısı, salt
-# görüntüleme — gerçek kapı/cooldown her zaman sunucuda). İksir sayısı da
-# yeni bir RPC/DB alanı GEREKTİRMİYOR: mevcut reward_notification/
-# BackendBridge REST çağrılarından çıkarılıyor (bkz. _on_inventory_fetched,
-# reward_notification'daki metin ayrıştırması).
+# görüntüleme — gerçek kapı/cooldown her zaman sunucuda). Her sınıfın 4
+# AYRI yeteneği var (Lv10/20/30/40, R/T/Y/U tuşları) — Faz D'deki "tek
+# yetenek güçlenir" modelinden farklı, bkz. plans/humble-chasing-galaxy.md
+# "Sınıf Yetenekleri Genişlemesi". İksir sayısı yeni bir RPC/DB alanı
+# GEREKTİRMİYOR: mevcut reward_notification/BackendBridge REST
+# çağrılarından çıkarılıyor (bkz. _on_inventory_fetched, reward_notification'daki
+# metin ayrıştırması).
 const ABILITY_INFO := {
-	"koylu": {"name": "Sağlam Duruş", "cooldown": 20.0},
-	"buyucu": {"name": "Büyü Patlaması", "cooldown": 8.0},
-	"kilic_ustasi": {"name": "Kasırga Darbesi", "cooldown": 6.0},
-	"firtina_rahibesi": {"name": "Şifa Dalgası", "cooldown": 15.0},
-	"vebali": {"name": "Zehir Bulutu", "cooldown": 10.0},
-	"firtina_avcisi": {"name": "Şimşek Hamlesi", "cooldown": 7.0},
+	"koylu": [{"name": "Sağlam Duruş", "cooldown": 20.0}],
+	"buyucu": [{"name": "Büyü Patlaması", "cooldown": 8.0}],
+	"kilic_ustasi": [{"name": "Kasırga Darbesi", "cooldown": 6.0}],
+	"firtina_rahibesi": [{"name": "Şifa Dalgası", "cooldown": 15.0}],
+	"vebali": [{"name": "Zehir Bulutu", "cooldown": 10.0}],
+	"firtina_avcisi": [{"name": "Şimşek Hamlesi", "cooldown": 7.0}],
 }
-const ABILITY_UNLOCK_LEVEL := 10
+const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
+const ABILITY_KEYS := ["R", "T", "Y", "U"]
 const POTION_NAME := "Küçük Can İksiri"
 
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
@@ -55,7 +59,7 @@ const POTION_NAME := "Küçük Can İksiri"
 @onready var toast_label: Label = $UI/ToastLabel
 @onready var leave_button: Button = $UI/LeaveButton
 @onready var potion_label: Label = $UI/PotionLabel
-@onready var ability_label: Label = $UI/AbilityLabel
+@onready var ability_labels: Array[Label] = [$UI/Ability1Label, $UI/Ability2Label, $UI/Ability3Label, $UI/Ability4Label]
 @onready var camera: Camera2D = $Camera2D
 
 var _local_player_id: int = -1
@@ -63,7 +67,7 @@ var _last_zone_name: String = ""
 var _toast_tween: Tween
 var _potion_count: int = 0
 var _character_level: int = 1
-var _ability_ready_at: float = 0.0
+var _ability_ready_at: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 func _server_host() -> String:
 	var override := OS.get_environment("FARM_SERVER_HOST")
@@ -121,7 +125,7 @@ func _process(_delta: float) -> void:
 	var me_pos: Vector2 = get_node(me_name).position
 	camera.position = me_pos
 	_update_zone_label(me_pos)
-	_update_ability_label()
+	_update_ability_labels()
 
 func _update_zone_label(pos: Vector2) -> void:
 	var dist := pos.length()
@@ -137,23 +141,27 @@ func _update_zone_label(pos: Vector2) -> void:
 func _update_potion_label() -> void:
 	potion_label.text = "İksir: %d  (H)" % _potion_count
 
-func _update_ability_label() -> void:
+func _update_ability_labels() -> void:
 	var me_name := str(_local_player_id)
 	if not has_node(me_name):
 		return
 	var class_id: String = get_node(me_name).class_id
-	if not ABILITY_INFO.has(class_id):
-		ability_label.text = ""
-		return
-	var info: Dictionary = ABILITY_INFO[class_id]
-	if _character_level < ABILITY_UNLOCK_LEVEL:
-		ability_label.text = "R: %s (Seviye %d'da açılır)" % [info["name"], ABILITY_UNLOCK_LEVEL]
-		return
-	var remaining: float = _ability_ready_at - (Time.get_ticks_msec() / 1000.0)
-	if remaining > 0.0:
-		ability_label.text = "R: %s (%.1fs)" % [info["name"], remaining]
-	else:
-		ability_label.text = "R: %s (Hazır)" % info["name"]
+	var slots: Array = ABILITY_INFO.get(class_id, [])
+	var now := Time.get_ticks_msec() / 1000.0
+	for i in range(ability_labels.size()):
+		var label := ability_labels[i]
+		if i >= slots.size():
+			label.text = "%s: —" % ABILITY_KEYS[i]
+			continue
+		var info: Dictionary = slots[i]
+		if _character_level < ABILITY_UNLOCK_LEVELS[i]:
+			label.text = "%s: %s (Sv.%d'da açılır)" % [ABILITY_KEYS[i], info["name"], ABILITY_UNLOCK_LEVELS[i]]
+			continue
+		var remaining: float = _ability_ready_at[i] - now
+		if remaining > 0.0:
+			label.text = "%s: %s (%.1fs)" % [ABILITY_KEYS[i], info["name"], remaining]
+		else:
+			label.text = "%s: %s (Hazır)" % [ABILITY_KEYS[i], info["name"]]
 
 # Karakter seviyesi/envanteri her REST çağrısını beklemeden en güncel
 # tutulsun diye — mevcut reward_notification/BackendBridge akışlarından
@@ -244,9 +252,10 @@ func leave_party() -> void:
 func request_use_potion() -> void:
 	pass
 
-# Faz D — sınıfa özgü yetenek kullanma isteği, bkz. godot-server/scripts/main.gd.
+# Faz D/E — sınıfa özgü yetenek kullanma isteği (slot_index: 0-3, R/T/Y/U),
+# bkz. godot-server/scripts/main.gd.
 @rpc("any_peer", "reliable")
-func request_use_ability() -> void:
+func request_use_ability(_slot_index: int) -> void:
 	pass
 
 @rpc("authority", "reliable")
@@ -319,17 +328,20 @@ func farm_death_notification(message: String) -> void:
 	_show_toast(message)
 	Audio.play("game_over", -6.0)
 
-# Faz D — hasar/heal zaten health_update ile gidiyor, bu sadece "biri
-# yetenek kullandı" anının görsel/sesli geri bildirimi.
+# Faz D/E — hasar/heal zaten health_update ile gidiyor, bu sadece "biri
+# yetenek kullandı" anının görsel/sesli geri bildirimi + kendi cooldown
+# sayacımızı başlatma (bkz. slot_index'e göre _ability_ready_at dizisi).
 @rpc("authority", "reliable")
-func ability_cast_notification(caster_name: String, class_id: String) -> void:
+func ability_cast_notification(caster_name: String, class_id: String, slot_index: int) -> void:
 	Audio.play("boss_slam", -8.0)
 	if has_node(caster_name):
 		var pos: Vector2 = get_node(caster_name).global_position
 		var color: Color = Color(1.0, 0.85, 0.3) if class_id == "buyucu" else Color(0.6, 0.8, 1.0)
 		Effects.spawn_burst(self, pos, color, 18, 170.0)
 	if caster_name == str(_local_player_id) and ABILITY_INFO.has(class_id):
-		_ability_ready_at = (Time.get_ticks_msec() / 1000.0) + float(ABILITY_INFO[class_id]["cooldown"])
+		var slots: Array = ABILITY_INFO[class_id]
+		if slot_index >= 0 and slot_index < slots.size() and slot_index < _ability_ready_at.size():
+			_ability_ready_at[slot_index] = (Time.get_ticks_msec() / 1000.0) + float(slots[slot_index]["cooldown"])
 
 # position client-otoriter bir alan (movement zaten böyle çalışıyor) —
 # sunucu bizi doğrudan ışınlayamaz, "kendi pozisyonunu buna ayarla" der,

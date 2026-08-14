@@ -61,7 +61,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_H:
 			get_parent().rpc_id(1, "request_use_potion")
 		KEY_R:
-			get_parent().rpc_id(1, "request_use_ability")
+			get_parent().rpc_id(1, "request_use_ability", 0)
+		KEY_T:
+			get_parent().rpc_id(1, "request_use_ability", 1)
+		KEY_Y:
+			get_parent().rpc_id(1, "request_use_ability", 2)
+		KEY_U:
+			get_parent().rpc_id(1, "request_use_ability", 3)
 
 # En yakın düşmanı bulup sunucudan saldırı doğrulaması ister — hasarı
 # BURADA hesaplamıyoruz, sadece "şuna saldırmak istiyorum" diyoruz

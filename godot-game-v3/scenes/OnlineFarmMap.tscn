@@ -70,13 +70,43 @@ text = "Haritadan Çık (ESC)"
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 10.0
-offset_top = -60.0
+offset_top = -130.0
 offset_right = 300.0
-offset_bottom = -36.0
+offset_bottom = -106.0
 label_settings = SubResource("LabelSettings_zone")
 text = "İksir: —"
 
-[node name="AbilityLabel" type="Label" parent="UI"]
+[node name="Ability1Label" type="Label" parent="UI"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -106.0
+offset_right = 400.0
+offset_bottom = -82.0
+label_settings = SubResource("LabelSettings_zone")
+text = "R: —"
+
+[node name="Ability2Label" type="Label" parent="UI"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -82.0
+offset_right = 400.0
+offset_bottom = -58.0
+label_settings = SubResource("LabelSettings_zone")
+text = "T: —"
+
+[node name="Ability3Label" type="Label" parent="UI"]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -58.0
+offset_right = 400.0
+offset_bottom = -34.0
+label_settings = SubResource("LabelSettings_zone")
+text = "Y: —"
+
+[node name="Ability4Label" type="Label" parent="UI"]
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 10.0
@@ -84,4 +114,4 @@ offset_top = -34.0
 offset_right = 400.0
 offset_bottom = -10.0
 label_settings = SubResource("LabelSettings_zone")
-text = "R: —"
+text = "U: —"

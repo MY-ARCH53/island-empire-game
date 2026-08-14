@@ -66,20 +66,36 @@ const POTION_DROP_CHANCE := 0.15
 const POTION_ITEM_ID := "minor_health_potion"
 const POTION_USE_COOLDOWN := 3.0
 
-# Faz D — sınıfa özgü yetenekler, her 10 seviyede bir güçleniyor (4 kademe,
-# seviye 40'ta tavan — KO'nun 60+ seviye ölçeğini birebir almak yerine bu
-# projenin çok daha küçük ölçeğine göre sonlu bir ufuk). v1'de SADECE farm,
-# PvP'ye eklenmedi (bkz. plan — yetenekler farm_enemy/parti altyapısını
-# kullanıyor, PvP'nin kendi ayarlanmış NP bahis modeli var).
+# Faz D/E — sınıfa özgü yetenekler. Her sınıfın 4 AYRI aktif yeteneği var
+# (bkz. plans/humble-chasing-galaxy.md "Sınıf Yetenekleri Genişlemesi"),
+# her biri Lv10/20/30/40'ta açılıyor ve BAĞIMSIZ olarak kullanılabiliyor
+# (üst kademe alt kademeyi değiştirmiyor, ekliyor — Faz D'deki "tek yetenek
+# güçlenir" modelinden farklı, kullanıcı açıkça "yeni yetenek" istedi).
+# ABILITIES[class_id][slot_index] — slot_index = ABILITY_UNLOCK_LEVELS'teki
+# indeksle eşleşir. Bir sınıfın o slotu için henüz tasarım eklenmediyse
+# (Faz E2-E4 tamamlanana kadar) dizi o slotta kısa kalır, request_use_ability
+# bunu nazikçe reddeder. v1'de SADECE farm, PvP'ye eklenmedi (yetenekler
+# farm_enemy/parti altyapısını kullanıyor, PvP'nin kendi NP bahis modeli var).
 const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
-const ABILITY_POWER_MULT_BY_TIER := [1.0, 1.3, 1.6, 2.0]
 const ABILITIES := {
-	"koylu":  {"cooldown": 20.0, "name": "Sağlam Duruş",   "base_armor": 15.0, "duration": 6.0},
-	"buyucu": {"cooldown": 8.0,  "name": "Büyü Patlaması", "base_damage": 25.0, "radius": 100.0},
-	"kilic_ustasi": {"cooldown": 6.0, "name": "Kasırga Darbesi", "base_damage": 30.0, "radius": 70.0},
-	"firtina_rahibesi": {"cooldown": 15.0, "name": "Şifa Dalgası", "base_heal": 30.0, "radius": 150.0},
-	"vebali": {"cooldown": 10.0, "name": "Zehir Bulutu", "base_damage": 8.0, "tick_damage": 4.0, "ticks": 5, "radius": 90.0},
-	"firtina_avcisi": {"cooldown": 7.0, "name": "Şimşek Hamlesi", "base_damage": 20.0, "chain_radius": 80.0, "chain_mult": 0.5},
+	"koylu": [
+		{"cooldown": 20.0, "name": "Sağlam Duruş", "base_armor": 15.0, "duration": 6.0},
+	],
+	"buyucu": [
+		{"cooldown": 8.0, "name": "Büyü Patlaması", "base_damage": 25.0, "radius": 100.0},
+	],
+	"kilic_ustasi": [
+		{"cooldown": 6.0, "name": "Kasırga Darbesi", "base_damage": 30.0, "radius": 70.0},
+	],
+	"firtina_rahibesi": [
+		{"cooldown": 15.0, "name": "Şifa Dalgası", "base_heal": 30.0, "radius": 150.0},
+	],
+	"vebali": [
+		{"cooldown": 10.0, "name": "Zehir Bulutu", "base_damage": 8.0, "tick_damage": 4.0, "ticks": 5, "radius": 90.0},
+	],
+	"firtina_avcisi": [
+		{"cooldown": 7.0, "name": "Şimşek Hamlesi", "base_damage": 20.0},
+	],
 }
 
 const SLOTS := ["weapon", "armor", "shield"]
@@ -101,7 +117,7 @@ var _enemy_counter: int = 0
 var _enemy_zone: Dictionary = {}      # enemy adı -> zone index (sunucu-only, replike edilmiyor)
 var _respawn_invuln_until: Dictionary = {}  # peer_id -> float saniye (Faz B)
 var _last_potion_use: Dictionary = {}       # peer_id -> float saniye (Faz C)
-var _last_ability_time: Dictionary = {}     # peer_id -> float saniye (Faz D)
+var _last_ability_time: Dictionary = {}     # peer_id -> {slot_index -> float saniye} (Faz E)
 var _ability_armor_bonus: Dictionary = {}   # peer_id -> {"amount": float, "expires_at": float} (koylu)
 
 # Faz 5 — parti sistemi (bu haritaya özgü, kalıcı değil — sadece bağlıyken
@@ -292,7 +308,7 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 	# görünüyordu, gerçek (170) değil.
 	var spawn_max_health: float = BASE_MAX_HEALTH + float(_peer_user[peer_id]["max_health_bonus"])
 	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"], "max_health": spawn_max_health})
-	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı, H can iksiri, R yetenek)" % _peer_user[peer_id]["class_id"])
+	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı, H can iksiri, R/T/Y/U yetenekler)" % _peer_user[peer_id]["class_id"])
 
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:
@@ -483,75 +499,73 @@ func respawn_teleport(new_position: Vector2) -> void:
 func farm_death_notification(message: String) -> void:
 	status_label.text = message
 
-# --- Faz D: sınıfa özgü yetenekler. İstemci "yeteneğimi kullanmak
-# istiyorum" der, sunucu seviye kapısını/cooldown'ı doğrulayıp etkiyi
-# SUNUCUDA uygular (mevcut request_attack/request_use_potion'la aynı
-# "istemci niyet bildirir, sunucu hesaplar" ilkesi). ---
+# --- Faz D/E: sınıfa özgü yetenekler. İstemci "şu SLOTU kullanmak
+# istiyorum" der (slot_index 0-3, R/T/Y/U tuşları), sunucu seviye
+# kapısını/cooldown'ı doğrulayıp etkiyi SUNUCUDA uygular (mevcut
+# request_attack/request_use_potion'la aynı "istemci niyet bildirir,
+# sunucu hesaplar" ilkesi). Her slot BAĞIMSIZ cooldown'a sahip. ---
 
 @rpc("any_peer", "reliable")
-func request_use_ability() -> void:
+func request_use_ability(slot_index: int) -> void:
 	if not _is_server:
 		return
 	var sender_id := multiplayer.get_remote_sender_id()
 	if not _peer_user.has(sender_id):
 		return
+	if slot_index < 0 or slot_index >= ABILITY_UNLOCK_LEVELS.size():
+		return
 	var level: int = int(_peer_user[sender_id]["level"])
-	var tier_index := -1
-	for i in range(ABILITY_UNLOCK_LEVELS.size()):
-		if level >= ABILITY_UNLOCK_LEVELS[i]:
-			tier_index = i
-	if tier_index == -1:
-		rpc_id(sender_id, "reward_notification", "Bu yetenek Seviye 10'da açılıyor.")
+	if level < ABILITY_UNLOCK_LEVELS[slot_index]:
+		rpc_id(sender_id, "reward_notification", "Bu yetenek Seviye %d'de açılıyor." % ABILITY_UNLOCK_LEVELS[slot_index])
 		return
 	var class_id: String = str(_peer_user[sender_id]["class_id"])
 	if not ABILITIES.has(class_id):
 		return
-	var cfg: Dictionary = ABILITIES[class_id]
+	var slots: Array = ABILITIES[class_id]
+	if slot_index >= slots.size():
+		# Bu sınıf için bu slotun yeteneği henüz tasarlanmadı (Faz E2-E4).
+		rpc_id(sender_id, "reward_notification", "Bu yetenek henüz mevcut değil.")
+		return
+	var cfg: Dictionary = slots[slot_index]
 	var now := Time.get_ticks_msec() / 1000.0
-	if now - _last_ability_time.get(sender_id, 0.0) < float(cfg["cooldown"]):
+	var peer_cooldowns: Dictionary = _last_ability_time.get(sender_id, {})
+	if now - float(peer_cooldowns.get(slot_index, 0.0)) < float(cfg["cooldown"]):
 		return
 	if not has_node(str(sender_id)):
 		return
-	_last_ability_time[sender_id] = now
-	var power_mult: float = ABILITY_POWER_MULT_BY_TIER[tier_index]
+	peer_cooldowns[slot_index] = now
+	_last_ability_time[sender_id] = peer_cooldowns
 	for peer_id in multiplayer.get_peers():
-		rpc_id(peer_id, "ability_cast_notification", str(sender_id), class_id)
-	match class_id:
-		"koylu":
-			_ability_koylu(sender_id, cfg, power_mult)
-		"buyucu":
-			_ability_buyucu(sender_id, cfg, power_mult)
-		"kilic_ustasi":
-			_ability_kilic_ustasi(sender_id, cfg, power_mult)
-		"firtina_rahibesi":
-			_ability_firtina_rahibesi(sender_id, cfg, power_mult)
-		"vebali":
-			_ability_vebali(sender_id, cfg, power_mult)
-		"firtina_avcisi":
-			_ability_firtina_avcisi(sender_id, cfg, power_mult, tier_index)
+		rpc_id(peer_id, "ability_cast_notification", str(sender_id), class_id, slot_index)
+	# _ability_<class_id>_t<slot+1> adlandırma kuralı — yeni bir slot
+	# eklerken sadece bu isimde bir metot eklemek yeterli, dispatch
+	# tablosu bakımı gerekmiyor (bkz. plan "Faz E1").
+	var method_name := "_ability_%s_t%d" % [class_id, slot_index + 1]
+	if has_method(method_name):
+		call(method_name, sender_id, cfg)
 
-# Çevredeki tüm düşmanlara alan hasarı — buyucu ve kilic_ustasi'nin ikisi
-# de aynı şekli kullanıyor (sadece sayılar farklı), tek yardımcıda
-# birleştirildi. Mevcut take_damage/died altyapısını bedava kullanıyor
-# (ödül/drop zaten oradan akıyor).
+# Çevredeki tüm düşmanlara alan hasarı — birden çok yetenek bu şekli
+# kullanıyor (sadece sayılar farklı), tek yardımcıda birleştirildi.
+# Mevcut take_damage/died altyapısını bedava kullanıyor (ödül/drop zaten
+# oradan akıyor).
 func _ability_aoe_damage(sender_id: int, dmg: float, radius: float) -> void:
 	var caster: Node2D = get_node(str(sender_id))
 	for child in get_children():
 		if child.name.begins_with("enemy_") and caster.position.distance_to(child.position) <= radius:
 			child.take_damage(dmg, sender_id)
 
-func _ability_buyucu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
-	_ability_aoe_damage(sender_id, float(cfg["base_damage"]) * power_mult, float(cfg["radius"]))
+func _ability_buyucu_t1(sender_id: int, cfg: Dictionary) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]), float(cfg["radius"]))
 
-func _ability_kilic_ustasi(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
-	_ability_aoe_damage(sender_id, float(cfg["base_damage"]) * power_mult, float(cfg["radius"]))
+func _ability_kilic_ustasi_t1(sender_id: int, cfg: Dictionary) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]), float(cfg["radius"]))
 
 # Sağlam Duruş — geçici zırh bonusu (bkz. _on_enemy_attacked_player'daki
 # hasar formülüne entegrasyon).
-func _ability_koylu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+func _ability_koylu_t1(sender_id: int, cfg: Dictionary) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	_ability_armor_bonus[sender_id] = {
-		"amount": float(cfg["base_armor"]) * power_mult,
+		"amount": float(cfg["base_armor"]),
 		"expires_at": now + float(cfg["duration"]),
 	}
 
@@ -559,9 +573,9 @@ func _ability_koylu(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
 # iyileştirir. Mevcut _party_members() (şimdiye kadar sadece ödül
 # paylaşımı için kullanılıyordu) ilk kez oyuncunun anlık hissedeceği bir
 # şeye dönüşüyor.
-func _ability_firtina_rahibesi(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+func _ability_firtina_rahibesi_t1(sender_id: int, cfg: Dictionary) -> void:
 	var caster: Node2D = get_node(str(sender_id))
-	var heal: float = float(cfg["base_heal"]) * power_mult
+	var heal: float = float(cfg["base_heal"])
 	var radius: float = float(cfg["radius"])
 	var targets: Array = [sender_id]
 	if _party_of.has(sender_id):
@@ -581,10 +595,10 @@ func _ability_firtina_rahibesi(sender_id: int, cfg: Dictionary, power_mult: floa
 # Zehir Bulutu — anlık ilk hasar + yarıçaptaki tüm düşmanlara zamana
 # yayılı ek hasar (DOT). Tik sayacı farm_enemy.gd → apply_poison()'da,
 # take_damage'ı tekrar tekrar çağırıyor (ödül/ölüm zaten o yoldan akıyor).
-func _ability_vebali(sender_id: int, cfg: Dictionary, power_mult: float) -> void:
+func _ability_vebali_t1(sender_id: int, cfg: Dictionary) -> void:
 	var caster: Node2D = get_node(str(sender_id))
-	var initial_dmg: float = float(cfg["base_damage"]) * power_mult
-	var tick_dmg: float = float(cfg["tick_damage"]) * power_mult
+	var initial_dmg: float = float(cfg["base_damage"])
+	var tick_dmg: float = float(cfg["tick_damage"])
 	var radius: float = float(cfg["radius"])
 	for child in get_children():
 		if child.name.begins_with("enemy_") and caster.position.distance_to(child.position) <= radius:
@@ -592,13 +606,13 @@ func _ability_vebali(sender_id: int, cfg: Dictionary, power_mult: float) -> void
 			if child.has_method("apply_poison"):
 				child.apply_poison(int(cfg["ticks"]), tick_dmg, sender_id)
 
-# Şimşek Hamlesi — en yakın düşmana ışınlanıp vurur. position client-
+# Şimşek Hamlesi — en yakın düşmana ışınlanıp vurur (zincirsiz — zincir
+# artık ayrı bir T2 yeteneği "Çift Şimşek", bkz. plan). position client-
 # otoriter olduğundan (bkz. respawn_teleport'taki aynı gotcha, Faz B)
 # sunucu burada caster.position'ı DOĞRUDAN değiştirse bile gerçek
 # istemciye yansımaz — ability_teleport RPC'siyle istemciye "kendi
-# pozisyonunu buna ayarla" deniyor. Zincir (2. hedefe %50 hasar) SADECE
-# tier≥1 (Seviye 20+) açılıyor — güç artışı değil, YETENEK ŞEKLİ değişimi.
-func _ability_firtina_avcisi(sender_id: int, cfg: Dictionary, power_mult: float, tier_index: int) -> void:
+# pozisyonunu buna ayarla" deniyor.
+func _ability_firtina_avcisi_t1(sender_id: int, cfg: Dictionary) -> void:
 	var caster: Node2D = get_node(str(sender_id))
 	var nearest: Node2D = null
 	var nearest_dist := INF
@@ -617,14 +631,7 @@ func _ability_firtina_avcisi(sender_id: int, cfg: Dictionary, power_mult: float,
 	caster.position = new_pos
 	if multiplayer.get_peers().has(sender_id):
 		rpc_id(sender_id, "ability_teleport", new_pos)
-	var dmg: float = float(cfg["base_damage"]) * power_mult
-	nearest.take_damage(dmg, sender_id)
-	if tier_index >= 1:
-		var chain_radius: float = float(cfg["chain_radius"])
-		var chain_dmg: float = dmg * float(cfg["chain_mult"])
-		for child in get_children():
-			if child.name.begins_with("enemy_") and child != nearest and nearest.position.distance_to(child.position) <= chain_radius:
-				child.take_damage(chain_dmg, sender_id)
+	nearest.take_damage(float(cfg["base_damage"]), sender_id)
 
 @rpc("authority", "reliable")
 func ability_teleport(new_position: Vector2) -> void:
@@ -633,8 +640,8 @@ func ability_teleport(new_position: Vector2) -> void:
 		get_node(me_name).position = new_position
 
 @rpc("authority", "reliable")
-func ability_cast_notification(caster_name: String, class_id: String) -> void:
-	print("ABILITY_CAST caster=", caster_name, " class=", class_id)
+func ability_cast_notification(caster_name: String, class_id: String, slot_index: int) -> void:
+	print("ABILITY_CAST caster=", caster_name, " class=", class_id, " slot=", slot_index)
 
 func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	if not _is_server:
