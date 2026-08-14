@@ -20,6 +20,12 @@ const BASE_MAX_HEALTH := 120.0
 const MIN_DAMAGE := 1.0
 const RESPAWN_INVULN_SEC := 2.0
 
+# Faz F1 — köy güvenli bölgesi (bkz. plans/humble-chasing-galaxy.md "Büyük
+# Harita Genişlemesi"). Bu yarıçapta hiç düşman yok, oyuncu burada
+# spawn/respawn oluyor — game.gd'deki (tek-oyunculu roguelite)
+# VILLAGE_RADIUS deseninin aynısı (kod paylaşılmıyor, sayı port edildi).
+const VILLAGE_RADIUS := 220.0
+
 # Faz F0 — düşman replikasyon LOD/culling (bkz. plans/humble-chasing-galaxy.md
 # "Büyük Harita Genişlemesi"). Kanıtlanmış kök neden: FarmEnemy.tscn'in
 # Sync'i önceden TÜM bağlı eşlere, mesafeden bağımsız, her ağ turunda
@@ -36,26 +42,35 @@ var _visibility_timer: Timer
 
 const FarmEnemyScene := preload("res://scenes/FarmEnemy.tscn")
 
-# Bölgeli zorluk sistemi (ek özellik, 2026-08-13 — bkz.
-# plans/humble-chasing-galaxy.md "Bölgeli farm haritası"). 4 iç içe halka,
-# merkeze göre eşit 350 birim genişlikte. Düşman sayısı halkaların gerçek
-# alan oranından (1:3:5:7) geliyor, rastgele değil. `pool`'daki tipler
-# ENEMY_BASE_STATS'tan taban istatistiği alır, sonra difficulty_mult
-# (can) / reward_mult (xp+gümüş) ile çarpılır; `elite=true` olan bölgede
-# ayrıca ELITE_HEALTH_MULT/ELITE_REWARD_MULT uygulanır.
+# Bölgeli zorluk sistemi (2026-08-13'te 4 halka olarak eklendi, Faz F1'de
+# 5 halkaya genişletildi — bkz. plans/humble-chasing-galaxy.md "Büyük
+# Harita Genişlemesi"). Merkezde VILLAGE_RADIUS'a kadar köy (düşmansız),
+# sonra 5 iç içe halka — genişlikleri artık eşit DEĞİL (biome'lara göre
+# ayarlandı) ama enemy_count yine halka alan oranına (dış_r²-iç_r²) göre
+# ölçekli, mevcut yoğunluk (64 düşman / 1400 yarıçap) korunarak hesaplandı.
+# `pool`'daki tipler ENEMY_BASE_STATS'tan taban istatistiği alır, sonra
+# difficulty_mult (can) / reward_mult (xp+gümüş) ile çarpılır; `elite=true`
+# olan bölgede ayrıca ELITE_HEALTH_MULT/ELITE_REWARD_MULT uygulanır.
+# NOT: tier4 ("Yağmur Ormanı") ve tier5 ("Kızıl Lav Diyarı") havuzları
+# henüz GEÇİCİ olarak mevcut mob'ları (brute/gulyabani) kullanıyor — Faz
+# F5/F6'da kendi temalı mob'larıyla (Bataklık İfriti/Zehir Sarmaşığı/Lav
+# İblisi) değiştirilecek, bu bilinçli bir ara adım.
 const ZONES := [
-	{"name": "tier1", "min_r": 0.0,    "max_r": 350.0,  "pool": ["bat"],
-	 "difficulty_mult": 1.0, "reward_mult": 1.0, "elite": false, "enemy_count": 4,
+	{"name": "tier1", "min_r": VILLAGE_RADIUS, "max_r": 750.0,  "pool": ["bat", "kabus"],
+	 "difficulty_mult": 1.0, "reward_mult": 1.0, "elite": false, "enemy_count": 5,
 	 "drop_chance": 0.30, "rarity_weights": {"common": 1.0}, "damage_mult": 1.0},
-	{"name": "tier2", "min_r": 350.0,  "max_r": 700.0,  "pool": ["skeleton", "ghost"],
-	 "difficulty_mult": 1.8, "reward_mult": 2.0, "elite": false, "enemy_count": 12,
+	{"name": "tier2", "min_r": 750.0,  "max_r": 1400.0, "pool": ["skeleton", "ghost"],
+	 "difficulty_mult": 1.8, "reward_mult": 2.0, "elite": false, "enemy_count": 15,
 	 "drop_chance": 0.35, "rarity_weights": {"common": 0.65, "rare": 0.35}, "damage_mult": 1.3},
-	{"name": "tier3", "min_r": 700.0,  "max_r": 1050.0, "pool": ["brute", "gulyabani"],
-	 "difficulty_mult": 3.0, "reward_mult": 3.5, "elite": false, "enemy_count": 20,
+	{"name": "tier3", "min_r": 1400.0, "max_r": 2100.0, "pool": ["brute", "gulyabani"],
+	 "difficulty_mult": 3.0, "reward_mult": 3.5, "elite": false, "enemy_count": 26,
 	 "drop_chance": 0.40, "rarity_weights": {"common": 0.30, "rare": 0.50, "epic": 0.20}, "damage_mult": 1.7},
-	{"name": "tier4", "min_r": 1050.0, "max_r": 1400.0, "pool": ["brute", "gulyabani"],
-	 "difficulty_mult": 4.5, "reward_mult": 5.0, "elite": true, "enemy_count": 28,
-	 "drop_chance": 0.50, "rarity_weights": {"common": 0.10, "rare": 0.30, "epic": 0.40, "legendary": 0.20}, "damage_mult": 2.2},
+	{"name": "tier4", "min_r": 2100.0, "max_r": 2800.0, "pool": ["brute", "gulyabani"],
+	 "difficulty_mult": 4.5, "reward_mult": 5.0, "elite": false, "enemy_count": 36,
+	 "drop_chance": 0.45, "rarity_weights": {"common": 0.15, "rare": 0.35, "epic": 0.35, "legendary": 0.15}, "damage_mult": 2.0},
+	{"name": "tier5", "min_r": 2800.0, "max_r": 3500.0, "pool": ["brute", "gulyabani"],
+	 "difficulty_mult": 6.5, "reward_mult": 7.5, "elite": true, "enemy_count": 46,
+	 "drop_chance": 0.50, "rarity_weights": {"common": 0.10, "rare": 0.30, "epic": 0.40, "legendary": 0.20}, "damage_mult": 2.8},
 ]
 const ELITE_HEALTH_MULT := 1.3
 const ELITE_REWARD_MULT := 1.5
@@ -69,6 +84,11 @@ const ELITE_DAMAGE_MULT := 1.15
 # burada ATTACK_DAMAGE=12/ATTACK_COOLDOWN=0.6 farklı bir PvE döngüsü).
 const ENEMY_BASE_STATS := {
 	"bat":       {"health": 30.0, "xp": 8,  "silver": 5,  "damage": 5.0,  "speed": 90.0},
+	# Faz F1 — Upgrades.ENEMIES'te zaten tanımlı+sprite'lı ama farm
+	# haritasında hiç kullanılmıyordu, devreye alındı (0 yeni PixelLab
+	# maliyeti). "silver" roguelite dict'inde yok, bat ile aynı xp/silver
+	# oranı (~0.6) korunarak eklendi.
+	"kabus":     {"health": 9.0,  "xp": 4,  "silver": 3,  "damage": 5.0,  "speed": 145.0},
 	"skeleton":  {"health": 55.0, "xp": 14, "silver": 10, "damage": 9.0,  "speed": 55.0},
 	"ghost":     {"health": 42.0, "xp": 12, "silver": 9,  "damage": 7.0,  "speed": 100.0},
 	"brute":     {"health": 140.0, "xp": 30, "silver": 24, "damage": 18.0, "speed": 45.0},
@@ -275,7 +295,7 @@ func _spawn_player(data: Dictionary) -> Node2D:
 	var player: Node2D = player_scene.instantiate()
 	player.name = str(id)
 	player.set_multiplayer_authority(id)
-	player.position = Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
+	player.position = _village_spawn_position()
 	player.max_health = float(data.get("max_health", BASE_MAX_HEALTH))
 	player.health = player.max_health
 	return player
@@ -377,6 +397,11 @@ func _run_auto_attack_test() -> void:
 			var mid_r: float = (float(zone["min_r"]) + float(zone["max_r"])) / 2.0
 			me0.position = Vector2(mid_r, 0.0)
 			print("ZONE_WARP zone=", zone["name"], " pos=", me0.position)
+			# Faz F0'ın görünürlük döngüsü (main.gd → _update_enemy_visibility,
+			# 0.5sn'de bir) ışınlama SONRASI pozisyona göre yeniden hesaplansın
+			# diye bekleniyor — yoksa "en yakın düşman" araması hâlâ eski
+			# (ışınlama öncesi) görünür kılınmış, uzak bir düşmanı bulabilir.
+			await get_tree().create_timer(1.0).timeout
 	# Bölgeli harita eskisinden çok daha büyük (bkz. ZONES) — yürüme
 	# bütçesi buna göre artırıldı (70 tur × 90 birim/tur), yoksa test
 	# oyuncunun spawn noktasından en yakın düşmana yetişemeyebilir.
@@ -469,6 +494,13 @@ func _random_zone_position(zone: Dictionary) -> Vector2:
 	var dist := sqrt(randf_range(min_r * min_r, max_r * max_r))
 	return Vector2(cos(angle), sin(angle)) * dist
 
+# Faz F1 — oyuncu spawn/respawn noktası artık köy merkezi (VILLAGE_RADIUS'un
+# 30 birim içinde, kenara/tier1'e çok yakın düşülmesin diye pay bırakılıyor).
+# Hem _spawn_player hem _on_player_died AYNI formülü kullanıyor (öncesinde
+# ikisi ayrı sabit bir aralık kullanıyordu, tutarsızdı).
+func _village_spawn_position() -> Vector2:
+	return _random_zone_position({"min_r": 0.0, "max_r": VILLAGE_RADIUS - 30.0})
+
 func _spawn_one_enemy(zone_index: int) -> void:
 	var zone: Dictionary = ZONES[zone_index]
 	var pool: Array = zone["pool"]
@@ -537,7 +569,7 @@ func health_update(player_name: String, new_health: float) -> void:
 # düşük gerilimli bir aktivite olmalı.
 func _on_player_died(peer_id: int, player: Node2D) -> void:
 	player.health = player.max_health
-	var new_pos := Vector2(randf_range(-150.0, 150.0), randf_range(-150.0, 150.0))
+	var new_pos := _village_spawn_position()
 	# position, oyuncunun kendi eşine ait client-otoriter bir alan
 	# (set_multiplayer_authority(peer_id), bkz. _spawn_player) — sunucu
 	# burada player.position'ı DOĞRUDAN değiştirse bile bu değişiklik asla
