@@ -740,6 +740,13 @@ func attack_notification(attacker_name: String) -> void:
 	if has_node(attacker_name):
 		get_node(attacker_name).get_node("Visual").play_attack()
 
+# Faz G2 — bir mob temas hasarı verdiğinde yayınlanır (bkz. main.gd →
+# _on_enemy_attacked_player), mobun saldırı animasyonunu tetikler.
+@rpc("authority", "reliable")
+func enemy_attack_notification(enemy_name: String) -> void:
+	if has_node(enemy_name):
+		get_node(enemy_name).get_node("Visual").play_attack()
+
 @rpc("authority", "reliable")
 func farm_death_notification(message: String) -> void:
 	_show_toast(message)

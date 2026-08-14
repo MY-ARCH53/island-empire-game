@@ -1,4 +1,4 @@
-[gd_resource type="SpriteFrames" load_steps=22 format=3]
+[gd_resource type="SpriteFrames" load_steps=43 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/idle_south.png" id="1"]
 [ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/idle_east.png" id="2"]
@@ -21,6 +21,27 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/walk_north_03.png" id="19"]
 [ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/walk_north_04.png" id="20"]
 [ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/walk_north_05.png" id="21"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_south_00.png" id="22"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_south_01.png" id="23"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_south_02.png" id="24"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_south_03.png" id="25"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_south_04.png" id="26"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_south_05.png" id="27"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_south_06.png" id="28"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_east_00.png" id="29"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_east_01.png" id="30"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_east_02.png" id="31"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_east_03.png" id="32"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_east_04.png" id="33"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_east_05.png" id="34"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_east_06.png" id="35"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_north_00.png" id="36"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_north_01.png" id="37"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_north_02.png" id="38"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_north_03.png" id="39"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_north_04.png" id="40"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_north_05.png" id="41"]
+[ext_resource type="Texture2D" path="res://assets/sprites/yaban_kurdu/attack_north_06.png" id="42"]
 
 [resource]
 animations = [{
@@ -116,4 +137,82 @@ animations = [{
 "loop": true,
 "name": &"walk_north",
 "speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("22")
+}, {
+"duration": 1.0,
+"texture": ExtResource("23")
+}, {
+"duration": 1.0,
+"texture": ExtResource("24")
+}, {
+"duration": 1.0,
+"texture": ExtResource("25")
+}, {
+"duration": 1.0,
+"texture": ExtResource("26")
+}, {
+"duration": 1.0,
+"texture": ExtResource("27")
+}, {
+"duration": 1.0,
+"texture": ExtResource("28")
+}],
+"loop": false,
+"name": &"attack_south",
+"speed": 16.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("29")
+}, {
+"duration": 1.0,
+"texture": ExtResource("30")
+}, {
+"duration": 1.0,
+"texture": ExtResource("31")
+}, {
+"duration": 1.0,
+"texture": ExtResource("32")
+}, {
+"duration": 1.0,
+"texture": ExtResource("33")
+}, {
+"duration": 1.0,
+"texture": ExtResource("34")
+}, {
+"duration": 1.0,
+"texture": ExtResource("35")
+}],
+"loop": false,
+"name": &"attack_east",
+"speed": 16.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("36")
+}, {
+"duration": 1.0,
+"texture": ExtResource("37")
+}, {
+"duration": 1.0,
+"texture": ExtResource("38")
+}, {
+"duration": 1.0,
+"texture": ExtResource("39")
+}, {
+"duration": 1.0,
+"texture": ExtResource("40")
+}, {
+"duration": 1.0,
+"texture": ExtResource("41")
+}, {
+"duration": 1.0,
+"texture": ExtResource("42")
+}],
+"loop": false,
+"name": &"attack_north",
+"speed": 16.0
 }]

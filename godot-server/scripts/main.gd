@@ -565,7 +565,7 @@ func _spawn_one_enemy(zone_index: int) -> void:
 	enemy.position = _random_zone_position(zone)
 	enemy._spawn_position = enemy.position
 	enemy.died.connect(_on_enemy_died.bind(enemy))
-	enemy.attacked_player.connect(_on_enemy_attacked_player)
+	enemy.attacked_player.connect(_on_enemy_attacked_player.bind(enemy))
 	_enemy_zone[enemy.name] = zone_index
 	add_child(enemy)
 
@@ -587,7 +587,7 @@ func _spawn_boss() -> void:
 	enemy.position = BOSS_POSITION
 	enemy._spawn_position = enemy.position
 	enemy.died.connect(_on_enemy_died.bind(enemy))
-	enemy.attacked_player.connect(_on_enemy_attacked_player)
+	enemy.attacked_player.connect(_on_enemy_attacked_player.bind(enemy))
 	_enemy_zone[enemy.name] = BOSS_ZONE_INDEX
 	add_child(enemy)
 	for peer_id in multiplayer.get_peers():
@@ -614,7 +614,7 @@ func _spawn_boss_kabus(preferred_name: String = "") -> void:
 	enemy.position = BOSS_POSITION + _random_zone_position({"min_r": 0.0, "max_r": BOSS_ARENA_RADIUS})
 	enemy._spawn_position = enemy.position
 	enemy.died.connect(_on_enemy_died.bind(enemy))
-	enemy.attacked_player.connect(_on_enemy_attacked_player)
+	enemy.attacked_player.connect(_on_enemy_attacked_player.bind(enemy))
 	_enemy_zone[enemy.name] = BOSS_ZONE_INDEX
 	add_child(enemy)
 
@@ -623,7 +623,7 @@ func _spawn_boss_kabus(preferred_name: String = "") -> void:
 # hiç eklenmiyor, sunucu her değişiklikte açıkça RPC ile yayınlıyor (Faz 3'te
 # PvP'de bulunan gerçek bir bug'ın tekrarlanmaması için). ---
 
-func _on_enemy_attacked_player(victim_peer_id: int, raw_damage: float) -> void:
+func _on_enemy_attacked_player(victim_peer_id: int, raw_damage: float, enemy: Node2D) -> void:
 	if not _is_server or not _peer_user.has(victim_peer_id):
 		return
 	var now := Time.get_ticks_msec() / 1000.0
@@ -641,6 +641,10 @@ func _on_enemy_attacked_player(victim_peer_id: int, raw_damage: float) -> void:
 	var damage: float = max(MIN_DAMAGE, raw_damage - armor_bonus)
 	victim.health -= damage
 	_broadcast_health(victim_name, victim.health)
+	# Faz G2 — mobun vurma animasyonunu tüm eşlerde tetikler (bkz.
+	# attack_notification'ın oyuncu saldırısı için aynı deseni).
+	for peer_id in multiplayer.get_peers():
+		rpc_id(peer_id, "enemy_attack_notification", enemy.name)
 	if victim.health <= 0.0:
 		_on_player_died(victim_peer_id, victim)
 
@@ -1079,6 +1083,12 @@ func ability_cast_notification(caster_name: String, class_id: String, slot_index
 @rpc("authority", "reliable")
 func attack_notification(attacker_name: String) -> void:
 	print("ATTACK_NOTIFICATION attacker=", attacker_name)
+
+# Faz G2 — bir mob temas hasarı verdiğinde diğer TÜM eşlere yayınlanır,
+# böylece o mobun saldırı animasyonu client'ta oynar (bkz. _on_enemy_attacked_player).
+@rpc("authority", "reliable")
+func enemy_attack_notification(enemy_name: String) -> void:
+	print("ENEMY_ATTACK_NOTIFICATION enemy=", enemy_name)
 
 func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	if not _is_server:

@@ -1,4 +1,4 @@
-[gd_resource type="SpriteFrames" load_steps=28 format=3]
+[gd_resource type="SpriteFrames" load_steps=49 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/sprites/hayalet/idle_south.png" id="1"]
 [ext_resource type="Texture2D" path="res://assets/sprites/hayalet/idle_east.png" id="2"]
@@ -27,6 +27,27 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/hayalet/walk_north_05.png" id="25"]
 [ext_resource type="Texture2D" path="res://assets/sprites/hayalet/walk_north_06.png" id="26"]
 [ext_resource type="Texture2D" path="res://assets/sprites/hayalet/walk_north_07.png" id="27"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_south_00.png" id="28"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_south_01.png" id="29"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_south_02.png" id="30"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_south_03.png" id="31"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_south_04.png" id="32"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_south_05.png" id="33"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_south_06.png" id="34"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_east_00.png" id="35"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_east_01.png" id="36"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_east_02.png" id="37"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_east_03.png" id="38"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_east_04.png" id="39"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_east_05.png" id="40"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_east_06.png" id="41"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_north_00.png" id="42"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_north_01.png" id="43"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_north_02.png" id="44"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_north_03.png" id="45"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_north_04.png" id="46"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_north_05.png" id="47"]
+[ext_resource type="Texture2D" path="res://assets/sprites/hayalet/attack_north_06.png" id="48"]
 
 [resource]
 animations = [{
@@ -140,4 +161,82 @@ animations = [{
 "loop": true,
 "name": &"walk_north",
 "speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("28")
+}, {
+"duration": 1.0,
+"texture": ExtResource("29")
+}, {
+"duration": 1.0,
+"texture": ExtResource("30")
+}, {
+"duration": 1.0,
+"texture": ExtResource("31")
+}, {
+"duration": 1.0,
+"texture": ExtResource("32")
+}, {
+"duration": 1.0,
+"texture": ExtResource("33")
+}, {
+"duration": 1.0,
+"texture": ExtResource("34")
+}],
+"loop": false,
+"name": &"attack_south",
+"speed": 16.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("35")
+}, {
+"duration": 1.0,
+"texture": ExtResource("36")
+}, {
+"duration": 1.0,
+"texture": ExtResource("37")
+}, {
+"duration": 1.0,
+"texture": ExtResource("38")
+}, {
+"duration": 1.0,
+"texture": ExtResource("39")
+}, {
+"duration": 1.0,
+"texture": ExtResource("40")
+}, {
+"duration": 1.0,
+"texture": ExtResource("41")
+}],
+"loop": false,
+"name": &"attack_east",
+"speed": 16.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("42")
+}, {
+"duration": 1.0,
+"texture": ExtResource("43")
+}, {
+"duration": 1.0,
+"texture": ExtResource("44")
+}, {
+"duration": 1.0,
+"texture": ExtResource("45")
+}, {
+"duration": 1.0,
+"texture": ExtResource("46")
+}, {
+"duration": 1.0,
+"texture": ExtResource("47")
+}, {
+"duration": 1.0,
+"texture": ExtResource("48")
+}],
+"loop": false,
+"name": &"attack_north",
+"speed": 16.0
 }]
