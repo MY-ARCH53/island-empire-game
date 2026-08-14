@@ -19,16 +19,38 @@ const PROD_HOST := "islandsempire.com"
 
 const OnlineRemotePlayerScene := preload("res://scenes/OnlineRemotePlayer.tscn")
 
-# Bölgeli farm haritası (bkz. plans/humble-chasing-galaxy.md "Bölgeli
-# farm haritası") — sadece görüntüleme için, godot-server/scripts/main.gd
-# → ZONES'un yarıçap/isim kısmının bir aynası (oynanış mantığı yok,
-# sadece "hangi bölgedeyim" göstergesi için).
+# Büyük Harita Genişlemesi (bkz. plans/humble-chasing-galaxy.md) — sadece
+# görüntüleme için, godot-server/scripts/main.gd → ZONES'un yarıçap/isim
+# kısmının bir aynası (oynanış mantığı yok, sadece "hangi bölgedeyim"
+# göstergesi için).
 const ZONE_DISPLAY := [
-	{"max_r": 350.0,  "name": "Tier 1 — Sakin Bölge"},
-	{"max_r": 700.0,  "name": "Tier 2 — Orta Bölge"},
-	{"max_r": 1050.0, "name": "Tier 3 — Tehlikeli Bölge"},
-	{"max_r": INF,    "name": "Tier 4 — Elit Bölge"},
+	{"max_r": 220.0,  "name": "Köy"},
+	{"max_r": 750.0,  "name": "Tier 1 — Yeşil Çayır"},
+	{"max_r": 1400.0, "name": "Tier 2 — Unutulmuş Mezarlık"},
+	{"max_r": 2100.0, "name": "Tier 3 — Verimli Vadi"},
+	{"max_r": 2800.0, "name": "Tier 4 — Yağmur Ormanı"},
+	{"max_r": INF,    "name": "Tier 5 — Kızıl Lav Diyarı"},
 ]
+
+# Faz F2 — köy + Tier1 (Yeşil Çayır) zemin portu. game.gd'deki (tek-oyunculu
+# roguelite) _spawn_village()/_grass_envelope()/_paint_ground() mantığının
+# birebir yeniden yazımı (kod paylaşılmıyor, sadece teknik port edildi).
+# Basitleştirme: game.gd'de kıyı/deniz geçişi de var, burada YOK — Tier1'in
+# ötesinde farklı bir biome (Faz F3'te mezarlık) başlıyor, deniz değil, o
+# yüzden COAST_TAPER kısmı hiç yok.
+const TerrainLookup := preload("res://assets/tileset/meadow_terrain_lookup.gd")
+const HouseScene := preload("res://scenes/House.tscn")
+const WellScene := preload("res://scenes/Well.tscn")
+const HouseTextures := [
+	preload("res://assets/props/house_thatch.png"),
+	preload("res://assets/props/house_tile_roof.png"),
+]
+const WellTexture := preload("res://assets/props/well.png")
+const VILLAGE_RADIUS := 220.0
+const GRASS_RAMP_END := 370.0   # köy sınırından sonra çim yoğunluğu bu yarıçapa kadar artıyor
+const TIER1_MAX_R := 750.0      # bu fazda SADECE köy+Tier1 boyanıyor
+const GROUND_CELL := 32
+const GROUND_MAX_CELL := 24     # ceil(TIER1_MAX_R / GROUND_CELL)
 const TOAST_HOLD_SEC := 3.0
 const TOAST_FADE_SEC := 1.0
 
@@ -83,6 +105,8 @@ const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
 const ABILITY_KEYS := ["R", "T", "Y", "U"]
 const POTION_NAME := "Küçük Can İksiri"
 
+@onready var village_ground: TileMapLayer = $VillageGround
+@onready var world_props: Node2D = $WorldProps
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var status_label: Label = $UI/StatusLabel
 @onready var zone_label: Label = $UI/ZoneLabel
@@ -119,6 +143,8 @@ func _resolve_jwt() -> String:
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	leave_button.pressed.connect(leave_map)
+	_paint_village_ground()
+	_spawn_village()
 	Audio.play_music("farm")
 	# BackendBridge.get_online_*() GameManager.jwt_token'ı okuyor — normal
 	# oyun akışında zaten set edilmiş oluyor (giriş ana menüde yapılıyor),
@@ -156,6 +182,66 @@ func _process(_delta: float) -> void:
 	camera.position = me_pos
 	_update_zone_label(me_pos)
 	_update_ability_labels()
+
+# game.gd'deki _grass_envelope()'un basitleştirilmiş hâli — köy içi çıplak
+# (0.0), GRASS_RAMP_END'e kadar artan çim yoğunluğu, sonrası tam çim (1.0).
+func _grass_envelope(dist: float) -> float:
+	if dist < VILLAGE_RADIUS:
+		return 0.0
+	if dist < GRASS_RAMP_END:
+		return clampf((dist - VILLAGE_RADIUS) / (GRASS_RAMP_END - VILLAGE_RADIUS), 0.0, 1.0)
+	return 1.0
+
+# game.gd → _paint_ground()'un birebir aynı Wang köşe-eşleme deseni (bkz.
+# TerrainLookup notu) — SADECE 0..TIER1_MAX_R aralığı boyanıyor (Faz F2
+# kapsamı), ötesi Faz F3+'ta kendi biome tileset'leriyle dolduruluyor.
+func _paint_village_ground() -> void:
+	var vertices: Dictionary = {}
+	for i in range(90):
+		var cx: int = randi_range(-GROUND_MAX_CELL, GROUND_MAX_CELL)
+		var cy: int = randi_range(-GROUND_MAX_CELL, GROUND_MAX_CELL)
+		var center_dist: float = Vector2(cx, cy).length() * GROUND_CELL
+		if randf() > _grass_envelope(center_dist):
+			continue
+		var blob_count: int = randi_range(2, 4)
+		for b in range(blob_count):
+			var bx: int = cx + randi_range(-3, 3)
+			var by: int = cy + randi_range(-3, 3)
+			var w: int = randi_range(3, 6)
+			var h: int = randi_range(3, 6)
+			for vx in range(bx, bx + w + 1):
+				for vy in range(by, by + h + 1):
+					vertices[Vector2i(vx, vy)] = 1
+	for x in range(-GROUND_MAX_CELL, GROUND_MAX_CELL + 1):
+		for y in range(-GROUND_MAX_CELL, GROUND_MAX_CELL + 1):
+			var world_dist: float = Vector2(x, y).length() * GROUND_CELL
+			if world_dist >= TIER1_MAX_R:
+				continue
+			var nw: int = vertices.get(Vector2i(x, y), 0)
+			var ne: int = vertices.get(Vector2i(x + 1, y), 0)
+			var sw: int = vertices.get(Vector2i(x, y + 1), 0)
+			var se: int = vertices.get(Vector2i(x + 1, y + 1), 0)
+			var key: String = "%d,%d,%d,%d" % [nw, ne, sw, se]
+			var atlas_coords: Vector2i = TerrainLookup.LOOKUP.get(key, Vector2i(2, 1))
+			village_ground.set_cell(Vector2i(x, y), 0, atlas_coords, 0)
+
+# game.gd → _spawn_village()'ın birebir aynısı (5 ev halka şeklinde + 1
+# kuyu) — SADECE görsel, çarpışma yok (online oyuncu hareketi
+# CharacterBody2D kullanmıyor, bkz. plan "bilinçli kapsam kararı").
+func _spawn_village() -> void:
+	var building_count := 5
+	for i in range(building_count):
+		var angle: float = (TAU / building_count) * i + randf_range(-0.2, 0.2)
+		var dist: float = randf_range(120.0, 190.0)
+		var pos: Vector2 = Vector2(cos(angle), sin(angle)) * dist
+		var house := HouseScene.instantiate()
+		world_props.add_child(house)
+		house.global_position = pos
+		house.set_texture(HouseTextures[randi() % HouseTextures.size()])
+	var well := WellScene.instantiate()
+	world_props.add_child(well)
+	well.global_position = Vector2(0, 90)
+	well.set_texture(WellTexture)
 
 func _update_zone_label(pos: Vector2) -> void:
 	var dist := pos.length()
