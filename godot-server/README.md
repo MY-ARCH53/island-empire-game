@@ -520,12 +520,45 @@ Her faz gerçek istemci+sunucu testiyle (ekran görüntüsü doğrulaması,
 her yeni biome/mob sahada bulunup doğru render edildiği teyit edilerek)
 ayrı ayrı commit+push edildi.
 
+## Vurma animasyonları + 24 yetenek VFX (Faz G0-G9, 2026-08-15)
+
+Kullanıcı "moblara yürüme ve vurma animasyonu, karakterlere SPACE'te
+vurma animasyonu, yeteneklere PixelLab ile güzel VFX" istedi ("acele
+etme dikkatli çok güzel bir iş" vurgusuyla) — Plan Mode'da araştırılıp
+G0-G9 olarak uygulandı.
+
+**Faz G0 (altyapı)**: `DirectionalSprite`'a 3. state ("attack", tek
+seferlik). Gerçek boşluk bulundu: `OnlineFarmEnemy.tscn`'in Visual'ı hiç
+`directional_sprite.gd` taşımıyordu, mob walk sprite'ları üretilmişti
+ama client'ta hiç oynatılmıyordu — düzeltildi.
+
+**Faz G1/G2**: PixelLab `animate_character(mode="v3")` ile 6 sınıf + 11
+mob türüne mevcut idle/walk'a dokunmadan yeni "Attack" animasyonu
+eklendi. Yeni `attack_notification`/`enemy_attack_notification` RPC'leri
+(mevcut `_broadcast_health` deseniyle) diğer oyunculara/mob'lara
+saldırının görünmesini sağlıyor. **Bulunan bug**: `generate_spriteframes.js`
+alfabetik sıralama yüzünden bazı karakterlerde "Attack" klasörünü walk
+sanıp walk sprite'larının üzerine yazıyordu — düzeltildi.
+
+**Faz G3-G8 (24 benzersiz yetenek VFX)**: kullanıcı kategori bazlı değil
+"her yetenek tamamen benzersiz" seçti. `create_1_direction_object` +
+`animate_object(mode="v3")` çifti, yeni `effects.gd → spawn_sprite_vfx()`
++ `ABILITY_VFX_PATHS` sözlüğü (dosya yoksa eski jenerik parçacığa
+kırılmadan düşüyor, fazlar tek tek deploy edilebilir).
+
+**Faz G9**: PvP'de de aynı client-tahminli saldırı animasyonu.
+
+Her faz gerçek istemci testiyle doğrulandı. **Bilinen kısıtlama**: bu
+geliştirme ortamında `godot-game-v3`'ün aynı anda 2 örneği çalıştırılamadı
+(ikinci istemci hiç bağlanmadan asılı kalıyor), bu yüzden "başka
+oyuncunun saldırısını görme" broadcast'i tam 2-oyunculu görsel testle
+değil, kod yapısının `health_update` ile birebir aynı olduğu + tek
+istemci + kendi mob'una vurma testiyle (server broadcast'inin çalıştığı
+dolaylı kanıtlanarak) doğrulandı.
+
 ## Sıradaki adım
 
-Büyük Harita Genişlemesi (Faz F0-F8) tamamlandı — "Kan Adası: Online"
-artık köy hub'ı + 5 tematik biome (Yeşil Çayır/Unutulmuş Mezarlık/
-Verimli Vadi/Yağmur Ormanı/Kızıl Lav Diyarı) + Kan Lordu boss encounter'ı
-içeren, 3500 yarıçaplı (önceki 1400'ün 2.5 katı) bir dünyaya sahip.
-Henüz PROD'A DEPLOY EDİLMEDİ — kullanıcı onayı bekleniyor. Bilinen tek
+Vurma animasyonları + 24 yetenek VFX (Faz G0-G9) tamamlandı. Henüz
+PROD'A DEPLOY EDİLMEDİ — kullanıcı onayı bekleniyor. Bilinen tek
 sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı
 desteği istenirse `wss://` + sertifika ayrı bir iş olarak gerekecek.
