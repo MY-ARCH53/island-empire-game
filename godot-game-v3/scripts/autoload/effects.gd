@@ -67,3 +67,26 @@ func _finish_floating_text(parent: Node, label: Label, pos: Vector2) -> void:
 	tween.tween_property(label, "global_position:y", start_y - 42.0, 0.7)
 	tween.tween_property(label, "modulate:a", 0.0, 0.5).set_delay(0.25)
 	tween.chain().tween_callback(label.queue_free)
+
+# Faz G3-G8 — PixelLab'dan üretilen tek-seferlik yetenek VFX sprite'ı
+# (ör. Kan Girdabı'nın kırmızı girdap patlaması). spawn_burst'ün aynı
+# call_deferred + otomatik temizlik desenini izler, sadece programatik
+# parçacık yerine hazır bir SpriteFrames animasyonu oynatır.
+func spawn_sprite_vfx(parent: Node, pos: Vector2, frames: SpriteFrames, anim_name: String, scale: float = 1.0) -> void:
+	if frames == null or not frames.has_animation(anim_name):
+		return
+	var sprite := AnimatedSprite2D.new()
+	sprite.sprite_frames = frames
+	sprite.animation = anim_name
+	sprite.scale = Vector2(scale, scale)
+	sprite.z_index = 5
+	sprite.process_mode = Node.PROCESS_MODE_ALWAYS
+	_finish_sprite_vfx.call_deferred(parent, sprite, pos)
+
+func _finish_sprite_vfx(parent: Node, sprite: AnimatedSprite2D, pos: Vector2) -> void:
+	if not is_instance_valid(parent) or not parent.is_inside_tree():
+		return
+	parent.add_child(sprite)
+	sprite.global_position = pos
+	sprite.play()
+	sprite.animation_finished.connect(sprite.queue_free)

@@ -159,6 +159,49 @@ const ABILITY_INFO := {
 		{"name": "Yıldırım Fırtınası", "cooldown": 14.0},
 	],
 }
+# Faz G3-G8 — her yeteneğin kendine özgü PixelLab VFX'i (bkz.
+# effects.gd → spawn_sprite_vfx). Her .tres'in içinde tek bir "cast"
+# animasyonu var. Dosya henüz üretilmediyse (fazlar kademeli ilerliyor)
+# ResourceLoader.exists() false döner ve ability_cast_notification eski
+# jenerik spawn_burst'e düşer — kırılmaz, kademeli geçiş.
+const ABILITY_VFX_PATHS := {
+	"koylu": [
+		"res://assets/vfx/koylu_0.tres",
+		"res://assets/vfx/koylu_1.tres",
+		"res://assets/vfx/koylu_2.tres",
+		"res://assets/vfx/koylu_3.tres",
+	],
+	"buyucu": [
+		"res://assets/vfx/buyucu_0.tres",
+		"res://assets/vfx/buyucu_1.tres",
+		"res://assets/vfx/buyucu_2.tres",
+		"res://assets/vfx/buyucu_3.tres",
+	],
+	"kilic_ustasi": [
+		"res://assets/vfx/kilic_ustasi_0.tres",
+		"res://assets/vfx/kilic_ustasi_1.tres",
+		"res://assets/vfx/kilic_ustasi_2.tres",
+		"res://assets/vfx/kilic_ustasi_3.tres",
+	],
+	"firtina_rahibesi": [
+		"res://assets/vfx/firtina_rahibesi_0.tres",
+		"res://assets/vfx/firtina_rahibesi_1.tres",
+		"res://assets/vfx/firtina_rahibesi_2.tres",
+		"res://assets/vfx/firtina_rahibesi_3.tres",
+	],
+	"vebali": [
+		"res://assets/vfx/vebali_0.tres",
+		"res://assets/vfx/vebali_1.tres",
+		"res://assets/vfx/vebali_2.tres",
+		"res://assets/vfx/vebali_3.tres",
+	],
+	"firtina_avcisi": [
+		"res://assets/vfx/firtina_avcisi_0.tres",
+		"res://assets/vfx/firtina_avcisi_1.tres",
+		"res://assets/vfx/firtina_avcisi_2.tres",
+		"res://assets/vfx/firtina_avcisi_3.tres",
+	],
+}
 const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
 const ABILITY_KEYS := ["R", "T", "Y", "U"]
 const POTION_NAME := "Küçük Can İksiri"
@@ -760,8 +803,15 @@ func ability_cast_notification(caster_name: String, class_id: String, slot_index
 	Audio.play("boss_slam", -8.0)
 	if has_node(caster_name):
 		var pos: Vector2 = get_node(caster_name).global_position
-		var color: Color = Color(1.0, 0.85, 0.3) if class_id == "buyucu" else Color(0.6, 0.8, 1.0)
-		Effects.spawn_burst(self, pos, color, 18, 170.0)
+		var vfx_path := ""
+		var vfx_slots: Array = ABILITY_VFX_PATHS.get(class_id, [])
+		if slot_index >= 0 and slot_index < vfx_slots.size():
+			vfx_path = str(vfx_slots[slot_index])
+		if vfx_path != "" and ResourceLoader.exists(vfx_path):
+			Effects.spawn_sprite_vfx(self, pos, load(vfx_path), "cast")
+		else:
+			var color: Color = Color(1.0, 0.85, 0.3) if class_id == "buyucu" else Color(0.6, 0.8, 1.0)
+			Effects.spawn_burst(self, pos, color, 18, 170.0)
 	if caster_name == str(_local_player_id) and ABILITY_INFO.has(class_id):
 		var slots: Array = ABILITY_INFO[class_id]
 		if slot_index >= 0 and slot_index < slots.size() and slot_index < _ability_ready_at.size():
