@@ -8,6 +8,12 @@ const { effectiveStat, getGuildInfo } = require('../utils/onlineStats');
 const CLASS_IDS = ['koylu', 'buyucu', 'kilic_ustasi', 'firtina_rahibesi', 'vebali', 'firtina_avcisi'];
 const SLOTS = ['weapon', 'armor', 'shield'];
 
+// Admin test hesapları için sınıf değiştirme (bkz. switchClass) — sadece
+// tüm yetenek kilitlerini (ABILITY_UNLOCK_LEVELS=[10,20,30,40]) açık tutacak
+// kadar yüksek olması gerekiyor, oynanışı etkileyecek bir stat ölçeklemesi
+// yok (level sadece yetenek kilidi için kullanılıyor, bkz. main.gd).
+const ADMIN_MAX_LEVEL = 99;
+
 // Faz 4 — item güçlendirme (KO tarzı, kullanıcı onaylı yüksek risk modeli).
 // Index = hedef seviye (+1..+10). +1..+4 güvenli (başarısızlıkta sadece
 // gümüş/deneme boşa gider); +5'ten itibaren başarısızlıkta eşya YOK OLABİLİR.
@@ -35,7 +41,10 @@ class OnlineController {
   static async getCharacter(req, res) {
     try {
       const result = await query(
-        'SELECT class_id, level, xp, silver, np, created_at FROM online_characters WHERE user_id = $1',
+        `SELECT oc.class_id, oc.level, oc.xp, oc.silver, oc.np, oc.created_at, u.is_admin
+         FROM online_characters oc
+         JOIN users u ON u.id = oc.user_id
+         WHERE oc.user_id = $1`,
         [req.userId]
       );
       const character = result.rows[0] || null;
@@ -45,6 +54,44 @@ class OnlineController {
       res.json({ success: true, data: character });
     } catch (err) {
       console.error('Online getCharacter error:', err.message);
+      res.status(500).json({ success: false, message: 'Hata olustu' });
+    }
+  }
+
+  // POST /api/online/switch-class  { classId }  — SADECE is_admin=true hesaplar.
+  // Test amaçlı: RPG sınıfları arasında kısıtlamasız geçiş + seviyeyi hep
+  // en yüksekte tutar (tüm yetenek kilitleri, ABILITY_UNLOCK_LEVELS=[10,20,30,40],
+  // hep açık kalsın diye — bkz. godot-server/scripts/main.gd). Envanter/ekipman
+  // sınıfa bağlı değil (item_defs'te sınıf alanı yok), bu yüzden dokunulmuyor.
+  static async switchClass(req, res) {
+    try {
+      const adminRes = await query('SELECT is_admin FROM users WHERE id = $1', [req.userId]);
+      if (!adminRes.rows[0]?.is_admin) {
+        return res.status(403).json({ success: false, message: 'Yetkisiz erişim' });
+      }
+
+      const { classId } = req.body;
+      if (!CLASS_IDS.includes(classId)) {
+        return res.status(400).json({ success: false, message: 'Geçersiz sınıf' });
+      }
+
+      const result = await query(
+        `UPDATE online_characters
+         SET class_id = $1, level = GREATEST(level, $2), updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $3
+         RETURNING class_id, level, xp, silver, np, created_at`,
+        [classId, ADMIN_MAX_LEVEL, req.userId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Önce bir karakter oluşturmalısın' });
+      }
+
+      const character = result.rows[0];
+      character.is_admin = true;
+      character.guild = await getGuildInfo(req.userId);
+      res.json({ success: true, data: character, message: 'Sınıf değiştirildi.' });
+    } catch (err) {
+      console.error('Online switchClass error:', err.message);
       res.status(500).json({ success: false, message: 'Hata olustu' });
     }
   }
@@ -68,8 +115,11 @@ class OnlineController {
          RETURNING class_id, level, xp, silver, np, created_at`,
         [req.userId, classId]
       );
+      const character = result.rows[0];
+      const adminRes = await query('SELECT is_admin FROM users WHERE id = $1', [req.userId]);
+      character.is_admin = !!adminRes.rows[0]?.is_admin;
 
-      res.status(201).json({ success: true, data: result.rows[0], message: 'Karakter oluşturuldu!' });
+      res.status(201).json({ success: true, data: character, message: 'Karakter oluşturuldu!' });
     } catch (err) {
       console.error('Online createCharacter error:', err.message);
       res.status(500).json({ success: false, message: 'Hata olustu' });

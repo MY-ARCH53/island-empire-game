@@ -7,6 +7,7 @@ router.use(auth);
 
 router.get('/character', OnlineController.getCharacter);
 router.post('/character', OnlineController.createCharacter);
+router.post('/switch-class', OnlineController.switchClass);
 router.get('/inventory', OnlineController.getInventory);
 router.post('/equip', OnlineController.equip);
 router.post('/unequip', OnlineController.unequip);

@@ -15,6 +15,9 @@ signal character_select_result(success: bool, data: Dictionary, message: String)
 # demek "henüz online karakter oluşturulmamış" demektir.
 signal online_character_result(success: bool, data: Variant, message: String)
 signal online_character_created(success: bool, data: Dictionary, message: String)
+# Admin test hesapları için sınıf değiştirme — bkz. online_hub.gd, sadece
+# data.is_admin == true dönen hesaplarda gösteriliyor.
+signal online_switch_class_result(success: bool, data: Dictionary, message: String)
 signal online_inventory_result(success: bool, data: Dictionary, message: String)
 signal online_equip_result(success: bool, message: String)
 signal online_unequip_result(success: bool, message: String)
@@ -294,6 +297,38 @@ func _on_create_online_character_completed(_result: int, code: int, _headers: Pa
 		if typeof(data) == TYPE_DICTIONARY:
 			msg = str(data.get("message", msg))
 		online_character_created.emit(false, {}, msg)
+
+func switch_online_class(class_id: String) -> void:
+	if GameManager.jwt_token == "":
+		online_switch_class_result.emit(false, {}, "Oturum yok.")
+		return
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request_completed.connect(_on_switch_online_class_completed.bind(http))
+	var body := JSON.stringify({"classId": class_id})
+	var headers := [
+		"Content-Type: application/json",
+		"Authorization: Bearer " + GameManager.jwt_token,
+	]
+	var err := http.request(_api_base() + "/online/switch-class", headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		online_switch_class_result.emit(false, {}, "Bağlantı hatası")
+		http.queue_free()
+
+func _on_switch_online_class_completed(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, http: HTTPRequest) -> void:
+	http.queue_free()
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		online_switch_class_result.emit(false, {}, "Sunucu yanıtı okunamadı")
+		return
+	var data = json.get_data()
+	if code == 200 and typeof(data) == TYPE_DICTIONARY and data.get("success", false):
+		online_switch_class_result.emit(true, data.get("data", {}), str(data.get("message", "")))
+	else:
+		var msg := "Sınıf değiştirilemedi"
+		if typeof(data) == TYPE_DICTIONARY:
+			msg = str(data.get("message", msg))
+		online_switch_class_result.emit(false, {}, msg)
 
 func get_online_inventory() -> void:
 	if GameManager.jwt_token == "":

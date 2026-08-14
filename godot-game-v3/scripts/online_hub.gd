@@ -25,6 +25,8 @@ const ENCHANT_SILVER_COST := [0, 200, 450, 800, 1250, 1800, 2450, 3200, 4050, 50
 @onready var character_box: VBoxContainer = $Center/Panel/VBox/CharacterBox
 @onready var info_label: Label = $Center/Panel/VBox/CharacterBox/InfoLabel
 @onready var equipped_label: Label = $Center/Panel/VBox/CharacterBox/EquippedLabel
+@onready var admin_class_box: VBoxContainer = $Center/Panel/VBox/CharacterBox/AdminClassBox
+@onready var admin_class_row: HFlowContainer = $Center/Panel/VBox/CharacterBox/AdminClassBox/AdminClassRow
 @onready var enter_farm_button: Button = $Center/Panel/VBox/CharacterBox/MapButtonsRow/EnterFarmButton
 @onready var enter_pvp_button: Button = $Center/Panel/VBox/CharacterBox/MapButtonsRow/EnterPvpButton
 @onready var inventory_items: VBoxContainer = $Center/Panel/VBox/CharacterBox/ScrollContainer/Items
@@ -46,6 +48,7 @@ func _ready() -> void:
 	BackendBridge.online_equip_result.connect(_on_equip_result)
 	BackendBridge.online_unequip_result.connect(_on_unequip_result)
 	BackendBridge.online_upgrade_result.connect(_on_upgrade_result)
+	BackendBridge.online_switch_class_result.connect(_on_switch_class_result)
 
 func open() -> void:
 	visible = true
@@ -132,8 +135,37 @@ func _show_character(reload_inventory: bool) -> void:
 		class_display_name, int(_character.get("level", 1)), int(_character.get("xp", 0)),
 		int(_character.get("silver", 0)), int(_character.get("np", 0)), guild_line,
 	]
+	admin_class_box.visible = bool(_character.get("is_admin", false))
+	if admin_class_box.visible:
+		_populate_admin_class_row(class_id)
 	if reload_inventory:
 		BackendBridge.get_online_inventory()
+
+# Admin test hesapları için — bkz. backend/src/controllers/online.controller.js
+# → switchClass. Sadece data.is_admin == true dönen hesaplarda görünür.
+func _populate_admin_class_row(current_class_id: String) -> void:
+	for child in admin_class_row.get_children():
+		child.queue_free()
+	for class_id in Upgrades.CHARACTERS.keys():
+		var btn := Button.new()
+		var char_name: String = Upgrades.CHARACTERS[class_id].get("name", class_id)
+		btn.text = "✓ %s" % char_name if class_id == current_class_id else char_name
+		btn.custom_minimum_size = Vector2(150, 40)
+		btn.disabled = class_id == current_class_id
+		btn.pressed.connect(_on_admin_switch_class.bind(class_id))
+		admin_class_row.add_child(btn)
+
+func _on_admin_switch_class(class_id: String) -> void:
+	Audio.play("ui_click")
+	status_label.text = "Sınıf değiştiriliyor..."
+	BackendBridge.switch_online_class(class_id)
+
+func _on_switch_class_result(success: bool, data: Dictionary, message: String) -> void:
+	status_label.text = message
+	if success:
+		Audio.play("levelup", -6.0)
+		_character = data
+		_show_character(false)
 
 func _on_inventory_result(success: bool, data: Dictionary, message: String) -> void:
 	if not success:
