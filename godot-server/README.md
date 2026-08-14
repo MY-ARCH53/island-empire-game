@@ -460,12 +460,72 @@ kademeyi DEĞİŞTİRMİYOR, EKLİYOR.
   kimlik doğrulama VPS logunda görüldü, test hesabı tamamen silindi.
   DB/backend'e hiç dokunulmadı (bu genişleme tamamen Godot-side).
 
+## Büyük Harita Genişlemesi: köy + 5 katmanlı biome dünyası (2026-08-14)
+
+Kullanıcı farm haritasının "çok ilkel" hissettiğini, karakterin bir
+köyde başlayıp moblu alanlara açılmasını, haritanın çok daha büyük
+olmasını ve PixelLab ile temalı bölgeler istedi. Derinlemesine
+araştırma (3 paralel Explore ajanı + 1 Plan ajanı) üç kritik gerçeği
+ortaya çıkardı: online farm haritasında hiç zemin/tilemap yoktu, online
+oyuncu hareketinde çarpışma sistemi yoktu (bilinçli kapsam dışı
+bırakıldı), ve `FarmEnemy.tscn`'in `SceneReplicationConfig`'i her
+düşmanı TÜM bağlı eşlere mesafeden bağımsız yayınlıyordu — bu, oturum
+boyunca defalarca görülen "Buffer payload full" WebSocket taşma
+bug'ının kanıtlanmış kök nedeniydi.
+
+**Faz F0 (ağ ölçeklenebilirliği, ÖNCELİKLİ)**: `Sync.public_visibility=false`
++ 0.5sn'de bir çalışan `_update_enemy_visibility()` ile her düşman
+sadece yakındaki (`VISIBILITY_RADIUS=1000`) oyunculara görünür oluyor
+— MultiplayerSpawner de görünürlüğe bakıyor, sadece property senkronu
+değil (bant genişliği artık toplam düşman sayısıyla değil yerel
+yoğunlukla orantılı). `health` replication ALWAYS→ON_CHANGE. Ayrıca
+gerçek istemciyle (`godot-game-v3`) test edilince `OnlineFarmEnemy.tscn`'in
+HİÇ güncellenmediği ortaya çıktı (sunucu/istemci config uyuşmazlığı,
+"Invalid packet received" hatası) — düzeltildi.
+
+**Faz F1**: `VILLAGE_RADIUS=220` (düşmansız köy, oyuncu spawn/respawn
+burada), `ZONES` 4→5 halkaya genişletildi (1400→3500 yarıçap, 2.5×),
+enemy_count halka alan oranına göre ölçeklendi (64→128 + boss + swarm).
+
+**Faz F2-F6 (görsel + içerik, PixelLab ile)**: `game.gd`'deki (tek-oyunculu
+roguelite) köy/zemin boyama mantığı online moda port edildi, sonra her
+katman kendi biome'una kavuştu:
+- Köy + Tier1 "Yeşil Çayır" (`meadow_terrain.tres`, mevcut, 0 maliyet)
+- Tier2 "Unutulmuş Mezarlık" (`graveyard_terrain.tres`, zaten üretilmiş
+  ama hiç kullanılmıyordu, 0 maliyet)
+- Tier3 "Verimli Vadi" (YENİ tileset + **Yaban Kurdu** mob'u)
+- Tier4 "Yağmur Ormanı" (YENİ tileset + **Bataklık İfriti** + **Zehir
+  Sarmaşığı**)
+- Tier5 "Kızıl Lav Diyarı" (YENİ tileset + **Lav İblisi**, brute/gulyabani
+  korunarak)
+
+Her tileset `create_topdown_tileset` (32×32 Wang, meadow ile aynı
+format) → `tools/generate_tileset.js`; her mob `create_character` +
+`animate_character` (walk, south/east/north) → `tools/generate_spriteframes.js`
+ile mevcut pipeline üzerinden işlendi. Toplam 3 yeni tileset + 4 yeni
+mob = 11 gerçek PixelLab API çağrısı.
+
+**Faz F7**: Kan Lordu'nun İni — `Upgrades.ENEMIES`'te zaten tanımlı+
+sprite'lı ama hiç kullanılmayan `kan_lordu` (boss, health=1400) devreye
+alındı. Tier5'in dış sınırının ötesinde sabit bir "cep" alanda (3800,0)
+tekil boss + 4 kabus sürüsü, normal respawn akışından tamamen ayrı
+(270sn respawn, tüm bağlı eşlere "Kan Lordu belirdi!"/"yenildi!" toast
+broadcast'i).
+
+**Faz F8**: Ekonomi tavan kontrolü (`MAX_SILVER/XP_PER_KILL=400`) —
+en yüksek yeni ödül (Tier5 elit brute, 337xp/270silver) tavanın altında
+kaldığı için değişiklik gerekmedi.
+
+Her faz gerçek istemci+sunucu testiyle (ekran görüntüsü doğrulaması,
+her yeni biome/mob sahada bulunup doğru render edildiği teyit edilerek)
+ayrı ayrı commit+push edildi.
+
 ## Sıradaki adım
 
-Plan'ın 6 fazı, prod deploy'u, bölgeli farm haritası, Farm Derinliği
-genişlemesi VE Sınıf Yetenekleri Genişlemesi (Faz E, tüm alt fazlar
-E1-E4) tamamlanıp deploy edildi — "Kan Adası: Online" şu an 24 sınıfa
-özgü yetenekle (6 sınıf × 4 kademe, Lv10/20/30/40) canlıda çalışıyor.
-Bilinen tek sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/
-tarayıcı desteği istenirse `wss://` + sertifika ayrı bir iş olarak
-gerekecek.
+Büyük Harita Genişlemesi (Faz F0-F8) tamamlandı — "Kan Adası: Online"
+artık köy hub'ı + 5 tematik biome (Yeşil Çayır/Unutulmuş Mezarlık/
+Verimli Vadi/Yağmur Ormanı/Kızıl Lav Diyarı) + Kan Lordu boss encounter'ı
+içeren, 3500 yarıçaplı (önceki 1400'ün 2.5 katı) bir dünyaya sahip.
+Henüz PROD'A DEPLOY EDİLMEDİ — kullanıcı onayı bekleniyor. Bilinen tek
+sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı
+desteği istenirse `wss://` + sertifika ayrı bir iş olarak gerekecek.
