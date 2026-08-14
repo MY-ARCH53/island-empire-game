@@ -16,6 +16,7 @@ extends Control
 @onready var character_select: CanvasLayer = $CharacterSelect
 @onready var online_button: Button = $Center/VBox/OnlineButton
 @onready var online_hub: CanvasLayer = $OnlineHub
+@onready var logout_button: Button = $Center/VBox/LogoutButton
 
 func _ready() -> void:
 	best_label.text = "En iyi skor: %d" % GameManager.best_score
@@ -24,6 +25,7 @@ func _ready() -> void:
 	character_button.pressed.connect(_on_character_pressed)
 	online_button.pressed.connect(_on_online_pressed)
 	login_button.pressed.connect(_on_login_pressed)
+	logout_button.pressed.connect(_on_logout_pressed)
 	BackendBridge.login_result.connect(_on_login_result)
 	BackendBridge.progress_result.connect(_on_progress_result)
 	BackendBridge.character_select_result.connect(_on_character_changed)
@@ -38,6 +40,7 @@ func _refresh_auth_state() -> void:
 		character_button.visible = true
 		online_button.visible = true
 		character_row.visible = true
+		logout_button.visible = true
 		status_label.text = ""
 		BackendBridge.get_progress()
 	else:
@@ -47,8 +50,19 @@ func _refresh_auth_state() -> void:
 		character_button.visible = false
 		online_button.visible = false
 		character_row.visible = false
+		logout_button.visible = false
 		status_label.text = "Oynamak için Island Empire hesabınla giriş yap."
 	_refresh_character_display()
+
+# Token diskte kalıcı (bkz. GameManager.save_local_data) ve login ekranı
+# sadece jwt_token boşken gösteriliyor — bu yüzden başka bir hesaba geçmek
+# için önce açıkça çıkış yapabilme yolu gerekiyordu.
+func _on_logout_pressed() -> void:
+	Audio.play("ui_click")
+	GameManager.set_token("")
+	username_field.text = ""
+	password_field.text = ""
+	_refresh_auth_state()
 
 func _refresh_character_display() -> void:
 	var char_id: String = GameManager.selected_character if Upgrades.CHARACTERS.has(GameManager.selected_character) else "koylu"

@@ -80,6 +80,11 @@ custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "⚔️ Online (Beta)"
 
+[node name="LogoutButton" type="Button" parent="Center/VBox"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "🚪 Çıkış Yap (başka hesapla giriş)"
+
 [node name="LoginBox" type="VBoxContainer" parent="Center/VBox"]
 layout_mode = 2
 
