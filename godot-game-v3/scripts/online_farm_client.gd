@@ -46,31 +46,37 @@ const ABILITY_INFO := {
 		{"name": "Sağlam Duruş", "cooldown": 20.0},
 		{"name": "Toparlanma", "cooldown": 12.0},
 		{"name": "Kalkan Duvarı", "cooldown": 25.0},
+		{"name": "Kahramanca Direniş", "cooldown": 30.0},
 	],
 	"buyucu": [
 		{"name": "Büyü Patlaması", "cooldown": 8.0},
 		{"name": "Alev Zinciri", "cooldown": 10.0},
 		{"name": "Manastik Kalkan", "cooldown": 20.0},
+		{"name": "Arkan Yağmuru", "cooldown": 15.0},
 	],
 	"kilic_ustasi": [
 		{"name": "Kasırga Darbesi", "cooldown": 6.0},
 		{"name": "Kan Öfkesi", "cooldown": 15.0},
 		{"name": "Yıkım Vuruşu", "cooldown": 9.0},
+		{"name": "Kan Girdabı", "cooldown": 12.0},
 	],
 	"firtina_rahibesi": [
 		{"name": "Şifa Dalgası", "cooldown": 15.0},
 		{"name": "Kutsal Kalkan", "cooldown": 15.0},
 		{"name": "Nova Patlaması", "cooldown": 10.0},
+		{"name": "Toplu Şifa", "cooldown": 22.0},
 	],
 	"vebali": [
 		{"name": "Zehir Bulutu", "cooldown": 10.0},
 		{"name": "Veba Gücü", "cooldown": 15.0},
 		{"name": "Ölüm Dokunuşu", "cooldown": 12.0},
+		{"name": "Salgın", "cooldown": 18.0},
 	],
 	"firtina_avcisi": [
 		{"name": "Şimşek Hamlesi", "cooldown": 7.0},
 		{"name": "Çift Şimşek", "cooldown": 9.0},
 		{"name": "Fırtına Kalkanı", "cooldown": 16.0},
+		{"name": "Yıldırım Fırtınası", "cooldown": 14.0},
 	],
 }
 const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]

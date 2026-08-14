@@ -82,31 +82,37 @@ const ABILITIES := {
 		{"cooldown": 20.0, "name": "Sağlam Duruş", "base_armor": 15.0, "duration": 6.0},
 		{"cooldown": 12.0, "name": "Toparlanma", "base_heal": 35.0},
 		{"cooldown": 25.0, "name": "Kalkan Duvarı", "base_armor": 20.0, "duration": 8.0, "radius": 150.0},
+		{"cooldown": 30.0, "name": "Kahramanca Direniş", "base_armor": 30.0, "duration": 8.0, "base_heal": 60.0},
 	],
 	"buyucu": [
 		{"cooldown": 8.0, "name": "Büyü Patlaması", "base_damage": 25.0, "radius": 100.0},
 		{"cooldown": 10.0, "name": "Alev Zinciri", "base_damage": 40.0, "search_radius": 250.0, "chain_radius": 80.0, "chain_mult": 0.6},
 		{"cooldown": 20.0, "name": "Manastik Kalkan", "base_armor": 20.0, "base_damage_bonus": 15.0, "duration": 10.0},
+		{"cooldown": 15.0, "name": "Arkan Yağmuru", "base_damage": 60.0, "radius": 130.0},
 	],
 	"kilic_ustasi": [
 		{"cooldown": 6.0, "name": "Kasırga Darbesi", "base_damage": 30.0, "radius": 70.0},
 		{"cooldown": 15.0, "name": "Kan Öfkesi", "base_damage_bonus": 18.0, "duration": 8.0},
 		{"cooldown": 9.0, "name": "Yıkım Vuruşu", "base_damage": 45.0},
+		{"cooldown": 12.0, "name": "Kan Girdabı", "base_damage": 55.0, "radius": 90.0},
 	],
 	"firtina_rahibesi": [
 		{"cooldown": 15.0, "name": "Şifa Dalgası", "base_heal": 30.0, "radius": 150.0},
 		{"cooldown": 15.0, "name": "Kutsal Kalkan", "base_armor": 15.0, "duration": 6.0, "radius": 150.0},
 		{"cooldown": 10.0, "name": "Nova Patlaması", "base_damage": 20.0, "radius": 90.0},
+		{"cooldown": 22.0, "name": "Toplu Şifa", "base_heal": 60.0, "radius": 180.0},
 	],
 	"vebali": [
 		{"cooldown": 10.0, "name": "Zehir Bulutu", "base_damage": 8.0, "tick_damage": 4.0, "ticks": 5, "radius": 90.0},
 		{"cooldown": 15.0, "name": "Veba Gücü", "base_damage_bonus": 15.0, "duration": 10.0},
 		{"cooldown": 12.0, "name": "Ölüm Dokunuşu", "base_damage": 15.0, "tick_damage": 5.0, "ticks": 6},
+		{"cooldown": 18.0, "name": "Salgın", "base_damage": 12.0, "tick_damage": 6.0, "ticks": 6, "radius": 130.0},
 	],
 	"firtina_avcisi": [
 		{"cooldown": 7.0, "name": "Şimşek Hamlesi", "base_damage": 20.0},
 		{"cooldown": 9.0, "name": "Çift Şimşek", "base_damage": 25.0, "chain_radius": 80.0, "chain_mult": 0.5},
 		{"cooldown": 16.0, "name": "Fırtına Kalkanı", "base_armor": 18.0, "duration": 7.0},
+		{"cooldown": 14.0, "name": "Yıldırım Fırtınası", "base_damage": 35.0, "radius": 110.0},
 	],
 }
 
@@ -543,7 +549,13 @@ func request_use_ability(slot_index: int) -> void:
 	var cfg: Dictionary = slots[slot_index]
 	var now := Time.get_ticks_msec() / 1000.0
 	var peer_cooldowns: Dictionary = _last_ability_time.get(sender_id, {})
-	if now - float(peer_cooldowns.get(slot_index, 0.0)) < float(cfg["cooldown"]):
+	# Sentinel varsayılan olarak 0.0 KULLANILMAZ — "hiç kullanılmadı" durumu
+	# sunucu uptime'ı henüz cooldown süresini geçmemişse (ör. taze başlatılmış
+	# sunucuda 30sn'lik bir yetenek ilk 30sn içinde denenirse) 0.0, "az önce
+	# t=0'da kullanıldı" ile karışıp yanlış reddediyordu — gerçek bir test
+	# sırasında bulunan bug. -INF, "hiç kullanılmadı"nın her zaman geçmesini
+	# garanti eder.
+	if now - float(peer_cooldowns.get(slot_index, -INF)) < float(cfg["cooldown"]):
 		return
 	if not has_node(str(sender_id)):
 		return
@@ -823,6 +835,67 @@ func _ability_firtina_avcisi_t3(sender_id: int, cfg: Dictionary) -> void:
 		"amount": float(cfg["base_armor"]),
 		"expires_at": now + float(cfg["duration"]),
 	}
+
+# --- Faz E4 (Lv40 yetenekleri) ---
+
+# Kahramanca Direniş — Sağlam Duruş'un zırhı + Toparlanma'nın self-heal'i
+# tek yetenekte, tavan (T4) numaralarıyla.
+func _ability_koylu_t4(sender_id: int, cfg: Dictionary) -> void:
+	var pname := str(sender_id)
+	if not has_node(pname):
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	_ability_armor_bonus[sender_id] = {
+		"amount": float(cfg["base_armor"]),
+		"expires_at": now + float(cfg["duration"]),
+	}
+	var p: Node2D = get_node(pname)
+	p.health = min(p.max_health, p.health + float(cfg["base_heal"]))
+	_broadcast_health(pname, p.health)
+
+# Arkan Yağmuru / Kan Girdabı / Yıldırım Fırtınası — _ability_aoe_damage'ın
+# tavan (T4) numaralarıyla tekrar kullanımı.
+func _ability_buyucu_t4(sender_id: int, cfg: Dictionary) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]), float(cfg["radius"]))
+
+func _ability_kilic_ustasi_t4(sender_id: int, cfg: Dictionary) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]), float(cfg["radius"]))
+
+func _ability_firtina_avcisi_t4(sender_id: int, cfg: Dictionary) -> void:
+	_ability_aoe_damage(sender_id, float(cfg["base_damage"]), float(cfg["radius"]))
+
+# Toplu Şifa — Şifa Dalgası'nın (T1) kendi+parti heal deseninin tavan
+# numaralarla tekrarı.
+func _ability_firtina_rahibesi_t4(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var heal: float = float(cfg["base_heal"])
+	var radius: float = float(cfg["radius"])
+	var targets: Array = [sender_id]
+	if _party_of.has(sender_id):
+		for pid in _party_members(_party_of[sender_id]):
+			if pid != sender_id:
+				targets.append(pid)
+	for pid in targets:
+		var pname := str(pid)
+		if not has_node(pname):
+			continue
+		var p: Node2D = get_node(pname)
+		if pid != sender_id and p.position.distance_to(caster.position) > radius:
+			continue
+		p.health = min(p.max_health, p.health + heal)
+		_broadcast_health(pname, p.health)
+
+# Salgın — Zehir Bulutu'nun (T1) alan+DOT deseninin tavan numaralarla tekrarı.
+func _ability_vebali_t4(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var initial_dmg: float = float(cfg["base_damage"])
+	var tick_dmg: float = float(cfg["tick_damage"])
+	var radius: float = float(cfg["radius"])
+	for child in get_children():
+		if child.name.begins_with("enemy_") and caster.position.distance_to(child.position) <= radius:
+			child.take_damage(initial_dmg, sender_id)
+			if child.has_method("apply_poison"):
+				child.apply_poison(int(cfg["ticks"]), tick_dmg, sender_id)
 
 @rpc("authority", "reliable")
 func ability_teleport(new_position: Vector2) -> void:
