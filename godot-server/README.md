@@ -407,7 +407,27 @@ kademeyi DEĞİŞTİRMİYOR, EKLİYOR.
   hedefi bazı testlerde menzil içinde ikinci düşman olmadığından
   görsel doğrulanamadı — kod, Faz D2'de zaten kanıtlanmış zincir
   desenin birebir aynısı olduğundan güvenilir kabul edildi.
-- **Faz E3/E4 (T3/T4, Lv30/Lv40)**: henüz uygulanmadı, sırada (bkz.
+- **Faz E3 — T3 yetenekleri (Lv30)** (commit 683af75): 6 sınıfın 3.
+  yeteneği eklendi — köylü "Kalkan Duvarı" (kendi+parti +20 zırh),
+  büyücü "Manastik Kalkan" (kendine +20 zırh + +15 hasar bonusu kombo),
+  kılıç ustası "Yıkım Vuruşu" (ışınlanma + 45 hasar, zincirsiz), fırtına
+  rahibesi "Nova Patlaması" (20 hasar, 90br alan), vebalı "Ölüm
+  Dokunuşu" (ışınlanma + 15 ilk hasar + 6×5 zehir DOT), fırtına avcısı
+  "Fırtına Kalkanı" (kendine +18 zırh). **Yeni mekanik icat edilmedi** —
+  hepsi Faz D/E1/E2'de zaten kanıtlanmış yapı taşlarının (armor_bonus,
+  damage_bonus, aoe_damage, apply_poison, ability_teleport) yeniden
+  kombinasyonu.
+  **Doğrulama**: 6 sınıfın hepsi gerçek istemci+sunucu testiyle
+  doğrulandı — kilic_ustasi -45 (Yıkım Vuruşu, tam eşleşme), buyucu -27
+  (12 taban+15 bonus) dealt VE -1 (armor MIN_DAMAGE tavanına düşürdü)
+  taken, vebali -15 ilk hasar + -5 DOT tick (ikisi de tam eşleşme),
+  rahibe -20 aynı anda İKİ düşmana (AOE doğrulandı), köylü/avcı
+  zırhlarında gelen hasarın MIN_DAMAGE tavanına (1.0) düştüğü gözlendi.
+  **Not**: "Buffer payload full" flood bu fazda ilk kez AYNI hesap/testte
+  iki kez üst üste (tamamen taze sunucu+istemcide bile) tekrarlandı,
+  üçüncü denemede temiz geçti — kök neden hâlâ belirsiz, ortam
+  kaynaklı görünüyor, kod mantığını etkilemiyor.
+- **Faz E4 (T4, Lv40)**: henüz uygulanmadı, sırada (bkz.
   `plans/humble-chasing-galaxy.md`).
 
 ## Sıradaki adım
