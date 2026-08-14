@@ -21,10 +21,18 @@ const AGGRO_RANGE := 220.0
 const CONTACT_RANGE := 40.0
 const CONTACT_COOLDOWN := 1.2
 const LEASH_RANGE := 300.0
+# Faz F0 — en yakın oyuncu araması artık her fizik karesinde (60Hz) değil,
+# en fazla bu sıklıkta (5Hz) yapılıyor; aradaki karelerde son bulunan hedef
+# önbellekten kullanılıyor. Büyük haritada çok sayıda düşman varken
+# O(N_düşman×N_oyuncu) taramanın CPU maliyetini düşürür (bkz.
+# plans/humble-chasing-galaxy.md "Ağ ölçeklenebilirliği").
+const TARGET_SEARCH_INTERVAL := 0.2
 
 var health: float
 var _spawn_position: Vector2
 var _last_contact_time: float = -999.0
+var _target_search_timer: float = 0.0
+var _cached_target: Node2D = null
 
 # Faz D — vebali'nin "Zehir Bulutu" yeteneği (bkz. main.gd → _ability_vebali).
 var _poison_ticks_left: int = 0
@@ -65,17 +73,20 @@ func _physics_process(delta: float) -> void:
 	if position.distance_to(_spawn_position) > LEASH_RANGE:
 		position = position.move_toward(_spawn_position, move_speed * delta)
 		return
-	var target := _find_nearest_player()
-	if target == null:
+	_target_search_timer -= delta
+	if _target_search_timer <= 0.0:
+		_target_search_timer = TARGET_SEARCH_INTERVAL
+		_cached_target = _find_nearest_player()
+	if _cached_target == null or not is_instance_valid(_cached_target):
 		return
-	var dist := position.distance_to(target.position)
+	var dist := position.distance_to(_cached_target.position)
 	if dist <= CONTACT_RANGE:
 		var now := Time.get_ticks_msec() / 1000.0
 		if now - _last_contact_time >= CONTACT_COOLDOWN:
 			_last_contact_time = now
-			attacked_player.emit(int(str(target.name)), contact_damage)
+			attacked_player.emit(int(str(_cached_target.name)), contact_damage)
 	elif dist <= AGGRO_RANGE:
-		position = position.move_toward(target.position, move_speed * delta)
+		position = position.move_toward(_cached_target.position, move_speed * delta)
 
 func _find_nearest_player() -> Node2D:
 	var nearest: Node2D = null

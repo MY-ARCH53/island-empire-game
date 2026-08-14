@@ -20,6 +20,20 @@ const BASE_MAX_HEALTH := 120.0
 const MIN_DAMAGE := 1.0
 const RESPAWN_INVULN_SEC := 2.0
 
+# Faz F0 — düşman replikasyon LOD/culling (bkz. plans/humble-chasing-galaxy.md
+# "Büyük Harita Genişlemesi"). Kanıtlanmış kök neden: FarmEnemy.tscn'in
+# Sync'i önceden TÜM bağlı eşlere, mesafeden bağımsız, her ağ turunda
+# position+health yayınlıyordu — bu, bu projede defalarca görülen "Buffer
+# payload full"/ERR_OUT_OF_MEMORY WebSocket taşma bug'ının kök nedeniydi.
+# Artık Sync.public_visibility=false, her VISIBILITY_UPDATE_INTERVAL
+# saniyede bir _update_enemy_visibility() her düşman×eş çiftini mesafeye
+# göre açıp kapatıyor — bant genişliği artık toplam düşman sayısıyla değil
+# oyuncu başına yerel yoğunlukla orantılı.
+const VISIBILITY_RADIUS := 1000.0
+const VISIBILITY_UPDATE_INTERVAL := 0.5
+
+var _visibility_timer: Timer
+
 const FarmEnemyScene := preload("res://scenes/FarmEnemy.tscn")
 
 # Bölgeli zorluk sistemi (ek özellik, 2026-08-13 — bkz.
@@ -186,6 +200,11 @@ func _start_server() -> void:
 	print("SERVER_STARTED port=", PORT)
 	status_label.text = "SUNUCU — port %d" % PORT
 	_spawn_initial_enemies()
+	_visibility_timer = Timer.new()
+	_visibility_timer.wait_time = VISIBILITY_UPDATE_INTERVAL
+	_visibility_timer.autostart = true
+	_visibility_timer.timeout.connect(_update_enemy_visibility)
+	add_child(_visibility_timer)
 
 func _start_client() -> void:
 	var peer := WebSocketMultiplayerPeer.new()
@@ -412,6 +431,32 @@ func _spawn_initial_enemies() -> void:
 			_spawn_one_enemy(zone_index)
 		print("ZONE_SPAWNED zone=", ZONES[zone_index]["name"], " count=", ZONES[zone_index]["enemy_count"])
 	print("TOTAL_ENEMIES_SPAWNED=", _enemy_counter)
+
+# Faz F0 — her düşmanın Sync'ini (public_visibility=false) sadece
+# VISIBILITY_RADIUS içindeki eşlere açar. Bir düşmana hiçbir eş yakın
+# değilse o düşman o eşler için hiç var olmaz (MultiplayerSpawner de
+# görünürlüğe bakıyor, sadece property senkronu değil) — hem ağ trafiği
+# hem istemci düğüm sayısı düşer.
+func _update_enemy_visibility() -> void:
+	var peers := multiplayer.get_peers()
+	if peers.is_empty():
+		return
+	var peer_positions: Dictionary = {}
+	for peer_id in peers:
+		var pname := str(peer_id)
+		if has_node(pname):
+			peer_positions[peer_id] = get_node(pname).position
+	for child in get_children():
+		if not child.name.begins_with("enemy_"):
+			continue
+		var sync: MultiplayerSynchronizer = child.get_node_or_null("Sync")
+		if sync == null:
+			continue
+		for peer_id in peers:
+			if not peer_positions.has(peer_id):
+				continue
+			var is_near: bool = child.position.distance_to(peer_positions[peer_id]) <= VISIBILITY_RADIUS
+			sync.set_visibility_for(peer_id, is_near)
 
 # Annulus (halka) içinde alan-tekdüze rastgele konum — game.gd'deki
 # _random_field_position()'daki aynı sqrt(randf_range(min_r², max_r²))
