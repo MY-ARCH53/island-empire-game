@@ -42,12 +42,30 @@ const TOAST_FADE_SEC := 1.0
 # çağrılarından çıkarılıyor (bkz. _on_inventory_fetched, reward_notification'daki
 # metin ayrıştırması).
 const ABILITY_INFO := {
-	"koylu": [{"name": "Sağlam Duruş", "cooldown": 20.0}],
-	"buyucu": [{"name": "Büyü Patlaması", "cooldown": 8.0}],
-	"kilic_ustasi": [{"name": "Kasırga Darbesi", "cooldown": 6.0}],
-	"firtina_rahibesi": [{"name": "Şifa Dalgası", "cooldown": 15.0}],
-	"vebali": [{"name": "Zehir Bulutu", "cooldown": 10.0}],
-	"firtina_avcisi": [{"name": "Şimşek Hamlesi", "cooldown": 7.0}],
+	"koylu": [
+		{"name": "Sağlam Duruş", "cooldown": 20.0},
+		{"name": "Toparlanma", "cooldown": 12.0},
+	],
+	"buyucu": [
+		{"name": "Büyü Patlaması", "cooldown": 8.0},
+		{"name": "Alev Zinciri", "cooldown": 10.0},
+	],
+	"kilic_ustasi": [
+		{"name": "Kasırga Darbesi", "cooldown": 6.0},
+		{"name": "Kan Öfkesi", "cooldown": 15.0},
+	],
+	"firtina_rahibesi": [
+		{"name": "Şifa Dalgası", "cooldown": 15.0},
+		{"name": "Kutsal Kalkan", "cooldown": 15.0},
+	],
+	"vebali": [
+		{"name": "Zehir Bulutu", "cooldown": 10.0},
+		{"name": "Veba Gücü", "cooldown": 15.0},
+	],
+	"firtina_avcisi": [
+		{"name": "Şimşek Hamlesi", "cooldown": 7.0},
+		{"name": "Çift Şimşek", "cooldown": 9.0},
+	],
 }
 const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
 const ABILITY_KEYS := ["R", "T", "Y", "U"]

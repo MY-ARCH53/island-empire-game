@@ -80,21 +80,27 @@ const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
 const ABILITIES := {
 	"koylu": [
 		{"cooldown": 20.0, "name": "Sağlam Duruş", "base_armor": 15.0, "duration": 6.0},
+		{"cooldown": 12.0, "name": "Toparlanma", "base_heal": 35.0},
 	],
 	"buyucu": [
 		{"cooldown": 8.0, "name": "Büyü Patlaması", "base_damage": 25.0, "radius": 100.0},
+		{"cooldown": 10.0, "name": "Alev Zinciri", "base_damage": 40.0, "search_radius": 250.0, "chain_radius": 80.0, "chain_mult": 0.6},
 	],
 	"kilic_ustasi": [
 		{"cooldown": 6.0, "name": "Kasırga Darbesi", "base_damage": 30.0, "radius": 70.0},
+		{"cooldown": 15.0, "name": "Kan Öfkesi", "base_damage_bonus": 18.0, "duration": 8.0},
 	],
 	"firtina_rahibesi": [
 		{"cooldown": 15.0, "name": "Şifa Dalgası", "base_heal": 30.0, "radius": 150.0},
+		{"cooldown": 15.0, "name": "Kutsal Kalkan", "base_armor": 15.0, "duration": 6.0, "radius": 150.0},
 	],
 	"vebali": [
 		{"cooldown": 10.0, "name": "Zehir Bulutu", "base_damage": 8.0, "tick_damage": 4.0, "ticks": 5, "radius": 90.0},
+		{"cooldown": 15.0, "name": "Veba Gücü", "base_damage_bonus": 15.0, "duration": 10.0},
 	],
 	"firtina_avcisi": [
 		{"cooldown": 7.0, "name": "Şimşek Hamlesi", "base_damage": 20.0},
+		{"cooldown": 9.0, "name": "Çift Şimşek", "base_damage": 25.0, "chain_radius": 80.0, "chain_mult": 0.5},
 	],
 }
 
@@ -118,7 +124,8 @@ var _enemy_zone: Dictionary = {}      # enemy adı -> zone index (sunucu-only, r
 var _respawn_invuln_until: Dictionary = {}  # peer_id -> float saniye (Faz B)
 var _last_potion_use: Dictionary = {}       # peer_id -> float saniye (Faz C)
 var _last_ability_time: Dictionary = {}     # peer_id -> {slot_index -> float saniye} (Faz E)
-var _ability_armor_bonus: Dictionary = {}   # peer_id -> {"amount": float, "expires_at": float} (koylu)
+var _ability_armor_bonus: Dictionary = {}   # peer_id -> {"amount": float, "expires_at": float} (koylu, Faz D)
+var _ability_damage_bonus: Dictionary = {}  # peer_id -> {"amount": float, "expires_at": float} (Faz E2)
 
 # Faz 5 — parti sistemi (bu haritaya özgü, kalıcı değil — sadece bağlıyken
 # geçerli). party_id olarak partiyi kuran oyuncunun peer_id'si kullanılıyor.
@@ -218,6 +225,7 @@ func _on_peer_disconnected(id: int) -> void:
 	_last_potion_use.erase(id)
 	_last_ability_time.erase(id)
 	_ability_armor_bonus.erase(id)
+	_ability_damage_bonus.erase(id)
 	if _party_of.has(id):
 		var party_id: int = _party_of[id]
 		_party_of.erase(id)
@@ -633,6 +641,104 @@ func _ability_firtina_avcisi_t1(sender_id: int, cfg: Dictionary) -> void:
 		rpc_id(sender_id, "ability_teleport", new_pos)
 	nearest.take_damage(float(cfg["base_damage"]), sender_id)
 
+func _find_nearest_enemy_to(pos: Vector2, max_dist: float = INF) -> Node2D:
+	var nearest: Node2D = null
+	var nearest_dist := INF
+	for child in get_children():
+		if child.name.begins_with("enemy_"):
+			var d: float = pos.distance_to(child.position)
+			if d < nearest_dist and d <= max_dist:
+				nearest_dist = d
+				nearest = child
+	return nearest
+
+# --- Faz E2 (Lv20 yetenekleri) ---
+
+# Toparlanma — kendine anlık iyileştirme.
+func _ability_koylu_t2(sender_id: int, cfg: Dictionary) -> void:
+	var pname := str(sender_id)
+	if not has_node(pname):
+		return
+	var p: Node2D = get_node(pname)
+	p.health = min(p.max_health, p.health + float(cfg["base_heal"]))
+	_broadcast_health(pname, p.health)
+
+# Alev Zinciri — geniş aramayla en yakın düşmana büyük hasar + yakındaki
+# ikinci bir hedefe zincirleme (ışınlanmasız — büyücü caster, avcı/kılıç
+# ustası gibi fiziksel ışınlanmıyor, bkz. plan notu).
+func _ability_buyucu_t2(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var primary := _find_nearest_enemy_to(caster.position, float(cfg["search_radius"]))
+	if primary == null:
+		return
+	var dmg: float = float(cfg["base_damage"])
+	primary.take_damage(dmg, sender_id)
+	var chain_radius: float = float(cfg["chain_radius"])
+	var chain_dmg: float = dmg * float(cfg["chain_mult"])
+	for child in get_children():
+		if child.name.begins_with("enemy_") and child != primary and primary.position.distance_to(child.position) <= chain_radius:
+			child.take_damage(chain_dmg, sender_id)
+
+# Kan Öfkesi / Veba Gücü — kendine geçici hasar bonusu (bkz.
+# _ability_damage_bonus, request_attack'taki entegrasyon).
+func _ability_kilic_ustasi_t2(sender_id: int, cfg: Dictionary) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	_ability_damage_bonus[sender_id] = {
+		"amount": float(cfg["base_damage_bonus"]),
+		"expires_at": now + float(cfg["duration"]),
+	}
+
+func _ability_vebali_t2(sender_id: int, cfg: Dictionary) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	_ability_damage_bonus[sender_id] = {
+		"amount": float(cfg["base_damage_bonus"]),
+		"expires_at": now + float(cfg["duration"]),
+	}
+
+# Kutsal Kalkan — koylu'nun T1 zırh mantığı + rahibe'nin T1 kendi+parti
+# hedef seçme döngüsü birleştirildi (plan'da önceden belirtilen 2. yeni
+# yapı taşı — "parti hedefli zırh buff'ı").
+func _ability_firtina_rahibesi_t2(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var now := Time.get_ticks_msec() / 1000.0
+	var amount: float = float(cfg["base_armor"])
+	var duration: float = float(cfg["duration"])
+	var radius: float = float(cfg["radius"])
+	var targets: Array = [sender_id]
+	if _party_of.has(sender_id):
+		for pid in _party_members(_party_of[sender_id]):
+			if pid != sender_id:
+				targets.append(pid)
+	for pid in targets:
+		var pname := str(pid)
+		if not has_node(pname):
+			continue
+		if pid != sender_id and get_node(pname).position.distance_to(caster.position) > radius:
+			continue
+		_ability_armor_bonus[pid] = {"amount": amount, "expires_at": now + duration}
+
+# Çift Şimşek — T1 "Şimşek Hamlesi"nin ışınlanma+vuruş deseni + yakındaki
+# ikinci bir hedefe zincirleme.
+func _ability_firtina_avcisi_t2(sender_id: int, cfg: Dictionary) -> void:
+	var caster: Node2D = get_node(str(sender_id))
+	var nearest := _find_nearest_enemy_to(caster.position)
+	if nearest == null:
+		return
+	var dir: Vector2 = (caster.position - nearest.position).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.RIGHT
+	var new_pos: Vector2 = nearest.position + dir * ATTACK_RANGE
+	caster.position = new_pos
+	if multiplayer.get_peers().has(sender_id):
+		rpc_id(sender_id, "ability_teleport", new_pos)
+	var dmg: float = float(cfg["base_damage"])
+	nearest.take_damage(dmg, sender_id)
+	var chain_radius: float = float(cfg["chain_radius"])
+	var chain_dmg: float = dmg * float(cfg["chain_mult"])
+	for child in get_children():
+		if child.name.begins_with("enemy_") and child != nearest and nearest.position.distance_to(child.position) <= chain_radius:
+			child.take_damage(chain_dmg, sender_id)
+
 @rpc("authority", "reliable")
 func ability_teleport(new_position: Vector2) -> void:
 	var me_name := str(_local_player_id)
@@ -720,6 +826,11 @@ func request_attack(enemy_name: String) -> void:
 		return
 	_last_attack_time[sender_id] = now
 	var damage_bonus: float = float(_peer_user[sender_id].get("damage_bonus", 0))
+	# Faz E2 — geçici yetenek hasar bonusu (bkz. _ability_damage_bonus,
+	# _ability_armor_bonus'un aynı desenle hasar tarafındaki karşılığı).
+	var ability_buff: Dictionary = _ability_damage_bonus.get(sender_id, {})
+	if not ability_buff.is_empty() and now < float(ability_buff.get("expires_at", 0.0)):
+		damage_bonus += float(ability_buff.get("amount", 0.0))
 	enemy.take_damage(ATTACK_DAMAGE + damage_bonus, sender_id)
 
 # --- Parti: davet/kabul/ayrılma, sadece bu haritaya özgü geçici bir
