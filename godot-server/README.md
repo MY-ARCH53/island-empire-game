@@ -448,16 +448,24 @@ kademeyi DEĞİŞTİRMİYOR, EKLİYOR.
   (99.2+60→120, 96.8+60→120), buyucu -60 (iki hedefe aynı anda), kılıç
   ustası bir Tier1 mobu tek vuruşta öldürdü, vebali -12 ilk hasar + -6
   DOT tick (ikisi de tam eşleşme), avcı -35 tam eşleşme.
-  **Faz E (E1-E4) TAMAMEN BİTTİ** — 24 yeteneğin (6 sınıf × 4 kademe)
-  hepsi uygulandı ve test edildi, henüz VPS'e deploy edilmedi (kullanıcı
-  onayı bekleniyor).
+  **Faz E (E1-E4) TAMAMEN BİTTİ ve PROD'A DEPLOY EDİLDİ (2026-08-14)** —
+  24 yeteneğin (6 sınıf × 4 kademe) hepsi uygulandı, test edildi, kullanıcı
+  onayı alınıp VPS'e deploy edildi: `git pull` (fast-forward, 649
+  ekleme/86 çıkarma), `godot --headless --import`,
+  `pm2 restart kanadasi-farm`. Restart anında bağlı GERÇEK bir oyuncu
+  (user_id 9920, firtina_rahibesi, seviye 11) RPC checksum uyuşmazlığıyla
+  koptu (beklenen davranış — yeniden bağlanınca sorunsuz çalışır, Farm
+  Derinliği deploy'unda da aynı durum yaşanmıştı). Dışarıdan gerçek
+  istemciyle (`deploytest_e` hesabı, prod backend'de kayıt) bağlanıp
+  kimlik doğrulama VPS logunda görüldü, test hesabı tamamen silindi.
+  DB/backend'e hiç dokunulmadı (bu genişleme tamamen Godot-side).
 
 ## Sıradaki adım
 
 Plan'ın 6 fazı, prod deploy'u, bölgeli farm haritası, Farm Derinliği
 genişlemesi VE Sınıf Yetenekleri Genişlemesi (Faz E, tüm alt fazlar
-E1-E4) tamamlandı. Farm Derinliği deploy edildi, Faz E henüz deploy
-edilmedi — tamamen Godot-side (DB/backend değişikliği yok), deploy
-öncesi kullanıcı onayı istenecek (mevcut alışkanlık). Bilinen tek
-sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı desteği
-istenirse `wss://` + sertifika ayrı bir iş olarak gerekecek.
+E1-E4) tamamlanıp deploy edildi — "Kan Adası: Online" şu an 24 sınıfa
+özgü yetenekle (6 sınıf × 4 kademe, Lv10/20/30/40) canlıda çalışıyor.
+Bilinen tek sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/
+tarayıcı desteği istenirse `wss://` + sertifika ayrı bir iş olarak
+gerekecek.
