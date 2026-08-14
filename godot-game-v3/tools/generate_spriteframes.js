@@ -25,6 +25,7 @@ const CHARACTERS = [
   { name: 'yaban_kurdu', out: 'yaban_kurdu' },
   { name: 'bataklik_ifriti', out: 'bataklik_ifriti' },
   { name: 'zehir_sarmasigi', out: 'zehir_sarmasigi' },
+  { name: 'lav_iblisi', out: 'lav_iblisi' },
   // Oynanabilir karakterler (bkz. scripts/autoload/upgrades.gd → CHARACTERS) —
   // "koylu" ayrı bir sprite değil, protagonist'i yeniden kullanır.
   { name: 'buyucu', out: 'char_buyucu' },
