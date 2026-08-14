@@ -61,6 +61,27 @@ const HouseTextures := [
 	preload("res://assets/props/house_tile_roof.png"),
 ]
 const WellTexture := preload("res://assets/props/well.png")
+# Faz F9 — biome dekorasyonu (PixelLab create_map_object). Tree.tscn genel
+# amaçlı bir "dekor obje" sahnesi (StaticBody2D+Sprite2D+set_texture(),
+# House/Well'de de kullanılan aynı tree.gd script'i) — 9 yeni doku için
+# YENİ bir sahne yazmaya gerek yok, hepsi bu tek sahneyi paylaşıyor.
+const DecorScene := preload("res://scenes/Tree.tscn")
+const TIER3_DECOR_TEXTURES := [
+	preload("res://assets/props/hay_bale.png"),
+	preload("res://assets/props/fence_post.png"),
+	preload("res://assets/props/scarecrow.png"),
+]
+const TIER4_DECOR_TEXTURES := [
+	preload("res://assets/props/giant_mushroom.png"),
+	preload("res://assets/props/hanging_vine.png"),
+	preload("res://assets/props/jungle_puddle.png"),
+]
+const TIER5_DECOR_TEXTURES := [
+	preload("res://assets/props/obsidian_rocks.png"),
+	preload("res://assets/props/ash_pile.png"),
+	preload("res://assets/props/charred_log.png"),
+]
+const DECOR_COUNT_PER_TIER := 36
 const VILLAGE_RADIUS := 220.0
 const GRASS_RAMP_END := 370.0   # köy sınırından sonra çim yoğunluğu bu yarıçapa kadar artıyor
 const TIER1_MAX_R := 750.0      # köy+Tier1 sınırı
@@ -222,6 +243,9 @@ func _ready() -> void:
 	_paint_tier4_ground()
 	_paint_tier5_ground()
 	_spawn_village()
+	_spawn_biome_decor(TIER3_MIN_R, TIER3_MAX_R, TIER3_DECOR_TEXTURES)
+	_spawn_biome_decor(TIER4_MIN_R, TIER4_MAX_R, TIER4_DECOR_TEXTURES)
+	_spawn_biome_decor(TIER5_MIN_R, TIER5_MAX_R, TIER5_DECOR_TEXTURES)
 	Audio.play_music("farm")
 	# BackendBridge.get_online_*() GameManager.jwt_token'ı okuyor — normal
 	# oyun akışında zaten set edilmiş oluyor (giriş ana menüde yapılıyor),
@@ -458,6 +482,21 @@ func _spawn_village() -> void:
 	world_props.add_child(well)
 	well.global_position = Vector2(0, 90)
 	well.set_texture(WellTexture)
+
+# Faz F9 — biome dekorasyonu. game.gd → _random_field_position()'daki aynı
+# annulus-uniform rastgele nokta tekniği (min_r/max_r arası tekdüze alan
+# dağılımı) — landmark min-spacing kontrolü kasıtlı YOK (game.gd'deki
+# _find_landmark_position'dan farklı), 36 obje/biome için üst üste binme
+# riski görsel olarak önemsiz, ekstra karmaşıklığa değmiyor.
+func _spawn_biome_decor(min_r: float, max_r: float, textures: Array) -> void:
+	for i in range(DECOR_COUNT_PER_TIER):
+		var angle: float = randf_range(0.0, TAU)
+		var dist: float = sqrt(randf_range(min_r * min_r, max_r * max_r))
+		var pos: Vector2 = Vector2(cos(angle), sin(angle)) * dist
+		var decor := DecorScene.instantiate()
+		world_props.add_child(decor)
+		decor.global_position = pos
+		decor.set_texture(textures[randi() % textures.size()])
 
 func _update_zone_label(pos: Vector2) -> void:
 	var dist := pos.length()
