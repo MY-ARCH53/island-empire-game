@@ -39,6 +39,11 @@ const ZONE_DISPLAY := [
 # ötesinde farklı bir biome (Faz F3'te mezarlık) başlıyor, deniz değil, o
 # yüzden COAST_TAPER kısmı hiç yok.
 const TerrainLookup := preload("res://assets/tileset/meadow_terrain_lookup.gd")
+# Faz F3 — Tier2 "Unutulmuş Mezarlık", zaten ÜRETİLMİŞ ama hiç kullanılmayan
+# graveyard_terrain.tres'in yeniden devreye alınması (0 yeni PixelLab
+# maliyeti). "0"=çatlak mezarlık toprağı+kemik/kaldırım taşı, "1"=yamalı
+# ölü çim+düşmüş yaprak (bkz. graveyard_tileset_metadata.json).
+const GraveyardLookup := preload("res://assets/tileset/graveyard_terrain_lookup.gd")
 const HouseScene := preload("res://scenes/House.tscn")
 const WellScene := preload("res://scenes/Well.tscn")
 const HouseTextures := [
@@ -48,9 +53,13 @@ const HouseTextures := [
 const WellTexture := preload("res://assets/props/well.png")
 const VILLAGE_RADIUS := 220.0
 const GRASS_RAMP_END := 370.0   # köy sınırından sonra çim yoğunluğu bu yarıçapa kadar artıyor
-const TIER1_MAX_R := 750.0      # bu fazda SADECE köy+Tier1 boyanıyor
+const TIER1_MAX_R := 750.0      # köy+Tier1 sınırı
 const GROUND_CELL := 32
 const GROUND_MAX_CELL := 24     # ceil(TIER1_MAX_R / GROUND_CELL)
+const TIER2_MIN_R := 750.0
+const TIER2_MAX_R := 1400.0     # Faz F3 kapsamı: köy+Tier1+Tier2
+const TIER2_MAX_CELL := 44      # ceil(TIER2_MAX_R / GROUND_CELL)
+const TIER2_GRASS_RATIO := 0.4  # ölü çim/toprak karışım oranı (sabit, envelope yok)
 const TOAST_HOLD_SEC := 3.0
 const TOAST_FADE_SEC := 1.0
 
@@ -106,6 +115,7 @@ const ABILITY_KEYS := ["R", "T", "Y", "U"]
 const POTION_NAME := "Küçük Can İksiri"
 
 @onready var village_ground: TileMapLayer = $VillageGround
+@onready var tier2_ground: TileMapLayer = $Tier2Ground
 @onready var world_props: Node2D = $WorldProps
 @onready var spawner: MultiplayerSpawner = $PlayerSpawner
 @onready var status_label: Label = $UI/StatusLabel
@@ -144,6 +154,7 @@ func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	leave_button.pressed.connect(leave_map)
 	_paint_village_ground()
+	_paint_tier2_ground()
 	_spawn_village()
 	Audio.play_music("farm")
 	# BackendBridge.get_online_*() GameManager.jwt_token'ı okuyor — normal
@@ -224,6 +235,42 @@ func _paint_village_ground() -> void:
 			var key: String = "%d,%d,%d,%d" % [nw, ne, sw, se]
 			var atlas_coords: Vector2i = TerrainLookup.LOOKUP.get(key, Vector2i(2, 1))
 			village_ground.set_cell(Vector2i(x, y), 0, atlas_coords, 0)
+
+# Faz F3 — Tier2 "Unutulmuş Mezarlık" zemin boyaması. game.gd'deki envelope
+# deseninden farklı: burada sabit bir karışım oranı kullanılıyor (envelope
+# yok) çünkü Tier2'nin TAMAMI tek bir biome — kademeli geçiş yerine baştan
+# sona homojen bir "yamalı ölü çim + çatlak toprak" karışımı isteniyor.
+func _paint_tier2_ground() -> void:
+	var vertices: Dictionary = {}
+	for i in range(70):
+		var cx: int = randi_range(-TIER2_MAX_CELL, TIER2_MAX_CELL)
+		var cy: int = randi_range(-TIER2_MAX_CELL, TIER2_MAX_CELL)
+		var center_dist: float = Vector2(cx, cy).length() * GROUND_CELL
+		if center_dist < TIER2_MIN_R or center_dist >= TIER2_MAX_R:
+			continue
+		if randf() > TIER2_GRASS_RATIO:
+			continue
+		var blob_count: int = randi_range(2, 4)
+		for b in range(blob_count):
+			var bx: int = cx + randi_range(-3, 3)
+			var by: int = cy + randi_range(-3, 3)
+			var w: int = randi_range(3, 6)
+			var h: int = randi_range(3, 6)
+			for vx in range(bx, bx + w + 1):
+				for vy in range(by, by + h + 1):
+					vertices[Vector2i(vx, vy)] = 1
+	for x in range(-TIER2_MAX_CELL, TIER2_MAX_CELL + 1):
+		for y in range(-TIER2_MAX_CELL, TIER2_MAX_CELL + 1):
+			var world_dist: float = Vector2(x, y).length() * GROUND_CELL
+			if world_dist < TIER2_MIN_R or world_dist >= TIER2_MAX_R:
+				continue
+			var nw: int = vertices.get(Vector2i(x, y), 0)
+			var ne: int = vertices.get(Vector2i(x + 1, y), 0)
+			var sw: int = vertices.get(Vector2i(x, y + 1), 0)
+			var se: int = vertices.get(Vector2i(x + 1, y + 1), 0)
+			var key: String = "%d,%d,%d,%d" % [nw, ne, sw, se]
+			var atlas_coords: Vector2i = GraveyardLookup.LOOKUP.get(key, Vector2i(2, 1))
+			tier2_ground.set_cell(Vector2i(x, y), 0, atlas_coords, 0)
 
 # game.gd → _spawn_village()'ın birebir aynısı (5 ev halka şeklinde + 1
 # kuyu) — SADECE görsel, çarpışma yok (online oyuncu hareketi
