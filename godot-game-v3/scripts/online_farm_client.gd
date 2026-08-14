@@ -141,6 +141,14 @@ const ABILITY_INFO := {
 const ABILITY_UNLOCK_LEVELS := [10, 20, 30, 40]
 const ABILITY_KEYS := ["R", "T", "Y", "U"]
 const POTION_NAME := "Küçük Can İksiri"
+# Ekranın alt orta noktasındaki tecrübe çubuğu — godot-server/scripts/
+# main.gd → _fetch_reward'ın reward_notification metnindeki "Tecrübe %d"
+# kısmından (ZATEN var olan mesaj, yeni RPC alanı gerekmiyor) canlı takip
+# ediliyor. Gereken toplam xp, backend/src/controllers/internal.controller.js
+# → xpNeededForLevel(level) ile BİREBİR AYNI formül (50 + level*30) —
+# burada da tekrarlanıyor çünkü sunucu bunu hiç RPC ile göndermiyor.
+const XP_BASE := 50
+const XP_PER_LEVEL := 30
 
 @onready var village_ground: TileMapLayer = $VillageGround
 @onready var tier2_ground: TileMapLayer = $Tier2Ground
@@ -155,6 +163,8 @@ const POTION_NAME := "Küçük Can İksiri"
 @onready var leave_button: Button = $UI/LeaveButton
 @onready var potion_label: Label = $UI/PotionLabel
 @onready var ability_labels: Array[Label] = [$UI/Ability1Label, $UI/Ability2Label, $UI/Ability3Label, $UI/Ability4Label]
+@onready var exp_bar: ProgressBar = $UI/ExpBar
+@onready var exp_label: Label = $UI/ExpBar/ExpLabel
 @onready var camera: Camera2D = $Camera2D
 
 var _local_player_id: int = -1
@@ -162,6 +172,7 @@ var _last_zone_name: String = ""
 var _toast_tween: Tween
 var _potion_count: int = 0
 var _character_level: int = 1
+var _character_xp: int = 0
 var _ability_ready_at: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 func _server_host() -> String:
@@ -202,6 +213,7 @@ func _ready() -> void:
 	BackendBridge.get_online_character()
 	BackendBridge.get_online_inventory()
 	_update_potion_label()
+	_update_exp_bar()
 	var peer := WebSocketMultiplayerPeer.new()
 	var err := peer.create_client("ws://%s:%d" % [_server_host(), PORT])
 	if err != OK:
@@ -440,6 +452,30 @@ func _update_zone_label(pos: Vector2) -> void:
 func _update_potion_label() -> void:
 	potion_label.text = "İksir: %d  (H)" % _potion_count
 
+func _xp_needed_for_level(level: int) -> int:
+	return XP_BASE + level * XP_PER_LEVEL
+
+func _update_exp_bar() -> void:
+	var needed := _xp_needed_for_level(_character_level)
+	exp_bar.max_value = float(needed)
+	exp_bar.value = float(_character_xp)
+	exp_label.text = "%d / %d" % [_character_xp, needed]
+
+# reward_notification'ın metni her zaman "... Tecrübe %d" ile bitiyor
+# (bkz. godot-server/scripts/main.gd → _fetch_reward) — _parse_level_from_message
+# ile aynı desen, yeni RPC alanı gerekmiyor.
+func _parse_xp_from_message(message: String) -> int:
+	var idx := message.find("Tecrübe ")
+	if idx == -1:
+		return -1
+	var start := idx + "Tecrübe ".length()
+	var end := start
+	while end < message.length() and message[end].is_valid_int():
+		end += 1
+	if end == start:
+		return -1
+	return int(message.substr(start, end - start))
+
 func _update_ability_labels() -> void:
 	var me_name := str(_local_player_id)
 	if not has_node(me_name):
@@ -468,6 +504,8 @@ func _update_ability_labels() -> void:
 func _on_character_fetched(success: bool, data: Variant, _message: String) -> void:
 	if success and data is Dictionary:
 		_character_level = int(data.get("level", 1))
+		_character_xp = int(data.get("xp", 0))
+		_update_exp_bar()
 
 func _on_inventory_fetched(success: bool, data: Dictionary, _message: String) -> void:
 	if not success:
@@ -571,6 +609,11 @@ func reward_notification(message: String) -> void:
 	var lvl := _parse_level_from_message(message)
 	if lvl != -1:
 		_character_level = lvl
+	var xp := _parse_xp_from_message(message)
+	if xp != -1:
+		_character_xp = xp
+	if lvl != -1 or xp != -1:
+		_update_exp_bar()
 	if message.find("Düştü: " + POTION_NAME) != -1:
 		_potion_count += 1
 		_update_potion_label()
