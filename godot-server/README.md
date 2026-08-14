@@ -427,16 +427,37 @@ kademeyi DEĞİŞTİRMİYOR, EKLİYOR.
   iki kez üst üste (tamamen taze sunucu+istemcide bile) tekrarlandı,
   üçüncü denemede temiz geçti — kök neden hâlâ belirsiz, ortam
   kaynaklı görünüyor, kod mantığını etkilemiyor.
-- **Faz E4 (T4, Lv40)**: henüz uygulanmadı, sırada (bkz.
-  `plans/humble-chasing-galaxy.md`).
+- **Faz E4 — T4 yetenekleri (Lv40, son kademe)** (commit 25b625e): 6
+  sınıfın 4. ve son yeteneği eklendi — köylü "Kahramanca Direniş"
+  (zırh+anlık heal kombo), büyücü "Arkan Yağmuru", kılıç ustası "Kan
+  Girdabı", fırtına rahibesi "Toplu Şifa" (kendi+parti heal), vebalı
+  "Salgın" (alan+DOT), fırtına avcısı "Yıldırım Fırtınası" — hepsi mevcut
+  alan hasarı/heal yapı taşlarının en büyük numaralarla tekrarı.
+  **Gerçek testte bulunan bir cooldown bug'ı düzeltildi**:
+  `request_use_ability`'nin "hiç kullanılmadı" sentinel değeri `0.0` idi
+  — sunucu henüz cooldown süresi kadar ayakta kalmamışsa (ör. taze
+  başlatılmış sunucuda 30sn'lik bir yeteneğin ilk 30sn içinde
+  denenmesi) bu, "az önce t=0'da kullanıldı" ile karışıp yanlış
+  reddediyordu (sessizce, hiç bildirim göndermeden). Sentinel `-INF`
+  yapıldı — tüm sınıf/kademe yeteneklerini etkileyen genel bir düzeltme.
+  Prodüksiyonda bu sadece her deploy/restart sonrası ilk birkaç saniyede
+  teorik olarak tetiklenebilirdi (çok dar bir pencere), ama gerçek
+  testte doğrudan yakalandı.
+  **Doğrulama**: 6 sınıfın hepsi gerçek istemci+sunucu testiyle
+  doğrulandı — köylü/rahibe heal'i tam max_health tavanına kilitlendi
+  (99.2+60→120, 96.8+60→120), buyucu -60 (iki hedefe aynı anda), kılıç
+  ustası bir Tier1 mobu tek vuruşta öldürdü, vebali -12 ilk hasar + -6
+  DOT tick (ikisi de tam eşleşme), avcı -35 tam eşleşme.
+  **Faz E (E1-E4) TAMAMEN BİTTİ** — 24 yeteneğin (6 sınıf × 4 kademe)
+  hepsi uygulandı ve test edildi, henüz VPS'e deploy edilmedi (kullanıcı
+  onayı bekleniyor).
 
 ## Sıradaki adım
 
-Plan'ın 6 fazı, prod deploy'u, bölgeli farm haritası VE Farm Derinliği
-genişlemesi tamamlanıp deploy edildi. Şu an Sınıf Yetenekleri
-Genişlemesi (Faz E) üzerinde çalışılıyor — E1/E2 commit edildi, henüz
-deploy edilmedi (E3/E4 bitince tek seferde deploy edilecek, kullanıcı
-onayı istenecek). Bu genişleme tamamen Godot-side, DB/backend
-değişikliği gerektirmiyor. Bilinen tek sınırlama: bağlantı hâlâ `ws://`
-(TLS'siz) — web export/tarayıcı desteği istenirse `wss://` + sertifika
-ayrı bir iş olarak gerekecek.
+Plan'ın 6 fazı, prod deploy'u, bölgeli farm haritası, Farm Derinliği
+genişlemesi VE Sınıf Yetenekleri Genişlemesi (Faz E, tüm alt fazlar
+E1-E4) tamamlandı. Farm Derinliği deploy edildi, Faz E henüz deploy
+edilmedi — tamamen Godot-side (DB/backend değişikliği yok), deploy
+öncesi kullanıcı onayı istenecek (mevcut alışkanlık). Bilinen tek
+sınırlama: bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı desteği
+istenirse `wss://` + sertifika ayrı bir iş olarak gerekecek.
