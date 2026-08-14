@@ -51,10 +51,10 @@ const FarmEnemyScene := preload("res://scenes/FarmEnemy.tscn")
 # `pool`'daki tipler ENEMY_BASE_STATS'tan taban istatistiği alır, sonra
 # difficulty_mult (can) / reward_mult (xp+gümüş) ile çarpılır; `elite=true`
 # olan bölgede ayrıca ELITE_HEALTH_MULT/ELITE_REWARD_MULT uygulanır.
-# NOT: tier4 ("Yağmur Ormanı") ve tier5 ("Kızıl Lav Diyarı") havuzları
-# henüz GEÇİCİ olarak mevcut mob'ları (brute/gulyabani) kullanıyor — Faz
-# F5/F6'da kendi temalı mob'larıyla (Bataklık İfriti/Zehir Sarmaşığı/Lav
-# İblisi) değiştirilecek, bu bilinçli bir ara adım.
+# NOT: tier5 ("Kızıl Lav Diyarı") havuzu henüz GEÇİCİ olarak mevcut
+# mob'ları (brute/gulyabani) kullanıyor — Faz F6'da Lav İblisi ile
+# değiştirilecek, bu bilinçli bir ara adım. tier4 ("Yağmur Ormanı") Faz
+# F5'te kendi temalı mob'larına (Bataklık İfriti/Zehir Sarmaşığı) geçti.
 const ZONES := [
 	{"name": "tier1", "min_r": VILLAGE_RADIUS, "max_r": 750.0,  "pool": ["bat", "kabus"],
 	 "difficulty_mult": 1.0, "reward_mult": 1.0, "elite": false, "enemy_count": 5,
@@ -65,7 +65,7 @@ const ZONES := [
 	{"name": "tier3", "min_r": 1400.0, "max_r": 2100.0, "pool": ["brute", "gulyabani", "yaban_kurdu"],
 	 "difficulty_mult": 3.0, "reward_mult": 3.5, "elite": false, "enemy_count": 26,
 	 "drop_chance": 0.40, "rarity_weights": {"common": 0.30, "rare": 0.50, "epic": 0.20}, "damage_mult": 1.7},
-	{"name": "tier4", "min_r": 2100.0, "max_r": 2800.0, "pool": ["brute", "gulyabani"],
+	{"name": "tier4", "min_r": 2100.0, "max_r": 2800.0, "pool": ["bataklik_ifriti", "zehir_sarmasigi"],
 	 "difficulty_mult": 4.5, "reward_mult": 5.0, "elite": false, "enemy_count": 36,
 	 "drop_chance": 0.45, "rarity_weights": {"common": 0.15, "rare": 0.35, "epic": 0.35, "legendary": 0.15}, "damage_mult": 2.0},
 	{"name": "tier5", "min_r": 2800.0, "max_r": 3500.0, "pool": ["brute", "gulyabani"],
@@ -102,6 +102,10 @@ const ENEMY_BASE_STATS := {
 	# gulyabani arası bir güç seviyesinde, xp/silver oranı ikisiyle tutarlı
 	# (~0.22/~0.18), daha hızlı ("sürü halinde saldıran kurt" teması).
 	"yaban_kurdu": {"health": 70.0, "xp": 15, "silver": 13, "damage": 14.0, "speed": 75.0},
+	# Faz F5 — Yağmur Ormanı'na özgü yeni mob'lar (PixelLab). xp/silver
+	# oranı brute/gulyabani ile tutarlı (~0.22/~0.18).
+	"bataklik_ifriti": {"health": 110.0, "xp": 24, "silver": 20, "damage": 16.0, "speed": 45.0},
+	"zehir_sarmasigi": {"health": 60.0, "xp": 13, "silver": 11, "damage": 20.0, "speed": 25.0},
 }
 
 # Faz F7 — Kan Lordu'nun İni: normal ZONES akışından ayrı, tekil bir boss

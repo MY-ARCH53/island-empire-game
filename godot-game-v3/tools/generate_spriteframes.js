@@ -23,6 +23,8 @@ const CHARACTERS = [
   { name: 'kabus', out: 'kabus' },
   { name: 'gulyabani', out: 'gulyabani' },
   { name: 'yaban_kurdu', out: 'yaban_kurdu' },
+  { name: 'bataklik_ifriti', out: 'bataklik_ifriti' },
+  { name: 'zehir_sarmasigi', out: 'zehir_sarmasigi' },
   // Oynanabilir karakterler (bkz. scripts/autoload/upgrades.gd → CHARACTERS) —
   // "koylu" ayrı bir sprite değil, protagonist'i yeniden kullanır.
   { name: 'buyucu', out: 'char_buyucu' },

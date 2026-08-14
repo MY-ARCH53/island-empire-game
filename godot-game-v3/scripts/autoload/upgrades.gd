@@ -179,6 +179,10 @@ const ENEMIES := {
 	# roguelite dengesi için, online farm KENDİ ayrı ENEMY_BASE_STATS'ını
 	# kullanıyor, bu alanları okumuyor).
 	"yaban_kurdu": {"name": "Yaban Kurdu", "health": 55.0, "speed": 85.0, "damage": 14.0, "xp": 10, "color": Color(0.5, 0.5, 0.5), "radius": 15.0, "sprite": "res://assets/sprites/yaban_kurdu.tres"},
+	# Faz F5 (online mod) — Yağmur Ormanı'na özgü, roguelite enemy_pool'a
+	# eklenmedi (yaban_kurdu'yla aynı gerekçe: bkz. yukarıdaki not).
+	"bataklik_ifriti": {"name": "Bataklık İfriti", "health": 80.0, "speed": 42.0, "damage": 16.0, "xp": 20, "color": Color(0.3, 0.45, 0.25), "radius": 22.0, "sprite": "res://assets/sprites/bataklik_ifriti.tres"},
+	"zehir_sarmasigi": {"name": "Zehir Sarmaşığı", "health": 45.0, "speed": 25.0, "damage": 20.0, "xp": 12, "color": Color(0.35, 0.55, 0.2), "radius": 16.0, "sprite": "res://assets/sprites/zehir_sarmasigi.tres"},
 }
 
 func random_weapon_or_upgrade_choices(owned_weapons: Dictionary, count: int = 3) -> Array:
