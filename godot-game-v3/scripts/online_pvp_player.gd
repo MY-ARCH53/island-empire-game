@@ -87,3 +87,7 @@ func _try_attack() -> void:
 				nearest = child
 	if nearest:
 		main.rpc_id(1, "request_pvp_attack", nearest.name)
+		# Faz G9 — farm'daki aynı client-tahminli desen (bkz.
+		# online_remote_player.gd → _try_attack): sunucu onayını beklemeden
+		# anında oynatılır.
+		$Visual.play_attack()
