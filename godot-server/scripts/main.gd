@@ -93,7 +93,27 @@ const ENEMY_BASE_STATS := {
 	"ghost":     {"health": 42.0, "xp": 12, "silver": 9,  "damage": 7.0,  "speed": 100.0},
 	"brute":     {"health": 140.0, "xp": 30, "silver": 24, "damage": 18.0, "speed": 45.0},
 	"gulyabani": {"health": 95.0, "xp": 22, "silver": 18, "damage": 13.0, "speed": 50.0},
+	# Faz F7 — Kan Lordu'nun İni boss'u. Upgrades.ENEMIES'te zaten
+	# tanımlı+sprite'lı (is_boss:true, 80x80), farm haritasında hiç
+	# kullanılmıyordu. "silver" roguelite dict'inde yok, brute/gulyabani'nin
+	# xp/silver oranı (~0.8) korunarak eklendi.
+	"kan_lordu": {"health": 1400.0, "xp": 150, "silver": 120, "damage": 22.0, "speed": 55.0},
 }
+
+# Faz F7 — Kan Lordu'nun İni: normal ZONES akışından ayrı, tekil bir boss
+# encounter. Tier5'in dış sınırının hemen ötesinde sabit bir "cep" alan
+# (bkz. plans/humble-chasing-galaxy.md "Büyük Harita Genişlemesi" tablosu).
+const BOSS_POSITION := Vector2(3800.0, 0.0)
+const BOSS_ARENA_RADIUS := 300.0
+const BOSS_ZONE_INDEX := 4   # ZONES[4] = tier5 — loot tablosu/rarity_weights ödünç alınıyor
+const BOSS_RESPAWN_DELAY := 270.0  # 4.5 dakika — sıradan RESPAWN_DELAY'den (4sn) çok daha uzun
+const BOSS_SWARM_COUNT := 4  # kabus sürüsü, boss'un etrafında
+# "enemy_" öneki KORUNUYOR — visibility culling (_update_enemy_visibility),
+# AOE yetenek hasarı (_ability_aoe_damage vb.) ve istemci test kodları hep
+# `child.name.begins_with("enemy_")` kontrolü yapıyor; farklı bir önek
+# kullanılsaydı boss/swarm bu mekanizmaların HİÇBİRİNE dahil olmazdı.
+const BOSS_NAME := "enemy_boss_lord"
+const BOSS_KABUS_PREFIX := "enemy_boss_kabus_"
 
 # Faz C — can iksiri (bkz. plans/humble-chasing-galaxy.md "Farm Derinliği").
 const POTION_DROP_CHANCE := 0.15
@@ -388,7 +408,15 @@ func _run_auto_attack_test() -> void:
 	# GEÇİCİ test yardımcısı: --test-zone=N ile oyuncuyu doğrudan o
 	# bölgenin ortasına ışınlar (bölgeli sistem doğrulaması için).
 	var test_zone := _get_cmdline_value("--test-zone=")
-	if test_zone != "":
+	if test_zone == "boss":
+		# GEÇİCİ test yardımcısı: --test-zone=boss ile Kan Lordu'nun İni'ne
+		# ışınlar (Faz F7 doğrulaması için).
+		var me_boss := str(_local_player_id)
+		if has_node(me_boss):
+			get_node(me_boss).position = BOSS_POSITION
+			print("ZONE_WARP zone=boss pos=", BOSS_POSITION)
+			await get_tree().create_timer(1.0).timeout
+	elif test_zone != "":
 		var zi := int(test_zone)
 		var me_name0 := str(_local_player_id)
 		if has_node(me_name0) and zi >= 0 and zi < ZONES.size():
@@ -455,6 +483,9 @@ func _spawn_initial_enemies() -> void:
 		for i in range(ZONES[zone_index]["enemy_count"]):
 			_spawn_one_enemy(zone_index)
 		print("ZONE_SPAWNED zone=", ZONES[zone_index]["name"], " count=", ZONES[zone_index]["enemy_count"])
+	_spawn_boss()
+	for i in range(BOSS_SWARM_COUNT):
+		_spawn_boss_kabus()
 	print("TOTAL_ENEMIES_SPAWNED=", _enemy_counter)
 
 # Faz F0 — her düşmanın Sync'ini (public_visibility=false) sadece
@@ -526,6 +557,55 @@ func _spawn_one_enemy(zone_index: int) -> void:
 	enemy.died.connect(_on_enemy_died.bind(enemy))
 	enemy.attacked_player.connect(_on_enemy_attacked_player)
 	_enemy_zone[enemy.name] = zone_index
+	add_child(enemy)
+
+# Faz F7 — Kan Lordu, tekil boss instance. Zone çarpanları UYGULANMIYOR
+# (ENEMY_BASE_STATS["kan_lordu"] zaten "boss" olarak tasarlanmış ham
+# değerler, Upgrades.ENEMIES'ten aynen alınmış) — sabit güçte, harita
+# genişledikçe otomatik güçlenmeyen bir varlık.
+func _spawn_boss() -> void:
+	var base_stats: Dictionary = ENEMY_BASE_STATS["kan_lordu"]
+	var enemy: Node2D = FarmEnemyScene.instantiate()
+	enemy.name = BOSS_NAME
+	enemy.max_health = base_stats["health"]
+	enemy.xp_reward = int(base_stats["xp"])
+	enemy.silver_reward = int(base_stats["silver"])
+	enemy.enemy_type = "kan_lordu"
+	enemy.is_elite = true
+	enemy.contact_damage = float(base_stats["damage"])
+	enemy.move_speed = float(base_stats["speed"])
+	enemy.position = BOSS_POSITION
+	enemy._spawn_position = enemy.position
+	enemy.died.connect(_on_enemy_died.bind(enemy))
+	enemy.attacked_player.connect(_on_enemy_attacked_player)
+	_enemy_zone[enemy.name] = BOSS_ZONE_INDEX
+	add_child(enemy)
+	for peer_id in multiplayer.get_peers():
+		rpc_id(peer_id, "reward_notification", "Kan Lordu belirdi! Dikkatli olun...")
+
+# preferred_name veriliyorsa (ölüm sonrası yeniden doğuş) AYNI isim
+# korunuyor — _enemy_zone dict key'i ve olası istemci-taraflı referanslar
+# tutarlı kalsın diye.
+func _spawn_boss_kabus(preferred_name: String = "") -> void:
+	var base_stats: Dictionary = ENEMY_BASE_STATS["kabus"]
+	var enemy: Node2D = FarmEnemyScene.instantiate()
+	if preferred_name != "":
+		enemy.name = preferred_name
+	else:
+		enemy.name = "%s%d" % [BOSS_KABUS_PREFIX, _enemy_counter]
+		_enemy_counter += 1
+	enemy.max_health = base_stats["health"]
+	enemy.xp_reward = int(base_stats["xp"])
+	enemy.silver_reward = int(base_stats["silver"])
+	enemy.enemy_type = "kabus"
+	enemy.is_elite = false
+	enemy.contact_damage = float(base_stats["damage"])
+	enemy.move_speed = float(base_stats["speed"])
+	enemy.position = BOSS_POSITION + _random_zone_position({"min_r": 0.0, "max_r": BOSS_ARENA_RADIUS})
+	enemy._spawn_position = enemy.position
+	enemy.died.connect(_on_enemy_died.bind(enemy))
+	enemy.attacked_player.connect(_on_enemy_attacked_player)
+	_enemy_zone[enemy.name] = BOSS_ZONE_INDEX
 	add_child(enemy)
 
 # --- Faz B: düşman temas hasarı → oyuncu canı. PvP'nin _broadcast_health/
@@ -993,6 +1073,7 @@ func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	var silver_reward: int = enemy.silver_reward
 	var zone_index: int = _enemy_zone.get(enemy.name, 0)
 	var drop_id := _roll_item_drop(zone_index)
+	var died_name := enemy.name
 	_enemy_zone.erase(enemy.name)
 	enemy.queue_free()
 	if user_id != -1:
@@ -1011,6 +1092,18 @@ func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 					_send_reward(pid, member_user_id, silver_share, xp_share, drop_id if pid == killer_peer_id else "")
 		else:
 			_send_reward(killer_peer_id, user_id, silver_reward, xp_reward, drop_id)
+	# Faz F7 — Kan Lordu/swarm normal zone respawn akışına GİRMİYOR, kendi
+	# özel deseniyle yeniden doğuyor (bkz. _spawn_boss/_spawn_boss_kabus).
+	if died_name == BOSS_NAME:
+		for peer_id in multiplayer.get_peers():
+			rpc_id(peer_id, "reward_notification", "Kan Lordu yenildi! Bölgeye tekrar huzur geldi.")
+		await get_tree().create_timer(BOSS_RESPAWN_DELAY).timeout
+		_spawn_boss()
+		return
+	if died_name.begins_with(BOSS_KABUS_PREFIX):
+		await get_tree().create_timer(RESPAWN_DELAY).timeout
+		_spawn_boss_kabus(died_name)
+		return
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	_spawn_one_enemy(zone_index)
 
