@@ -40,7 +40,12 @@ const DIRS = ['south', 'east', 'north'];
 function findAnimDir(charDir) {
   const animsRoot = path.join(charDir, 'extracted/Idle/animations');
   if (!fs.existsSync(animsRoot)) return null;
-  const entries = fs.readdirSync(animsRoot);
+  // "Attack" ayrı, isme göre findNamedAnimDir() ile aranıyor — burada
+  // atlanmazsa, "Attack" klasörü alfabetik olarak walk klasöründen önce
+  // gelen karakterlerde (ör. "Attack" < "Yrme") yanlışlıkla walk animasyonu
+  // olarak seçilip walk_*.png dosyalarının üzerine yazılırdı (gerçek testte
+  // yakalanan bir bug — bkz. generateForCharacter'daki attack bloğu).
+  const entries = fs.readdirSync(animsRoot).filter(e => e.toLowerCase() !== 'attack');
   return entries.length ? path.join(animsRoot, entries[0]) : null;
 }
 

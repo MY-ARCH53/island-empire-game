@@ -1074,6 +1074,12 @@ func ability_teleport(new_position: Vector2) -> void:
 func ability_cast_notification(caster_name: String, class_id: String, slot_index: int) -> void:
 	print("ABILITY_CAST caster=", caster_name, " class=", class_id, " slot=", slot_index)
 
+# Faz G1 — bir oyuncu SPACE ile saldırdığında diğer TÜM eşlere yayınlanır,
+# böylece uzak istemcilerde de vurma animasyonu oynar (bkz. request_attack).
+@rpc("authority", "reliable")
+func attack_notification(attacker_name: String) -> void:
+	print("ATTACK_NOTIFICATION attacker=", attacker_name)
+
 func _on_enemy_died(killer_peer_id: int, enemy: Node2D) -> void:
 	if not _is_server:
 		return
@@ -1170,6 +1176,8 @@ func request_attack(enemy_name: String) -> void:
 	if not ability_buff.is_empty() and now < float(ability_buff.get("expires_at", 0.0)):
 		damage_bonus += float(ability_buff.get("amount", 0.0))
 	enemy.take_damage(ATTACK_DAMAGE + damage_bonus, sender_id)
+	for peer_id in multiplayer.get_peers():
+		rpc_id(peer_id, "attack_notification", attacker_name)
 
 # --- Parti: davet/kabul/ayrılma, sadece bu haritaya özgü geçici bir
 # gruplama (kalıcı DB'ye hiç yazılmıyor). ---

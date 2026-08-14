@@ -729,6 +729,17 @@ func health_update(player_name: String, new_health: float) -> void:
 		Audio.play("player_hurt", -4.0, randf_range(0.9, 1.05))
 		camera.shake(clampf(dmg * 0.15, 2.0, 10.0))
 
+# Faz G1 — bir oyuncunun SPACE ile saldırdığını TÜM eşlere bildirir (bkz.
+# main.gd → request_attack). Kendi saldırımız zaten anında tahminen
+# oynatıldı (bkz. online_remote_player.gd → _try_attack), burada SADECE
+# başka oyuncuların saldırısını görebilmemiz için.
+@rpc("authority", "reliable")
+func attack_notification(attacker_name: String) -> void:
+	if attacker_name == str(_local_player_id):
+		return
+	if has_node(attacker_name):
+		get_node(attacker_name).get_node("Visual").play_attack()
+
 @rpc("authority", "reliable")
 func farm_death_notification(message: String) -> void:
 	_show_toast(message)

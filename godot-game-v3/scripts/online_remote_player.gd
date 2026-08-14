@@ -106,6 +106,10 @@ func _try_attack() -> void:
 				nearest = child
 	if nearest:
 		main.rpc_id(1, "request_attack", nearest.name)
+		# Sunucu onayını beklemeden anında oynat — SPACE'e basan oyuncu zaten
+		# "vurdum" biliyor (bkz. request_attack'ın client-tahminli yapısı).
+		# Diğer oyuncuların bunu görmesi main.gd → attack_notification ile.
+		$Visual.play_attack()
 
 # Faz 5 — en yakın DİĞER oyuncuyu (düşman değil) partiye davet eder.
 func _try_invite() -> void:
