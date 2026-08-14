@@ -397,7 +397,7 @@ func _on_auth_response(_result: int, code: int, _headers: PackedStringArray, bod
 	# görünüyordu, gerçek (170) değil.
 	var spawn_max_health: float = BASE_MAX_HEALTH + float(_peer_user[peer_id]["max_health_bonus"])
 	spawner.spawn({"id": peer_id, "class_id": _peer_user[peer_id]["class_id"], "max_health": spawn_max_health})
-	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı, H can iksiri, R/T/Y/U yetenekler)" % _peer_user[peer_id]["class_id"])
+	rpc_id(peer_id, "auth_result", true, "Hoş geldin, %s! (WASD hareket, SPACE saldırı, H can iksiri, R/T/Y/U yetenekler, I envanter)" % _peer_user[peer_id]["class_id"])
 
 @rpc("authority", "reliable")
 func auth_result(success: bool, message: String) -> void:

@@ -16,6 +16,20 @@ const ENCHANT_SUCCESS_CHANCE = [null, 0.95, 0.90, 0.85, 0.75, 0.65, 0.50, 0.40, 
 const ENCHANT_DESTROY_ON_FAIL = [null, 0, 0, 0, 0, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50];
 const ENCHANT_SILVER_COST = [null, 200, 450, 800, 1250, 1800, 2450, 3200, 4050, 5000, 6050];
 
+// Faz F11 — item satışı. Taban fiyat nadirliğe göre (mevcut item_defs
+// güç ölçeğiyle orantılı — legendary damage/common damage oranı ~7x,
+// taban fiyat oranı da benzer şekilde büyütüldü), her +1 güçlendirme
+// taban fiyatı %20 artırıyor. Kasıtlı olarak ENCHANT_SILVER_COST
+// toplamının (+10'a kadar 26050 gümüş) ÇOK altında kalıyor — aksi halde
+// "güçlendir, sonra sat" bir gümüş üretme döngüsüne dönüşürdü.
+const SELL_PRICE_BY_RARITY = { common: 15, rare: 40, epic: 100, legendary: 250 };
+const SELL_ENCHANT_BONUS_PER_LEVEL = 0.2;
+
+function computeSellPrice(rarity, enchantLevel) {
+  const base = SELL_PRICE_BY_RARITY[rarity] ?? SELL_PRICE_BY_RARITY.common;
+  return Math.round(base * (1 + (enchantLevel || 0) * SELL_ENCHANT_BONUS_PER_LEVEL));
+}
+
 class OnlineController {
   // GET /api/online/character
   static async getCharacter(req, res) {
@@ -212,6 +226,63 @@ class OnlineController {
       });
     } catch (err) {
       console.error('Online upgradeItem error:', err.message);
+      res.status(500).json({ success: false, message: 'Hata olustu' });
+    }
+  }
+
+  // POST /api/online/sell-item  { inventoryItemId }  (Faz F11)
+  // Kuşanılıyken satılamaz — önce çıkarılmalı (equip'in kontrolüyle
+  // tutarlı, kuşanılı bir eşyanın envanterden aniden kaybolmasını
+  // (online_equipment'ta artık var olmayan bir inventory_item_id'ye
+  // işaret etmesini) önlüyor.
+  static async sellItem(req, res) {
+    try {
+      const inventoryItemId = parseInt(req.body.inventoryItemId, 10);
+      if (!Number.isFinite(inventoryItemId)) {
+        return res.status(400).json({ success: false, message: 'Geçersiz eşya' });
+      }
+
+      const itemRes = await query(
+        `SELECT oi.id, oi.enchant_level, d.name, d.rarity, d.slot
+         FROM online_inventory oi
+         JOIN item_defs d ON d.id = oi.item_def_id
+         WHERE oi.id = $1 AND oi.user_id = $2`,
+        [inventoryItemId, req.userId]
+      );
+      if (itemRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Eşya envanterinde bulunamadı' });
+      }
+      const item = itemRes.rows[0];
+
+      const equippedRes = await query(
+        'SELECT 1 FROM online_equipment WHERE user_id = $1 AND inventory_item_id = $2',
+        [req.userId, inventoryItemId]
+      );
+      if (equippedRes.rows.length > 0) {
+        return res.status(400).json({ success: false, message: 'Kuşanılı eşya satılamaz — önce çıkar.' });
+      }
+
+      const price = computeSellPrice(item.rarity, item.enchant_level);
+
+      const charRes = await query('SELECT silver FROM online_characters WHERE user_id = $1', [req.userId]);
+      if (charRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Online karakter bulunamadı' });
+      }
+      const newSilver = charRes.rows[0].silver + price;
+
+      await query('DELETE FROM online_inventory WHERE id = $1', [inventoryItemId]);
+      await query(
+        'UPDATE online_characters SET silver = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [newSilver, req.userId]
+      );
+
+      res.json({
+        success: true,
+        data: { itemName: item.name, price, silver: newSilver },
+        message: `${item.name} ${price} gümüşe satıldı.`,
+      });
+    } catch (err) {
+      console.error('Online sellItem error:', err.message);
       res.status(500).json({ success: false, message: 'Hata olustu' });
     }
   }

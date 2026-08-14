@@ -150,6 +150,20 @@ const POTION_NAME := "Küçük Can İksiri"
 const XP_BASE := 50
 const XP_PER_LEVEL := 30
 
+# Faz F11 — item satışı. Bu sabitler SADECE fiyat ÖNİZLEMESİ için (online_hub.gd
+# → ENCHANT_SILVER_COST'un aynı deseni) — gerçek fiyat her zaman sunucuda
+# hesaplanır (backend/src/controllers/online.controller.js → computeSellPrice),
+# istemci hiçbir zaman kendi fiyatını "gerçek" saymaz.
+const SELL_PRICE_BY_RARITY := {"common": 15, "rare": 40, "epic": 100, "legendary": 250}
+const SELL_ENCHANT_BONUS_PER_LEVEL := 0.2
+const SLOT_NAMES := {"weapon": "Silah", "armor": "Zırh", "shield": "Kalkan", "consumable": "Tüketim"}
+const RARITY_COLORS := {
+	"common": Color(0.8, 0.8, 0.8, 1),
+	"rare": Color(0.4, 0.65, 1.0, 1),
+	"epic": Color(0.75, 0.4, 0.95, 1),
+	"legendary": Color(1.0, 0.65, 0.15, 1),
+}
+
 @onready var village_ground: TileMapLayer = $VillageGround
 @onready var tier2_ground: TileMapLayer = $Tier2Ground
 @onready var tier3_ground: TileMapLayer = $Tier3Ground
@@ -165,6 +179,9 @@ const XP_PER_LEVEL := 30
 @onready var ability_labels: Array[Label] = [$UI/Ability1Label, $UI/Ability2Label, $UI/Ability3Label, $UI/Ability4Label]
 @onready var exp_bar: ProgressBar = $UI/ExpBar
 @onready var exp_label: Label = $UI/ExpBar/ExpLabel
+@onready var inventory_panel: Panel = $UI/InventoryPanel
+@onready var inventory_close_button: Button = $UI/InventoryPanel/VBox/TitleRow/InvCloseButton
+@onready var inventory_items_box: VBoxContainer = $UI/InventoryPanel/VBox/InvScrollContainer/InvItems
 @onready var camera: Camera2D = $Camera2D
 
 var _local_player_id: int = -1
@@ -174,6 +191,8 @@ var _potion_count: int = 0
 var _character_level: int = 1
 var _character_xp: int = 0
 var _ability_ready_at: Array[float] = [0.0, 0.0, 0.0, 0.0]
+var _inventory: Array = []
+var _equipped: Dictionary = {}
 
 func _server_host() -> String:
 	var override := OS.get_environment("FARM_SERVER_HOST")
@@ -195,6 +214,8 @@ func _resolve_jwt() -> String:
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player
 	leave_button.pressed.connect(leave_map)
+	inventory_close_button.pressed.connect(_close_inventory)
+	BackendBridge.online_sell_result.connect(_on_sell_result)
 	_paint_village_ground()
 	_paint_tier2_ground()
 	_paint_tier3_ground()
@@ -511,12 +532,16 @@ func _on_inventory_fetched(success: bool, data: Dictionary, _message: String) ->
 	if not success:
 		return
 	var items: Array = data.get("items", [])
+	_inventory = items
+	_equipped = data.get("equipped", {})
 	var count := 0
 	for item in items:
 		if str(item.get("item_def_id", "")) == "minor_health_potion":
 			count += 1
 	_potion_count = count
 	_update_potion_label()
+	if inventory_panel.visible:
+		_refresh_inventory_panel()
 
 # reward_notification'ın metni her zaman "... Seviye %d, ..." içeriyor
 # (bkz. godot-server/scripts/main.gd → _on_reward_response) — yeni bir
@@ -723,5 +748,87 @@ func leave_map() -> void:
 	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		leave_map()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE:
+			leave_map()
+		elif event.keycode == KEY_I:
+			_toggle_inventory()
+
+# Faz F11 — envanter paneli. Görüntüleme + satış, kuşanma/güçlendirme
+# HALA sadece hub'da (online_hub.gd) — burada kasıtlı olarak eklenmedi,
+# kullanıcı sadece "görebileceğimiz bir inventory + satış" istedi.
+func _toggle_inventory() -> void:
+	if inventory_panel.visible:
+		_close_inventory()
+	else:
+		_open_inventory()
+
+func _open_inventory() -> void:
+	inventory_panel.visible = true
+	BackendBridge.get_online_inventory()
+	_refresh_inventory_panel()
+
+func _close_inventory() -> void:
+	inventory_panel.visible = false
+
+func _compute_sell_price(rarity: String, enchant_level: int) -> int:
+	var base: int = SELL_PRICE_BY_RARITY.get(rarity, SELL_PRICE_BY_RARITY["common"])
+	return int(round(base * (1.0 + enchant_level * SELL_ENCHANT_BONUS_PER_LEVEL)))
+
+func _refresh_inventory_panel() -> void:
+	for child in inventory_items_box.get_children():
+		child.queue_free()
+	if _inventory.is_empty():
+		var empty_label := Label.new()
+		empty_label.text = "Envanterin boş."
+		inventory_items_box.add_child(empty_label)
+		return
+	for item in _inventory:
+		_add_inventory_row(item)
+
+func _add_inventory_row(item: Dictionary) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+
+	var enchant_level: int = int(item.get("enchant_level", 0))
+	var rarity: String = str(item.get("rarity", "common"))
+	var slot: String = str(item.get("slot", ""))
+	var level_suffix := " +%d" % enchant_level if enchant_level > 0 else ""
+
+	var label := Label.new()
+	var stats_parts: Array = []
+	var effective_stats: Dictionary = item.get("effective_stats", item.get("base_stats", {}))
+	for stat_key in effective_stats.keys():
+		stats_parts.append("%s +%s" % [stat_key, str(effective_stats[stat_key])])
+	label.text = "%s%s (%s)\n%s" % [item["name"], level_suffix, SLOT_NAMES.get(slot, slot), ", ".join(stats_parts)]
+	label.add_theme_color_override("font_color", RARITY_COLORS.get(rarity, Color.WHITE))
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	row.add_child(label)
+
+	var inventory_item_id: int = int(item["id"])
+	var is_equipped: bool = int(_equipped.get(slot, -1)) == inventory_item_id
+
+	var sell_btn := Button.new()
+	sell_btn.custom_minimum_size = Vector2(150, 48)
+	if is_equipped:
+		sell_btn.text = "Kuşanılı"
+		sell_btn.disabled = true
+	else:
+		sell_btn.text = "Sat (%d gümüş)" % _compute_sell_price(rarity, enchant_level)
+		sell_btn.pressed.connect(_on_sell_pressed.bind(inventory_item_id))
+	row.add_child(sell_btn)
+
+	inventory_items_box.add_child(row)
+
+func _on_sell_pressed(inventory_item_id: int) -> void:
+	Audio.play("ui_click")
+	BackendBridge.sell_online_item(inventory_item_id)
+
+func _on_sell_result(success: bool, data: Dictionary, message: String) -> void:
+	if not success:
+		_show_toast(message)
+		return
+	_show_toast(message)
+	Audio.play("ui_click")
+	BackendBridge.get_online_inventory()
