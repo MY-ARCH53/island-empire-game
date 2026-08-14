@@ -368,12 +368,55 @@ edildi. Hasar/heal sayıları formülle birebir eşleşti (ör. kilic_ustasi
 -39 = 30×1.3, avcı -26 = 20×1.3, koylu zırhıyla hasar 11.7→1.0). Zırhlı/
 zırhsız karşılaştırmalı test armor_bonus'un doğru uygulandığını kanıtladı.
 
+**Deploy**: Farm Derinliği (Faz A-D) 2026-08-13'te prod VPS'e deploy
+edildi (bkz. `project_pending_work` hafıza notu) — bu bölümdeki "henüz
+deploy edilmedi" notu artık geçersiz.
+
+## Sınıf Yetenekleri Genişlemesi (Faz E) — her sınıfa 4 ayrı yetenek (2026-08-14)
+
+Kullanıcı Faz D'nin modelini netleştirdi: "her 10 seviyede TEK yeteneğin
+güçlenmesini" değil, **her 10 seviyede yeni, bağımsız bir yetenek**
+istiyordu. Büyük işi seçti (bkz. `plans/humble-chasing-galaxy.md`):
+her sınıf artık 4 ayrı aktif yetenek kazanıyor (Lv10/20/30/40), her biri
+kendi tuşuna (R/T/Y/U) ve kendi cooldown'una sahip, üst kademe alt
+kademeyi DEĞİŞTİRMİYOR, EKLİYOR.
+
+- **Faz E1 — altyapı restructure** (commit c3407ab): `ABILITIES`
+  `{class_id: config}` → `{class_id: [4 config]}` (dizi, index=slot=tier).
+  `request_use_ability()` artık `slot_index: int` parametresi alıyor,
+  `_last_ability_time` tek float yerine slot bazlı `Dictionary`
+  (bağımsız cooldown'lar). HUD tek `AbilityLabel` yerine 4 satır
+  (`Ability1Label`..`Ability4Label`). Bu fazda YENİ yetenek YOK —
+  saf restructure, regresyon testiyle mevcut 6 T1 yeteneğin davranışı
+  BİREBİR AYNI kaldığı doğrulandı.
+- **Faz E2 — T2 yetenekleri (Lv20)** (commit b13b930): 6 sınıfın 2.
+  yeteneği eklendi — köylü "Toparlanma" (self-heal +35), büyücü "Alev
+  Zinciri" (40 hasar + %60 zincir), kılıç ustası "Kan Öfkesi" (+18
+  geçici hasar bonusu), fırtına rahibesi "Kutsal Kalkan" (kendi+parti
+  +15 zırh), vebalı "Veba Gücü" (+15 geçici hasar bonusu), fırtına
+  avcısı "Çift Şimşek" (ışınlanma + 25 hasar + %50 zincir). Yeni genel
+  yapı taşı: `_ability_damage_bonus` (peer_id → {amount, expires_at}),
+  `_ability_armor_bonus`'un birebir aynısı, `request_attack`'a entegre
+  edildi.
+  **Doğrulama**: 6 sınıfın hepsi gerçek istemci+sunucu testiyle
+  doğrulandı — kilic_ustasi -30 = 12(taban)+18(bonus), vebali -27 =
+  12+15, buyucu -40 (Alev Zinciri birincil hedef), köylü +35.0 tam
+  self-heal, fırtına rahibesi'nde zırh sonrası gelen hasar MIN_DAMAGE
+  tavanına (1.0) düştüğü gözlendi, fırtına avcısında pozisyon
+  (525,0)→(438,39) ışınlanmayı kanıtladı. Zincir hasarının ikincil
+  hedefi bazı testlerde menzil içinde ikinci düşman olmadığından
+  görsel doğrulanamadı — kod, Faz D2'de zaten kanıtlanmış zincir
+  desenin birebir aynısı olduğundan güvenilir kabul edildi.
+- **Faz E3/E4 (T3/T4, Lv30/Lv40)**: henüz uygulanmadı, sırada (bkz.
+  `plans/humble-chasing-galaxy.md`).
+
 ## Sıradaki adım
 
 Plan'ın 6 fazı, prod deploy'u, bölgeli farm haritası VE Farm Derinliği
-genişlemesi tamamlandı. Farm Derinliği henüz VPS'e deploy edilmedi —
-deploy edilirken standart akışa ek olarak `item_defs_slot_check`
-constraint'inin prod Postgres'te de güncellenmesi gerekiyor (bkz.
-`backend/scripts/seed_online_items.sql`). Bilinen tek sınırlama:
-bağlantı hâlâ `ws://` (TLS'siz) — web export/tarayıcı desteği
-istenirse `wss://` + sertifika ayrı bir iş olarak gerekecek.
+genişlemesi tamamlanıp deploy edildi. Şu an Sınıf Yetenekleri
+Genişlemesi (Faz E) üzerinde çalışılıyor — E1/E2 commit edildi, henüz
+deploy edilmedi (E3/E4 bitince tek seferde deploy edilecek, kullanıcı
+onayı istenecek). Bu genişleme tamamen Godot-side, DB/backend
+değişikliği gerektirmiyor. Bilinen tek sınırlama: bağlantı hâlâ `ws://`
+(TLS'siz) — web export/tarayıcı desteği istenirse `wss://` + sertifika
+ayrı bir iş olarak gerekecek.
